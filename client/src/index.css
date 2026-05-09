@@ -1,0 +1,606 @@
+/* ============================================================================
+   COOLMAN REFRIGERATION — MASTER GLOBAL STYLESHEET
+   src/index.css
+   
+   This file is the single source of truth for shared UI across ALL pages.
+   Individual page CSS files should only contain page-specific styles
+   (tables, cards, grids etc.) — never redefine anything listed here.
+   ============================================================================ */
+
+/* ── Reset ──────────────────────────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────── */
+body {
+  font-family:
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  background: #f4f6f9;
+  color: #1a1a2e;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Design tokens ──────────────────────────────────────────────────────── */
+:root {
+  --blue: #1976d2;
+  --blue-dark: #1565c0;
+  --blue-light: #e3f2fd;
+  --green: #2e7d32;
+  --green-dark: #1b5e20;
+  --red: #c62828;
+  --red-light: #ffebee;
+  --bg: #f4f6f9;
+  --white: #ffffff;
+  --border: #e0e0e0;
+  --border-soft: #f0f0f0;
+  --text: #1a1a2e;
+  --text-muted: #888;
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.2);
+  --radius: 8px;
+  --radius-lg: 14px;
+
+  /* Spacing — all pages use these values */
+  --header-padding: 12px 24px;
+  --page-padding: 28px 24px;
+}
+
+/* ============================================================================
+   HEADER  — used by every page
+   Class names: .portal-header  OR  .tasks-header / .fu-header / .meetings-header
+   ============================================================================ */
+
+.portal-header,
+.tasks-header,
+.fu-header,
+.meetings-header,
+.documents-header,
+.stores-header {
+  background: var(--white) !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: var(--header-padding) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+  box-shadow: var(--shadow-sm) !important;
+  /* Remove any old box-shadow overrides */
+}
+
+/* Header left: logo + title */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.company-logo {
+  height: 40px !important;
+  width: 40px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+}
+
+/* Header title */
+.header-title,
+.portal-title {
+  font-size: 1.3rem !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  margin: 0 !important;
+  cursor: pointer;
+}
+
+.brand-cool {
+  color: var(--blue) !important;
+  font-weight: 700 !important;
+}
+.brand-man {
+  color: #333 !important;
+}
+
+/* Header right: user info */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-icon {
+  font-size: 1.2rem;
+}
+
+.username {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+/* Year badge (Worklist) */
+.year-badge {
+  background: var(--blue);
+  color: var(--white);
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+/* ============================================================================
+   MAIN CONTENT AREA — used by every page
+   ============================================================================ */
+
+.main-content,
+.main-content-full,
+.tasks-main-content,
+.fu-main,
+.meetings-main,
+.documents-main-content,
+.stores-main-content,
+.project-main-content,
+.purchasing-main {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: var(--page-padding) !important;
+}
+
+/* ============================================================================
+   PAGE TITLE ROW
+   ============================================================================ */
+
+.page-header,
+.page-header-row,
+.page-title-row,
+.project-header-row {
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: space-between !important;
+  margin-bottom: 20px !important;
+  flex-wrap: wrap !important;
+  gap: 12px !important;
+}
+
+.page-header h2,
+.page-header-row h2,
+.page-title-row h2,
+.page-title {
+  font-size: 1.6rem !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  margin: 0 !important;
+}
+
+.page-subtitle,
+.page-sub {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+  margin-top: 2px;
+}
+
+.header-actions,
+.title-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* ============================================================================
+   BUTTONS
+   ============================================================================ */
+
+/* Back button */
+.btn-back {
+  padding: 8px 18px !important;
+  background: var(--white) !important;
+  border: 1px solid #d0d0d0 !important;
+  border-radius: var(--radius) !important;
+  cursor: pointer !important;
+  font-size: 0.88rem !important;
+  color: #444 !important;
+  font-family: inherit !important;
+  font-weight: 500 !important;
+  transition: all 0.2s !important;
+  /* Remove any purple/gradient overrides */
+  background-image: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+.btn-back:hover {
+  background: #f0f0f0 !important;
+  border-color: #aaa !important;
+  color: #444 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Primary add button (green) */
+.btn-add,
+.btn-add-task,
+.btn-add-year,
+.btn-add-customer,
+.btn-add-project,
+.btn-add-item,
+.btn-add-file,
+.btn-add-meeting {
+  padding: 8px 18px !important;
+  background: var(--green) !important;
+  color: var(--white) !important;
+  border: none !important;
+  border-radius: var(--radius) !important;
+  cursor: pointer !important;
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  font-family: inherit !important;
+  transition: background 0.2s !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+.btn-add:hover,
+.btn-add-task:hover,
+.btn-add-year:hover,
+.btn-add-customer:hover,
+.btn-add-project:hover,
+.btn-add-item:hover,
+.btn-add-file:hover,
+.btn-add-meeting:hover {
+  background: var(--green-dark) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Modal cancel button */
+.btn-cancel {
+  padding: 9px 20px !important;
+  background: var(--white) !important;
+  border: 1px solid #ddd !important;
+  border-radius: var(--radius) !important;
+  cursor: pointer !important;
+  font-size: 0.88rem !important;
+  color: #555 !important;
+  font-family: inherit !important;
+  transition: all 0.2s !important;
+  background-image: none !important;
+}
+.btn-cancel:hover {
+  background: #f5f5f5 !important;
+}
+
+/* Modal save/confirm button */
+.btn-save,
+.btn-save-project {
+  padding: 9px 22px !important;
+  background: var(--blue) !important;
+  color: var(--white) !important;
+  border: none !important;
+  border-radius: var(--radius) !important;
+  cursor: pointer !important;
+  font-size: 0.88rem !important;
+  font-weight: 600 !important;
+  font-family: inherit !important;
+  transition: background 0.2s !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+.btn-save:hover,
+.btn-save-project:hover {
+  background: var(--blue-dark) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* ============================================================================
+   SEARCH INPUT
+   ============================================================================ */
+
+.search-input {
+  padding: 10px 16px !important;
+  border: 1px solid #ddd !important;
+  border-radius: var(--radius) !important;
+  font-size: 0.9rem !important;
+  outline: none !important;
+  background: var(--white) !important;
+  font-family: inherit !important;
+  transition: border-color 0.2s !important;
+}
+.search-input:focus {
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1) !important;
+}
+
+/* ============================================================================
+   FORM ELEMENTS
+   ============================================================================ */
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 0;
+}
+
+.form-group.full,
+.form-group.full-width {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  font-size: 0.8rem !important;
+  font-weight: 600 !important;
+  color: #555 !important;
+  display: block;
+  margin-bottom: 0;
+}
+
+.form-input,
+.form-group input,
+.form-group textarea,
+.form-group select {
+  padding: 9px 12px !important;
+  border: 1px solid #ddd !important;
+  border-radius: 7px !important;
+  font-size: 0.9rem !important;
+  outline: none !important;
+  font-family: inherit !important;
+  transition: border-color 0.2s !important;
+  width: 100% !important;
+  background: var(--white);
+}
+.form-input:focus,
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1) !important;
+}
+
+/* ============================================================================
+   MODALS
+   ============================================================================ */
+
+.modal-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  z-index: 1000 !important;
+  padding: 20px !important;
+}
+
+.modal-content,
+.modal-content-large,
+.modal-box {
+  background: var(--white) !important;
+  border-radius: var(--radius-lg) !important;
+  width: 100% !important;
+  max-width: 700px !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.modal-content-simple,
+.modal-sm {
+  background: var(--white) !important;
+  border-radius: var(--radius-lg) !important;
+  width: 100% !important;
+  max-width: 420px !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+
+.modal-header {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  padding: 20px 24px 16px !important;
+  border-bottom: 1px solid #eee !important;
+}
+
+.modal-header h2 {
+  font-size: 1.1rem !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  margin: 0 !important;
+}
+
+.modal-body {
+  padding: 20px 24px !important;
+}
+
+.modal-footer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 10px !important;
+  padding: 16px 24px !important;
+  border-top: 1px solid #eee !important;
+  flex-wrap: wrap !important;
+}
+
+.close-button,
+.close-btn {
+  background: none !important;
+  border: none !important;
+  font-size: 1.5rem !important;
+  cursor: pointer !important;
+  color: #888 !important;
+  line-height: 1 !important;
+  padding: 0 4px !important;
+  transition: color 0.2s !important;
+}
+.close-button:hover,
+.close-btn:hover {
+  color: #333 !important;
+}
+
+/* ============================================================================
+   BADGES & PILLS
+   ============================================================================ */
+
+.no-badge,
+.task-no-badge {
+  display: inline-block;
+  background: var(--blue-light);
+  color: #1565c0;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   EMPTY STATE
+   ============================================================================ */
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #aaa;
+}
+
+.empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.empty-state h3 {
+  font-size: 1.2rem;
+  color: #666;
+  margin-bottom: 8px;
+}
+.empty-state p {
+  font-size: 0.95rem;
+}
+
+/* ============================================================================
+   TABLE SHARED STYLES
+   ============================================================================ */
+
+.stores-table thead,
+.fu-table thead,
+.users-table thead,
+.meetings-table thead,
+.attachments-table thead {
+  background: #f8f9fa;
+}
+
+.stores-table th,
+.fu-table th,
+.users-table th,
+.meetings-table th,
+.attachments-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 700;
+  color: #888;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   CARD SHARED STYLES (portal cards, year cards, customer cards)
+   ============================================================================ */
+
+.portal-card,
+.year-card,
+.customer-card,
+.project-card,
+.operation-card {
+  background: var(--white);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.25s ease !important;
+}
+
+.portal-card:hover,
+.year-card:hover,
+.customer-card:hover,
+.project-card:hover,
+.operation-card:hover {
+  border-color: var(--blue) !important;
+  transform: translateY(-4px) !important;
+  box-shadow: 0 8px 24px rgba(25, 118, 210, 0.15) !important;
+}
+
+/* Remove purple gradient top bar on hover */
+.portal-card::before,
+.project-card::before {
+  display: none !important;
+}
+
+/* ============================================================================
+   RESPONSIVE
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  :root {
+    --page-padding: 16px 14px;
+    --header-padding: 10px 16px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-group.full,
+  .form-group.full-width {
+    grid-column: 1;
+  }
+
+  .page-header h2,
+  .page-title {
+    font-size: 1.3rem !important;
+  }
+
+  .header-title,
+  .portal-title {
+    font-size: 1.1rem !important;
+  }
+
+  .operations-grid,
+  .portals-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .operations-grid,
+  .portals-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

@@ -1,0 +1,366 @@
+/* ============================================
+   Compressor Service Dashboard
+   Save as: client/src/pages/customers/CompressorServiceDashboard.css
+   ============================================ */
+
+/* ── Inline form panel ──────────────────────────────────────────────────── */
+.inline-form-panel {
+  background: #f8f9fa;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.inline-form-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 14px;
+}
+
+.inline-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.inline-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #e8e8e8;
+}
+
+/* ── Auto-fill banner ───────────────────────────────────────────────────── */
+.auto-fill-banner {
+  background: #e3f2fd;
+  border: 1px solid #c5d8fc;
+  border-radius: 7px;
+  padding: 10px 14px;
+  font-size: 0.87rem;
+  color: #1a1a2e;
+}
+.auto-fill-banner span {
+  color: #888;
+  font-size: 0.8rem;
+  margin-left: 6px;
+}
+
+/* ── No password warning ────────────────────────────────────────────────── */
+.no-pwd-warning {
+  background: #fff8e1;
+  border: 1px solid #ffcc80;
+  border-radius: 8px;
+  padding: 12px 18px;
+  font-size: 0.88rem;
+  color: #e65100;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-set-pwd-inline {
+  padding: 5px 14px;
+  background: #e65100;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.btn-set-pwd-inline:hover {
+  background: #bf360c;
+}
+
+/* ── Master password button in header ──────────────────────────────────── */
+.btn-master-pwd {
+  padding: 6px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: 1px solid;
+  transition: all 0.2s;
+}
+.btn-master-pwd.pwd-set {
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-color: #a5d6a7;
+}
+.btn-master-pwd.pwd-set:hover {
+  background: #c8e6c9;
+}
+.btn-master-pwd.pwd-unset {
+  background: #fff3e0;
+  color: #e65100;
+  border-color: #ffcc80;
+}
+.btn-master-pwd.pwd-unset:hover {
+  background: #ffe0b2;
+}
+
+/* ── Attachment modal ───────────────────────────────────────────────────── */
+.att-modal {
+  background: #fff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 460px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px 14px;
+  border-bottom: 1px solid #eee;
+}
+.modal-header h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #888;
+  line-height: 1;
+  padding: 0 4px;
+}
+.close-btn:hover {
+  color: #333;
+}
+
+.modal-body {
+  padding: 20px 24px;
+}
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 24px;
+  border-top: 1px solid #eee;
+}
+.footer-right {
+  display: flex;
+  gap: 10px;
+}
+
+/* ── Upload drop zone ───────────────────────────────────────────────────── */
+.upload-drop-zone {
+  border: 2px dashed #c5d8fc;
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  cursor: pointer;
+  background: #fafbff;
+  transition: all 0.2s;
+  margin-bottom: 14px;
+}
+.upload-drop-zone:hover {
+  border-color: #1976d2;
+  background: #e8f0fe;
+}
+
+.upload-icon {
+  font-size: 2rem;
+  display: block;
+  margin-bottom: 6px;
+}
+.upload-drop-zone p {
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 4px;
+}
+.upload-hint {
+  font-size: 0.75rem;
+  color: #aaa;
+}
+
+.upload-file-selected {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.upload-file-icon {
+  font-size: 1.8rem;
+}
+.upload-file-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  word-break: break-all;
+}
+.upload-file-size {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+/* ── Password info box ──────────────────────────────────────────────────── */
+.pwd-info-box {
+  background: #fff8e1;
+  border: 1px solid #ffcc80;
+  border-radius: 7px;
+  padding: 10px 12px;
+  font-size: 0.82rem;
+  color: #6d4c00;
+  line-height: 1.5;
+}
+
+/* ── Password input with toggle ─────────────────────────────────────────── */
+.pwd-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.pwd-input-wrap .form-input {
+  padding-right: 40px;
+}
+.pwd-toggle {
+  position: absolute;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  padding: 0;
+  line-height: 1;
+}
+
+/* ── Download file info ─────────────────────────────────────────────────── */
+.download-file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8f9fa;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 4px;
+}
+.download-file-icon {
+  font-size: 2rem;
+}
+.download-file-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  word-break: break-all;
+}
+.download-file-meta {
+  font-size: 0.75rem;
+  color: #888;
+  margin-top: 2px;
+}
+
+/* ── Error ──────────────────────────────────────────────────────────────── */
+.input-error {
+  border-color: #e53935 !important;
+}
+.error-text {
+  font-size: 0.78rem;
+  color: #c62828;
+  margin-top: 4px;
+  display: block;
+}
+
+/* ── Attachments cell in table ──────────────────────────────────────────── */
+.attachments-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 130px;
+}
+
+.att-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #e8f0fe;
+  border: 1px solid #c5d8fc;
+  border-radius: 5px;
+  padding: 3px 6px;
+}
+
+.att-name-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: #1565c0;
+  text-align: left;
+  padding: 0;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+.att-name-btn:hover {
+  text-decoration: underline;
+}
+
+.att-delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #c62828;
+  font-size: 0.8rem;
+  padding: 0 2px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.att-delete-btn:hover {
+  color: #b71c1c;
+}
+
+.att-add-btn {
+  background: none;
+  border: 1px dashed #aaa;
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 0.75rem;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+}
+.att-add-btn:hover {
+  border-color: #1976d2;
+  color: #1976d2;
+  background: #e8f0fe;
+}
+
+/* ── Empty table cell ───────────────────────────────────────────────────── */
+.empty-td {
+  text-align: center;
+  color: #999;
+  padding: 40px 20px !important;
+  font-size: 0.9rem;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .inline-form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 600px) {
+  .inline-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

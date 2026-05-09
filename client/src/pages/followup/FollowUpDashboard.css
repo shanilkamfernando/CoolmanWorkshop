@@ -1,0 +1,595 @@
+/* ============================================
+   Follow Up Dashboard
+   Save as: client/src/pages/followup/FollowUpDashboard.css
+   ============================================ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.followup-dashboard {
+  min-height: 100vh;
+  background: #f4f6f9;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.fu-header {
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.company-logo {
+  height: 40px;
+  width: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.header-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+.brand-cool {
+  color: #1976d2;
+}
+.brand-man {
+  color: #333;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-icon {
+  font-size: 1.2rem;
+}
+.username {
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+/* ── Main ───────────────────────────────────────────────────────────────── */
+.fu-main {
+  max-width: 100%;
+  padding: 28px 20px;
+}
+
+/* ── Page Header ────────────────────────────────────────────────────────── */
+.page-title-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.page-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+.page-sub {
+  color: #888;
+  font-size: 0.88rem;
+  margin-top: 2px;
+}
+
+.title-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.btn-back {
+  padding: 8px 18px;
+  background: #fff;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: #444;
+  transition: all 0.2s;
+}
+.btn-back:hover {
+  background: #f0f0f0;
+  border-color: #aaa;
+}
+
+.btn-add {
+  padding: 8px 18px;
+  background: #2e7d32;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.btn-add:hover {
+  background: #1b5e20;
+}
+
+/* ── Search ─────────────────────────────────────────────────────────────── */
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.search-input {
+  flex: 1;
+  max-width: 460px;
+  padding: 10px 16px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+  background: #fff;
+}
+.search-input:focus {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+.record-count {
+  font-size: 0.82rem;
+  color: #888;
+  white-space: nowrap;
+}
+
+/* ── Table container ────────────────────────────────────────────────────── */
+.fu-table-wrapper {
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #e8e8e8;
+  overflow-x: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.fu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.83rem;
+  min-width: 1400px;
+}
+
+/* ── Table head ─────────────────────────────────────────────────────────── */
+.fu-table thead tr:first-child th {
+  background: #f8f9fa;
+  color: #888;
+  padding: 10px 12px;
+  font-weight: 700;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid #e8e8e8;
+  border-right: 1px solid #e8e8e8;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.fu-table thead tr:last-child th {
+  background: #f8f9fa;
+  color: #aaa;
+  padding: 6px 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+  border-bottom: 1px solid #e8e8e8;
+  border-right: 1px solid #efefef;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.th-contact-group {
+  text-align: center !important;
+  border-left: 2px solid #e3f2fd !important;
+  color: #1976d2 !important;
+}
+
+.th-sub {
+  min-width: 90px;
+}
+.th-no {
+  width: 90px;
+}
+.th-progress {
+  width: 140px;
+}
+.th-actions {
+  width: 60px;
+  text-align: center !important;
+}
+
+/* ── Table body ─────────────────────────────────────────────────────────── */
+.fu-table tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.15s;
+}
+.fu-table tbody tr:hover {
+  background: #f5f8ff;
+}
+.fu-table tbody tr.row-complete {
+  background: #f1f8f1;
+}
+.fu-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.fu-table td {
+  padding: 10px 12px;
+  vertical-align: middle;
+  border-right: 1px solid #f0f0f0;
+  color: #333;
+  font-size: 0.85rem;
+}
+
+/* contact group left border to visually separate groups */
+.fu-table td:nth-child(7),
+.fu-table td:nth-child(9),
+.fu-table td:nth-child(11),
+.fu-table td:nth-child(13),
+.fu-table td:nth-child(15) {
+  border-left: 2px solid #e3f2fd;
+}
+
+/* ── No badge ───────────────────────────────────────────────────────────── */
+.td-no {
+  text-align: center;
+}
+
+.no-badge {
+  display: inline-block;
+  background: #e8f0fe;
+  color: #1565c0;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ── Progress ───────────────────────────────────────────────────────────── */
+.td-progress {
+  text-align: center;
+  min-width: 140px;
+}
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.progress-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #555;
+  white-space: nowrap;
+}
+
+.btn-log-contact {
+  display: block;
+  width: 100%;
+  padding: 5px 0;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border: 1px solid #a5d6a7;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+.btn-log-contact:hover {
+  background: #2e7d32;
+  color: #fff;
+  border-color: #2e7d32;
+}
+
+/* ── Contact cells ──────────────────────────────────────────────────────── */
+.td-contact {
+  min-width: 90px;
+  max-width: 140px;
+  vertical-align: middle;
+}
+.td-update {
+  min-width: 120px;
+  max-width: 160px;
+  vertical-align: middle;
+}
+
+.empty-contact {
+  color: #ccc;
+  font-size: 0.8rem;
+}
+
+.logged-by {
+  display: block;
+  font-size: 0.68rem;
+  color: #aaa;
+  margin-top: 3px;
+  font-style: italic;
+}
+
+/* ── Inline editing (admin) ─────────────────────────────────────────────── */
+.editable-cell {
+  cursor: pointer;
+  display: block;
+  min-height: 20px;
+  border-radius: 4px;
+  padding: 2px 4px;
+  transition: background 0.15s;
+}
+.editable-cell:hover {
+  background: #e8f0fe;
+}
+
+.placeholder {
+  color: #ccc;
+}
+
+.inline-edit {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1.5px solid #1976d2;
+  border-radius: 5px;
+  font-size: 0.83rem;
+  font-family: inherit;
+  outline: none;
+  background: #fff;
+  resize: vertical;
+}
+
+/* ── Actions ────────────────────────────────────────────────────────────── */
+.td-actions {
+  text-align: center;
+}
+
+.btn-delete-small {
+  background: none;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 5px;
+  transition: background 0.15s;
+}
+.btn-delete-small:hover {
+  background: #ffebee;
+}
+
+/* ── Empty state ────────────────────────────────────────────────────────── */
+.empty-row {
+  padding: 0 !important;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #aaa;
+}
+.empty-icon {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+  display: block;
+}
+.empty-state p {
+  font-size: 0.95rem;
+}
+
+/* ── Modals ─────────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-box {
+  background: #fff;
+  border-radius: 14px;
+  width: 100%;
+  max-width: 580px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.modal-sm {
+  max-width: 420px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #eee;
+}
+.modal-header h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1a1a2e;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #888;
+  line-height: 1;
+  padding: 0 4px;
+}
+.close-btn:hover {
+  color: #333;
+}
+
+.modal-body {
+  padding: 20px 24px;
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-top: 1px solid #eee;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.footer-right {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* ── Contact modal extras ───────────────────────────────────────────────── */
+.contact-info-banner {
+  background: #e8f0fe;
+  border: 1px solid #c5d8fc;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 0.9rem;
+  color: #1a1a2e;
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+
+.contact-attempt-no {
+  font-size: 0.78rem;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.lock-notice {
+  font-size: 0.78rem;
+  color: #e65100;
+  background: #fff3e0;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid #ffcc80;
+}
+
+/* ── Form ───────────────────────────────────────────────────────────────── */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.form-group.full {
+  grid-column: 1 / -1;
+}
+
+.form-group label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #555;
+}
+
+.req {
+  color: red;
+}
+
+.form-input {
+  padding: 9px 12px;
+  border: 1px solid #ddd;
+  border-radius: 7px;
+  font-size: 0.9rem;
+  outline: none;
+  font-family: inherit;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+.form-input:focus {
+  border-color: #1976d2;
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.1);
+}
+
+.btn-cancel {
+  padding: 9px 20px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  color: #555;
+  transition: all 0.2s;
+}
+.btn-cancel:hover {
+  background: #f5f5f5;
+}
+
+.btn-save {
+  padding: 9px 22px;
+  background: #1976d2;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+.btn-save:hover {
+  background: #1565c0;
+}
+
+.delete-warn {
+  color: #f44336;
+  margin-top: 10px;
+  font-size: 0.88rem;
+}

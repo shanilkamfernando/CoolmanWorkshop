@@ -1,0 +1,29 @@
+import { Pool } from "pg";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const pool = new Pool({
+  user: process.env.DB_USER || "postgres",
+  host: process.env.DB_HOST || "localhost",
+  database: process.env.DB_NAME || "coolman_workshop",
+  password: process.env.DB_PASSWORD || "admin123",
+  port: parseInt(process.env.DB_PORT || "5432"),
+});
+
+// Test connection on startup
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error("❌ Error connecting to database:", err.message);
+  } else {
+    console.log("✅ Database connected successfully!");
+    release();
+  }
+});
+
+// Handle pool errors
+pool.on("error", (err) => {
+  console.error("❌ Unexpected database error:", err);
+});
+
+export default pool;
