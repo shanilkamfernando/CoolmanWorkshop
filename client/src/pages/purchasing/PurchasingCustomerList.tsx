@@ -51,7 +51,7 @@ const getColor = (name: string) => {
   return colors[Math.abs(h) % colors.length];
 };
 
-const PurchasingCustomerPortal = () => {
+const PurchasingCustomerList = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [customers, setCustomers] = useState<PurchasingCustomer[]>([]);
@@ -81,8 +81,7 @@ const PurchasingCustomerPortal = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        "http://localhost:5000/api/workshop/customers",
-        // "http://localhost:5000/api/purchasing/customers",
+        "http://localhost:5000/api/purchasing/customers",
         { headers: headers() },
       );
       setCustomers(res.data.customers || []);
@@ -101,7 +100,7 @@ const PurchasingCustomerPortal = () => {
     setSaving(true);
     try {
       await axios.post(
-        "http://localhost:5000/api/workshop/customers",
+        "http://localhost:5000/api/purchasing/customers",
         // "http://localhost:5000/api/purchasing/customers",
         {
           name: newName.trim(),
@@ -127,7 +126,7 @@ const PurchasingCustomerPortal = () => {
   const handleDelete = async (customer: PurchasingCustomer) => {
     try {
       await axios.delete(
-        `http://localhost:5000/api/workshop/customers/${customer.id}`,
+        `http://localhost:5000/api/purchasing/customers/${customer.id}`,
         // `http://localhost:5000/api/purchasing/customers/${customer.id}`,
         { headers: headers() },
       );
@@ -182,7 +181,7 @@ const PurchasingCustomerPortal = () => {
         {/* Page header */}
         <div className="project-header-row">
           <div>
-            <h2 style={{ margin: 0 }}>Workshop Customers</h2>
+            <h2 style={{ margin: 0 }}>Customers</h2>
             <p style={{ color: "#888", fontSize: "0.9rem", marginTop: "4px" }}>
               {filtered.length} customer{filtered.length !== 1 ? "s" : ""} ·
               Select a customer to view operations
@@ -194,7 +193,7 @@ const PurchasingCustomerPortal = () => {
             </button>
             <button
               className="btn-back"
-              onClick={() => navigate("/purchasing/workshop")}
+              onClick={() => navigate("/purchasing")}
             >
               ← Back
             </button>
@@ -394,12 +393,9 @@ const PurchasingCustomerPortal = () => {
                       "0 2px 6px rgba(0,0,0,0.05)";
                   }}
                   onClick={() =>
-                    navigate(
-                      `/purchasing/workshop/customers/${customer.id}/dashboard`,
-                      {
-                        state: { customer },
-                      },
-                    )
+                    navigate(`/purchasing/customers/${customer.id}/dashboard`, {
+                      state: { customer },
+                    })
                   }
                 >
                   {isAdmin && (
@@ -575,4 +571,4 @@ const PurchasingCustomerPortal = () => {
   );
 };
 
-export default PurchasingCustomerPortal;
+export default PurchasingCustomerList;

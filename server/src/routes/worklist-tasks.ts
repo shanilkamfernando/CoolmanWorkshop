@@ -1,5 +1,5 @@
 // ============================================
-// Worklist Tasks Routes - Redesigned
+// Worklist Tasks Routes
 // Save as: server/src/routes/worklist-tasks.ts
 // ============================================
 
@@ -13,16 +13,15 @@ interface AuthRequest extends Request {
   user?: {
     id: number;
     username: string;
-    role: "admin" | "user";
+    role: string;
     permissions: { portals: string[] };
   };
 }
 
 const getPool = (req: Request): Pool => req.app.locals.pool;
 
-// ─── GET dropdown data for the form ──────────────────────────────
+// ─── DROPDOWN DATA ────────────────────────────────────────────────
 
-// GET all customers (for dropdown)
 router.get(
   "/worklist/dropdown/customers",
   authenticateToken,
@@ -34,7 +33,6 @@ router.get(
       );
       res.json({ success: true, customers: result.rows });
     } catch (error) {
-      console.error("Get customers error:", error);
       res
         .status(500)
         .json({ success: false, error: "Failed to fetch customers" });
@@ -42,7 +40,6 @@ router.get(
   },
 );
 
-// GET projects for a customer
 router.get(
   "/worklist/dropdown/customers/:customerId/projects",
   authenticateToken,
@@ -56,7 +53,6 @@ router.get(
       );
       res.json({ success: true, projects: result.rows });
     } catch (error) {
-      console.error("Get projects error:", error);
       res
         .status(500)
         .json({ success: false, error: "Failed to fetch projects" });
@@ -64,7 +60,6 @@ router.get(
   },
 );
 
-// GET compressor service companies for a customer
 router.get(
   "/worklist/dropdown/customers/:customerId/compressor-service",
   authenticateToken,
@@ -83,7 +78,6 @@ router.get(
   },
 );
 
-// GET compressor repair companies for a customer
 router.get(
   "/worklist/dropdown/customers/:customerId/compressor-repair",
   authenticateToken,
@@ -102,7 +96,6 @@ router.get(
   },
 );
 
-// GET system repair records for a customer
 router.get(
   "/worklist/dropdown/customers/:customerId/system-repair",
   authenticateToken,
@@ -121,7 +114,6 @@ router.get(
   },
 );
 
-// GET system inspection records for a customer
 router.get(
   "/worklist/dropdown/customers/:customerId/system-inspection",
   authenticateToken,
@@ -140,7 +132,6 @@ router.get(
   },
 );
 
-// GET all active system users (for assigned member dropdown)
 router.get(
   "/worklist/dropdown/users",
   authenticateToken,
@@ -152,7 +143,6 @@ router.get(
       );
       res.json({ success: true, users: result.rows });
     } catch (error) {
-      console.error("Get users error:", error);
       res.status(500).json({ success: false, error: "Failed to fetch users" });
     }
   },
@@ -169,20 +159,17 @@ router.get(
     const pool = getPool(req);
     try {
       const result = await pool.query(
-        `SELECT * FROM worklist_tasks_v2 
-         WHERE year = $1 
-         ORDER BY task_no ASC`,
+        `SELECT * FROM worklist_tasks_v2 WHERE year = $1 ORDER BY task_no ASC`,
         [year],
       );
       res.json({ success: true, tasks: result.rows });
     } catch (error) {
-      console.error("Get worklist tasks error:", error);
       res.status(500).json({ success: false, error: "Failed to fetch tasks" });
     }
   },
 );
 
-// POST create new task (all users)
+// POST create new task — syncs to project_assigned_members if job_type = "project"
 router.post(
   "/jobAssigned/tasks",
   authenticateToken,
@@ -212,17 +199,17 @@ router.post(
         "SELECT COALESCE(MAX(task_no), 0) as max_no FROM worklist_tasks_v2 WHERE year = $1",
         [year],
       );
-      const nextNo = maxNoResult.rows[0].max_no + 1;
+      const nextTaskNo = maxNoResult.rows[0].max_no + 1;
 
       const result = await pool.query(
         `INSERT INTO worklist_tasks_v2
-          (year, task_no, customer_id, customer_name, job_type, job_reference_id,
-           job_reference_name, assigned_member, job_description, due_date, status, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-         RETURNING *`,
+        (year, task_no, customer_id, customer_name, job_type, job_reference_id,
+         job_reference_name, assigned_member, job_description, due_date, status, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       RETURNING *`,
         [
           year,
-          nextNo,
+          nextTaskNo,
           customer_id || null,
           customer_name || null,
           job_type || null,
@@ -236,7 +223,40 @@ router.post(
         ],
       );
 
-      res.status(201).json({ success: true, task: result.rows[0] });
+      const newTask = result.rows[0];
+
+      // ── Sync to project_assigned_members if job_type is "project" ──
+      if (job_type === "project" && job_reference_id && customer_id) {
+        try {
+          const pmMaxResult = await pool.query(
+            `SELECT COALESCE(MAX(assignment_no), 0) as max_no 
+           FROM project_assigned_members WHERE project_id = $1`,
+            [job_reference_id],
+          );
+          const pmNextNo = pmMaxResult.rows[0].max_no + 1;
+
+          await pool.query(
+            `INSERT INTO project_assigned_members
+            (project_id, assignment_no, assigned_date, assigned_time,
+             assigned_member, job_description, due_date, status, created_by)
+           VALUES ($1, $2, CURRENT_DATE, CURRENT_TIME, $3, $4, $5, $6, $7)`,
+            [
+              job_reference_id,
+              pmNextNo,
+              assigned_member || null,
+              job_description || null,
+              due_date || null,
+              status || "todo",
+              req.user?.username,
+            ],
+          );
+        } catch (syncErr) {
+          console.error("Sync to project_assigned_members failed:", syncErr);
+          // Non-blocking — don't fail the main request
+        }
+      }
+
+      res.status(201).json({ success: true, task: newTask });
     } catch (error) {
       console.error("Create task error:", error);
       res.status(500).json({ success: false, error: "Failed to create task" });
@@ -244,8 +264,7 @@ router.post(
   },
 );
 
-// PUT update task
-// Admin: all fields | Assigned user: update_note, status, finish_date only
+// PUT update task — syncs status/note back to project_assigned_members
 router.put(
   "/jobAssigned/tasks/:taskId",
   authenticateToken,
@@ -290,6 +309,11 @@ router.put(
           });
           return;
         }
+
+        // Lock finish_date for non-admin if already set
+        if (!isAdmin && record.finish_date && updates.finish_date) {
+          delete updates.finish_date;
+        }
       }
 
       if (fields.length === 0) {
@@ -297,16 +321,203 @@ router.put(
         return;
       }
 
-      const setClause = fields.map((f, i) => `${f} = $${i + 2}`).join(", ");
+      const updatedFields = Object.keys(updates);
+      const setClause = updatedFields
+        .map((f, i) => `${f} = $${i + 2}`)
+        .join(", ");
+
       const result = await pool.query(
-        `UPDATE worklist_tasks_v2 SET ${setClause}, updated_at=CURRENT_TIMESTAMP WHERE id=$1 RETURNING *`,
+        `UPDATE worklist_tasks_v2 SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
         [taskId, ...Object.values(updates)],
       );
 
-      res.json({ success: true, task: result.rows[0] });
-    } catch (error) {
-      console.error("Update task error:", error);
-      res.status(500).json({ success: false, error: "Failed to update task" });
+      const updatedTask = result.rows[0];
+
+      // ── Sync status/finish_date back to project_assigned_members (non-blocking) ──
+      if (updatedTask.job_type === "project" && updatedTask.job_reference_id) {
+        pool
+          .query(
+            `UPDATE project_assigned_members
+         SET status = $1, finish_date = $2, updated_at = CURRENT_TIMESTAMP
+         WHERE project_id = $3 AND assigned_member = $4`,
+            [
+              updatedTask.status,
+              updatedTask.finish_date || null,
+              updatedTask.job_reference_id,
+              updatedTask.assigned_member,
+            ],
+          )
+          .catch((err) =>
+            console.error("Sync to project_assigned_members failed:", err),
+          );
+      }
+
+      // Send response ONCE — after all sync is fired (non-blocking)
+      res.json({ success: true, task: updatedTask });
+    } catch (error: any) {
+      console.error("Update task error:", error?.message || error);
+      res.status(500).json({
+        success: false,
+        error: error?.message || "Failed to update task",
+      });
+    }
+  },
+);
+
+// GET update logs for a task
+router.get(
+  "/jobAssigned/tasks/:taskId/updates",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { taskId } = req.params;
+    const pool = getPool(req);
+    try {
+      const result = await pool.query(
+        `SELECT * FROM worklist_task_updates WHERE task_id = $1 ORDER BY created_at ASC`,
+        [taskId],
+      );
+      res.json({ success: true, updates: result.rows });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message });
+    }
+  },
+);
+
+// POST add update log row
+router.post(
+  "/jobAssigned/tasks/:taskId/updates",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { taskId } = req.params;
+    const { update_note } = req.body;
+    const pool = getPool(req);
+
+    if (!update_note?.trim()) {
+      res
+        .status(400)
+        .json({ success: false, error: "Update note is required" });
+      return;
+    }
+
+    try {
+      const result = await pool.query(
+        `INSERT INTO worklist_task_updates (task_id, update_note, created_by)
+   VALUES ($1, $2, $3) RETURNING *`,
+        [taskId, update_note.trim(), req.user?.username],
+      );
+
+      // Sync to project_member_updates if task is linked to a project
+      try {
+        const taskResult = await pool.query(
+          `SELECT * FROM worklist_tasks_v2 WHERE id = $1`,
+          [taskId],
+        );
+        const task = taskResult.rows[0];
+        if (
+          task?.job_type === "project" &&
+          task?.job_reference_id &&
+          task?.assigned_member
+        ) {
+          // Find the linked project_assigned_member
+          const memberResult = await pool.query(
+            `SELECT id FROM project_assigned_members
+       WHERE project_id = $1 AND assigned_member = $2
+       LIMIT 1`,
+            [task.job_reference_id, task.assigned_member],
+          );
+          if (memberResult.rows.length > 0) {
+            const memberId = memberResult.rows[0].id;
+            await pool.query(
+              `INSERT INTO project_member_updates (member_id, update_note, created_by)
+         VALUES ($1, $2, $3)`,
+              [memberId, update_note.trim(), req.user?.username],
+            );
+          }
+        }
+      } catch (syncErr) {
+        console.error("Sync update to project_member_updates failed:", syncErr);
+      }
+
+      res.status(201).json({ success: true, update: result.rows[0] });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message });
+    }
+  },
+);
+
+// DELETE update log row (admin only)
+router.delete(
+  "/jobAssigned/tasks/:taskId/updates/:updateId",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { taskId, updateId } = req.params;
+    const pool = getPool(req);
+
+    if (req.user?.role !== "admin") {
+      res.status(403).json({ success: false, error: "Admin only" });
+      return;
+    }
+
+    try {
+      // Get the update note before deleting so we can match it in project_member_updates
+      const updateResult = await pool.query(
+        "SELECT * FROM worklist_task_updates WHERE id = $1",
+        [updateId],
+      );
+
+      if (updateResult.rows.length === 0) {
+        res.status(404).json({ success: false, error: "Update not found" });
+        return;
+      }
+
+      const updateRow = updateResult.rows[0];
+
+      // Delete from worklist_task_updates
+      await pool.query("DELETE FROM worklist_task_updates WHERE id = $1", [
+        updateId,
+      ]);
+
+      // Sync delete to project_member_updates (non-blocking)
+      pool
+        .query(`SELECT * FROM worklist_tasks_v2 WHERE id = $1`, [taskId])
+        .then(async (taskResult) => {
+          const task = taskResult.rows[0];
+          if (
+            task?.job_type === "project" &&
+            task?.job_reference_id &&
+            task?.assigned_member
+          ) {
+            const memberResult = await pool.query(
+              `SELECT id FROM project_assigned_members
+             WHERE project_id = $1 AND assigned_member = $2
+             LIMIT 1`,
+              [task.job_reference_id, task.assigned_member],
+            );
+            if (memberResult.rows.length > 0) {
+              const memberId = memberResult.rows[0].id;
+              // Delete matching entry by member_id + note + created_by
+              await pool.query(
+                `DELETE FROM project_member_updates
+                  WHERE id = (
+                    SELECT id FROM project_member_updates
+                    WHERE member_id = $1
+                      AND update_note = $2
+                      AND created_by = $3
+                    ORDER BY created_at ASC
+                    LIMIT 1
+                  )`,
+                [memberId, updateRow.update_note, updateRow.created_by],
+              );
+            }
+          }
+        })
+        .catch((err) =>
+          console.error("Sync delete to project_member_updates failed:", err),
+        );
+
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message });
     }
   },
 );

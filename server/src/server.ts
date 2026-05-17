@@ -18,6 +18,7 @@ import customerDocuments from "./routes/customer-documents";
 import jobCards from "./routes/job-cards";
 
 import purchasing from "./routes/purchasing";
+import boqRouter from "./routes/boq";
 import workshopProjects from "./routes/workshop-projects";
 import workshopRepairs from "./routes/workshop-repairs";
 
@@ -73,7 +74,9 @@ app.use("/api/customers", jobCards);
 
 app.use("/api/purchasing", workshopProjects);
 app.use("/api/purchasing", workshopRepairs);
+
 app.use("/api", purchasing);
+app.use("/api", boqRouter);
 
 app.use("/api", stores);
 app.use("/api", storeBrands);

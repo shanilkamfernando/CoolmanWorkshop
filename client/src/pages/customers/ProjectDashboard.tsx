@@ -82,6 +82,945 @@ interface SystemUser {
   role: string;
 }
 
+// ── Meeting Detail Panel ──────────────────────────────────────
+const MeetingDetailPanel = ({
+  meeting,
+  customerId,
+  projectId,
+  isAdmin,
+  onUpdate,
+}: {
+  meeting: any;
+  customerId: string | undefined;
+  projectId: string | undefined;
+  isAdmin: boolean;
+  onUpdate: (id: number, field: string, value: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [updates, setUpdates] = useState<any[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const token = () => localStorage.getItem("token");
+  const hdr = () => ({ Authorization: `Bearer ${token()}` });
+  const BASE = `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/meetings/${meeting.id}/updates`;
+
+  useEffect(() => {
+    if (open) fetchUpdates();
+  }, [open, meeting.id]);
+
+  const fetchUpdates = async () => {
+    try {
+      const r = await axios.get(BASE, { headers: hdr() });
+      setUpdates(r.data.updates || []);
+    } catch {}
+  };
+
+  const handleAdd = async () => {
+    if (!newNote.trim()) return;
+    setSaving(true);
+    try {
+      await axios.post(BASE, { update_note: newNote }, { headers: hdr() });
+      setNewNote("");
+      fetchUpdates();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to add update");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteUpdate = async (updateId: number) => {
+    if (!confirm("Delete this update?")) return;
+    try {
+      await axios.delete(`${BASE}/${updateId}`, { headers: hdr() });
+      fetchUpdates();
+    } catch {}
+  };
+
+  const fmtD = (d: string) => {
+    if (!d) return "—";
+    const [y, m, day] = d.split("T")[0].split("-");
+    return `${day} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
+  };
+  const fmtT = (t: string) => (!t ? "—" : t.substring(0, 5));
+
+  const hasContent =
+    meeting.customer_side || meeting.cm_side || updates.length > 0;
+
+  return (
+    <div>
+      {/* Toggle button */}
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          padding: "4px 12px",
+          borderRadius: "20px",
+          border: "none",
+          cursor: "pointer",
+          background: open ? "#667eea" : hasContent ? "#e8f0fe" : "#f0f0f0",
+          color: open ? "#fff" : hasContent ? "#667eea" : "#888",
+          fontSize: "12px",
+          fontWeight: 600,
+          transition: "all 0.2s",
+        }}
+      >
+        {hasContent ? "📋" : "+"} View {open ? "▲" : "▼"}
+      </button>
+
+      {open && (
+        <div
+          style={{
+            marginTop: "10px",
+            background: "#fafbff",
+            border: "1px solid #e8e8e8",
+            borderRadius: "10px",
+            padding: "14px",
+            minWidth: "320px",
+          }}
+        >
+          {/* Customer Side */}
+          <div style={{ marginBottom: "12px" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#667eea",
+                textTransform: "uppercase" as const,
+                letterSpacing: "0.5px",
+                marginBottom: "5px",
+              }}
+            >
+              Customer Side
+            </label>
+            <textarea
+              defaultValue={meeting.customer_side || ""}
+              onBlur={(e) => {
+                if (e.target.value !== (meeting.customer_side || ""))
+                  onUpdate(meeting.id, "customer_side", e.target.value);
+              }}
+              rows={2}
+              placeholder="Notes from customer side..."
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                fontSize: "13px",
+                border: "1px solid #d0d5ff",
+                borderRadius: "6px",
+                resize: "vertical" as const,
+                fontFamily: "inherit",
+                boxSizing: "border-box" as const,
+              }}
+            />
+          </div>
+
+          {/* CM Side */}
+          <div style={{ marginBottom: "14px" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#667eea",
+                textTransform: "uppercase" as const,
+                letterSpacing: "0.5px",
+                marginBottom: "5px",
+              }}
+            >
+              CM Side
+            </label>
+            <textarea
+              defaultValue={meeting.cm_side || ""}
+              onBlur={(e) => {
+                if (e.target.value !== (meeting.cm_side || ""))
+                  onUpdate(meeting.id, "cm_side", e.target.value);
+              }}
+              rows={2}
+              placeholder="Notes from CM side..."
+              style={{
+                width: "100%",
+                padding: "6px 8px",
+                fontSize: "13px",
+                border: "1px solid #d0d5ff",
+                borderRadius: "6px",
+                resize: "vertical" as const,
+                fontFamily: "inherit",
+                boxSizing: "border-box" as const,
+              }}
+            />
+          </div>
+
+          {/* Update Log */}
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#667eea",
+                textTransform: "uppercase" as const,
+                letterSpacing: "0.5px",
+                marginBottom: "8px",
+              }}
+            >
+              Update Log
+            </label>
+
+            {updates.length > 0 && (
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  fontSize: "12px",
+                  marginBottom: "8px",
+                }}
+              >
+                <thead>
+                  <tr style={{ background: "#eef0ff" }}>
+                    <th
+                      style={{
+                        padding: "4px 6px",
+                        textAlign: "left" as const,
+                        color: "#667eea",
+                        fontWeight: 600,
+                        width: "80px",
+                      }}
+                    >
+                      Date
+                    </th>
+                    <th
+                      style={{
+                        padding: "4px 6px",
+                        textAlign: "left" as const,
+                        color: "#667eea",
+                        fontWeight: 600,
+                        width: "45px",
+                      }}
+                    >
+                      Time
+                    </th>
+                    <th
+                      style={{
+                        padding: "4px 6px",
+                        textAlign: "left" as const,
+                        color: "#667eea",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Note
+                    </th>
+                    <th
+                      style={{
+                        padding: "4px 6px",
+                        textAlign: "left" as const,
+                        color: "#667eea",
+                        fontWeight: 600,
+                        width: "55px",
+                      }}
+                    >
+                      By
+                    </th>
+                    {isAdmin && <th style={{ width: "24px" }}></th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {updates.map((u, idx) => (
+                    <tr
+                      key={u.id}
+                      style={{ background: idx % 2 === 0 ? "#fff" : "#f5f6ff" }}
+                    >
+                      <td
+                        style={{
+                          padding: "4px 6px",
+                          color: "#555",
+                          fontSize: "11px",
+                          borderBottom: "1px solid #f0f0f0",
+                        }}
+                      >
+                        {fmtD(u.update_date || u.created_at)}
+                      </td>
+                      <td
+                        style={{
+                          padding: "4px 6px",
+                          color: "#555",
+                          fontSize: "11px",
+                          borderBottom: "1px solid #f0f0f0",
+                        }}
+                      >
+                        {fmtT(
+                          u.update_time || u.created_at?.split("T")[1] || "",
+                        )}
+                      </td>
+                      <td
+                        style={{
+                          padding: "4px 6px",
+                          color: "#333",
+                          borderBottom: "1px solid #f0f0f0",
+                        }}
+                      >
+                        {u.update_note}
+                      </td>
+                      <td
+                        style={{
+                          padding: "4px 6px",
+                          color: "#888",
+                          fontSize: "11px",
+                          borderBottom: "1px solid #f0f0f0",
+                        }}
+                      >
+                        {u.created_by || "—"}
+                      </td>
+                      {isAdmin && (
+                        <td
+                          style={{
+                            padding: "4px 6px",
+                            borderBottom: "1px solid #f0f0f0",
+                            textAlign: "center" as const,
+                          }}
+                        >
+                          <button
+                            onClick={() => handleDeleteUpdate(u.id)}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              cursor: "pointer",
+                              color: "#ddd",
+                              fontSize: "12px",
+                            }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.color = "#ef4444")
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.color = "#ddd")
+                            }
+                          >
+                            🗑️
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {/* Add update input */}
+            <div style={{ display: "flex", gap: "6px" }}>
+              <input
+                type="text"
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                placeholder="Add update note..."
+                style={{
+                  flex: 1,
+                  padding: "5px 8px",
+                  fontSize: "12px",
+                  border: "1px solid #c7d0ff",
+                  borderRadius: "5px",
+                  outline: "none",
+                }}
+              />
+              <button
+                onClick={handleAdd}
+                disabled={saving || !newNote.trim()}
+                style={{
+                  padding: "5px 10px",
+                  background: "#667eea",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "5px",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  opacity: !newNote.trim() ? 0.5 : 1,
+                }}
+              >
+                {saving ? "..." : "+ Add"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Meeting Update Log Component ──────────────────────────────
+const MeetingUpdateLog = ({
+  customerId,
+  projectId,
+  meetingId,
+  isAdmin,
+}: {
+  customerId: string | undefined;
+  projectId: string | undefined;
+  meetingId: number;
+  isAdmin: boolean;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [updates, setUpdates] = useState<any[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const token = () => localStorage.getItem("token");
+  const hdr = () => ({ Authorization: `Bearer ${token()}` });
+  const BASE = `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/meetings/${meetingId}/updates`;
+
+  useEffect(() => {
+    if (open) fetchUpdates();
+  }, [open]);
+
+  const fetchUpdates = async () => {
+    try {
+      const r = await axios.get(BASE, { headers: hdr() });
+      setUpdates(r.data.updates || []);
+    } catch {}
+  };
+
+  const handleAdd = async () => {
+    if (!newNote.trim()) return;
+    setSaving(true);
+    try {
+      await axios.post(BASE, { update_note: newNote }, { headers: hdr() });
+      setNewNote("");
+      fetchUpdates();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to add update");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (updateId: number) => {
+    if (!confirm("Delete this update?")) return;
+    try {
+      await axios.delete(`${BASE}/${updateId}`, { headers: hdr() });
+      fetchUpdates();
+    } catch {}
+  };
+
+  const fmtD = (d: string) => {
+    if (!d) return "—";
+    const [y, m, day] = d.split("T")[0].split("-");
+    return `${day} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
+  };
+  const fmtT = (t: string) => {
+    if (!t) return "—";
+    return t.substring(0, 5);
+  };
+
+  return (
+    <div>
+      {/* Toggle button showing update count */}
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          padding: "5px 12px",
+          background: open ? "#667eea" : "#f0f0f0",
+          color: open ? "#fff" : "#555",
+          border: "none",
+          borderRadius: "20px",
+          cursor: "pointer",
+          fontSize: "12px",
+          fontWeight: 600,
+          transition: "all 0.2s",
+        }}
+      >
+        📝 Updates {updates.length > 0 && `(${updates.length})`}
+        <span style={{ fontSize: "10px" }}>{open ? "▲" : "▼"}</span>
+      </button>
+
+      {open && (
+        <div
+          style={{
+            marginTop: "8px",
+            background: "#f8f9ff",
+            borderRadius: "8px",
+            border: "1px solid #e8e8e8",
+            padding: "10px",
+            minWidth: "280px",
+          }}
+        >
+          {/* Updates table */}
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "12px",
+              marginBottom: "8px",
+            }}
+          >
+            <thead>
+              <tr style={{ background: "#eef0ff" }}>
+                <th
+                  style={{
+                    padding: "5px 8px",
+                    textAlign: "left" as const,
+                    color: "#667eea",
+                    fontWeight: 600,
+                    borderBottom: "1px solid #e0e0ff",
+                    width: "85px",
+                  }}
+                >
+                  Date
+                </th>
+                <th
+                  style={{
+                    padding: "5px 8px",
+                    textAlign: "left" as const,
+                    color: "#667eea",
+                    fontWeight: 600,
+                    borderBottom: "1px solid #e0e0ff",
+                    width: "50px",
+                  }}
+                >
+                  Time
+                </th>
+                <th
+                  style={{
+                    padding: "5px 8px",
+                    textAlign: "left" as const,
+                    color: "#667eea",
+                    fontWeight: 600,
+                    borderBottom: "1px solid #e0e0ff",
+                  }}
+                >
+                  Update
+                </th>
+                <th
+                  style={{
+                    padding: "5px 8px",
+                    textAlign: "left" as const,
+                    color: "#667eea",
+                    fontWeight: 600,
+                    borderBottom: "1px solid #e0e0ff",
+                    width: "65px",
+                  }}
+                >
+                  By
+                </th>
+                {isAdmin && (
+                  <th
+                    style={{
+                      padding: "5px 8px",
+                      width: "28px",
+                      borderBottom: "1px solid #e0e0ff",
+                    }}
+                  ></th>
+                )}
+              </tr>
+            </thead>
+            <tbody>
+              {updates.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={isAdmin ? 5 : 4}
+                    style={{
+                      padding: "10px 8px",
+                      textAlign: "center" as const,
+                      color: "#bbb",
+                      fontStyle: "italic",
+                      fontSize: "12px",
+                    }}
+                  >
+                    No updates yet
+                  </td>
+                </tr>
+              ) : (
+                updates.map((u, idx) => (
+                  <tr
+                    key={u.id}
+                    style={{ background: idx % 2 === 0 ? "#fff" : "#f5f6ff" }}
+                  >
+                    <td
+                      style={{
+                        padding: "5px 8px",
+                        color: "#555",
+                        borderBottom: "1px solid #f0f0f0",
+                        fontSize: "11px",
+                      }}
+                    >
+                      {fmtD(u.update_date || u.created_at)}
+                    </td>
+                    <td
+                      style={{
+                        padding: "5px 8px",
+                        color: "#555",
+                        borderBottom: "1px solid #f0f0f0",
+                        fontSize: "11px",
+                      }}
+                    >
+                      {fmtT(u.update_time || u.created_at?.split("T")[1] || "")}
+                    </td>
+                    <td
+                      style={{
+                        padding: "5px 8px",
+                        color: "#333",
+                        borderBottom: "1px solid #f0f0f0",
+                      }}
+                    >
+                      {u.update_note}
+                    </td>
+                    <td
+                      style={{
+                        padding: "5px 8px",
+                        color: "#888",
+                        borderBottom: "1px solid #f0f0f0",
+                        fontSize: "11px",
+                      }}
+                    >
+                      {u.created_by || "—"}
+                    </td>
+                    {isAdmin && (
+                      <td
+                        style={{
+                          padding: "5px 8px",
+                          borderBottom: "1px solid #f0f0f0",
+                          textAlign: "center" as const,
+                        }}
+                      >
+                        <button
+                          onClick={() => handleDelete(u.id)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "#ddd",
+                            fontSize: "13px",
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.color = "#ef4444")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.color = "#ddd")
+                          }
+                        >
+                          🗑️
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+
+          {/* Add new update */}
+          <div style={{ display: "flex", gap: "6px" }}>
+            <input
+              type="text"
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+              placeholder="Add update note..."
+              style={{
+                flex: 1,
+                padding: "5px 8px",
+                fontSize: "12px",
+                border: "1.5px solid #c7d0ff",
+                borderRadius: "5px",
+                outline: "none",
+              }}
+            />
+            <button
+              onClick={handleAdd}
+              disabled={saving || !newNote.trim()}
+              style={{
+                padding: "5px 12px",
+                background: "#667eea",
+                color: "#fff",
+                border: "none",
+                borderRadius: "5px",
+                cursor: "pointer",
+                fontSize: "12px",
+                fontWeight: 600,
+                opacity: !newNote.trim() ? 0.5 : 1,
+              }}
+            >
+              {saving ? "..." : "+ Add"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Member Update Log Component ───────────────────────────────
+const MemberUpdateLog = ({
+  customerId,
+  projectId,
+  memberId,
+  canEdit,
+  isAdmin,
+}: {
+  customerId: string | undefined;
+  projectId: string | undefined;
+  memberId: number;
+  canEdit: boolean;
+  isAdmin: boolean;
+}) => {
+  const [updates, setUpdates] = useState<any[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const token = () => localStorage.getItem("token");
+  const hdr = () => ({ Authorization: `Bearer ${token()}` });
+  const BASE = `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/members/${memberId}/updates`;
+
+  useEffect(() => {
+    fetchUpdates();
+  }, [memberId]);
+
+  const fetchUpdates = async () => {
+    try {
+      const r = await axios.get(BASE, { headers: hdr() });
+      setUpdates(r.data.updates || []);
+    } catch {}
+  };
+
+  const handleAdd = async () => {
+    if (!newNote.trim()) return;
+    setSaving(true);
+    try {
+      await axios.post(BASE, { update_note: newNote }, { headers: hdr() });
+      setNewNote("");
+      fetchUpdates();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to add update");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (updateId: number) => {
+    if (!confirm("Delete this update?")) return;
+    try {
+      await axios.delete(`${BASE}/${updateId}`, { headers: hdr() });
+      fetchUpdates();
+    } catch {}
+  };
+
+  const fmtD = (d: string) => {
+    if (!d) return "—";
+    const [y, m, day] = d.split("T")[0].split("-");
+    return `${day} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
+  };
+  const fmtT = (t: string) => {
+    if (!t) return "—";
+    return t.substring(0, 5);
+  };
+
+  return (
+    <div>
+      <table
+        style={{
+          width: "100%",
+          borderCollapse: "collapse",
+          fontSize: "12px",
+          marginBottom: "8px",
+        }}
+      >
+        <thead>
+          <tr style={{ background: "#f8f9ff" }}>
+            <th
+              style={{
+                padding: "5px 8px",
+                textAlign: "left" as const,
+                color: "#888",
+                fontWeight: 600,
+                borderBottom: "1px solid #e8e8e8",
+                width: "90px",
+              }}
+            >
+              Date
+            </th>
+            <th
+              style={{
+                padding: "5px 8px",
+                textAlign: "left" as const,
+                color: "#888",
+                fontWeight: 600,
+                borderBottom: "1px solid #e8e8e8",
+                width: "60px",
+              }}
+            >
+              Time
+            </th>
+            <th
+              style={{
+                padding: "5px 8px",
+                textAlign: "left" as const,
+                color: "#888",
+                fontWeight: 600,
+                borderBottom: "1px solid #e8e8e8",
+              }}
+            >
+              Update
+            </th>
+            <th
+              style={{
+                padding: "5px 8px",
+                textAlign: "left" as const,
+                color: "#888",
+                fontWeight: 600,
+                borderBottom: "1px solid #e8e8e8",
+                width: "70px",
+              }}
+            >
+              By
+            </th>
+            {isAdmin && (
+              <th
+                style={{
+                  padding: "5px 8px",
+                  width: "30px",
+                  borderBottom: "1px solid #e8e8e8",
+                }}
+              ></th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {updates.length === 0 ? (
+            <tr>
+              <td
+                colSpan={isAdmin ? 5 : 4}
+                style={{
+                  padding: "10px 8px",
+                  textAlign: "center" as const,
+                  color: "#bbb",
+                  fontStyle: "italic",
+                  fontSize: "12px",
+                }}
+              >
+                No updates yet
+              </td>
+            </tr>
+          ) : (
+            updates.map((u, idx) => (
+              <tr
+                key={u.id}
+                style={{ background: idx % 2 === 0 ? "#fff" : "#fafbff" }}
+              >
+                <td
+                  style={{
+                    padding: "5px 8px",
+                    color: "#555",
+                    borderBottom: "1px solid #f0f0f0",
+                  }}
+                >
+                  {fmtD(u.update_date || u.created_at)}
+                </td>
+                <td
+                  style={{
+                    padding: "5px 8px",
+                    color: "#555",
+                    borderBottom: "1px solid #f0f0f0",
+                  }}
+                >
+                  {fmtT(u.update_time || u.created_at?.split("T")[1] || "")}
+                </td>
+                <td
+                  style={{
+                    padding: "5px 8px",
+                    color: "#333",
+                    borderBottom: "1px solid #f0f0f0",
+                  }}
+                >
+                  {u.update_note}
+                </td>
+                <td
+                  style={{
+                    padding: "5px 8px",
+                    color: "#888",
+                    borderBottom: "1px solid #f0f0f0",
+                    fontSize: "11px",
+                  }}
+                >
+                  {u.created_by || "—"}
+                </td>
+                {isAdmin && (
+                  <td
+                    style={{
+                      padding: "5px 8px",
+                      borderBottom: "1px solid #f0f0f0",
+                      textAlign: "center" as const,
+                    }}
+                  >
+                    <button
+                      onClick={() => handleDelete(u.id)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "#ddd",
+                        fontSize: "13px",
+                      }}
+                      onMouseEnter={(e) =>
+                        (e.currentTarget.style.color = "#ef4444")
+                      }
+                      onMouseLeave={(e) =>
+                        (e.currentTarget.style.color = "#ddd")
+                      }
+                    >
+                      🗑️
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+
+      {canEdit && (
+        <div style={{ display: "flex", gap: "6px" }}>
+          <input
+            type="text"
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            placeholder="Add update..."
+            style={{
+              flex: 1,
+              padding: "5px 8px",
+              fontSize: "12px",
+              border: "1.5px solid #ddd",
+              borderRadius: "5px",
+            }}
+          />
+          <button
+            onClick={handleAdd}
+            disabled={saving || !newNote.trim()}
+            style={{
+              padding: "5px 12px",
+              background: "#667eea",
+              color: "#fff",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+              fontSize: "12px",
+              fontWeight: 600,
+              opacity: !newNote.trim() ? 0.5 : 1,
+            }}
+          >
+            {saving ? "..." : "+ Add"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ProjectDashboard = () => {
   const navigate = useNavigate();
   const { customerId, projectId } = useParams();
@@ -111,9 +1050,10 @@ const ProjectDashboard = () => {
   const [newMeetingDesc, setNewMeetingDesc] = useState("");
   const [newMeetingTime, setNewMeetingTime] = useState("");
   const [newMeetingLocation, setNewMeetingLocation] = useState("");
+  const [newMeetingCustomerSide, setNewMeetingCustomerSide] = useState("");
+  const [newMeetingCMSide, setNewMeetingCMSide] = useState("");
 
   const [showAddEntry, setShowAddEntry] = useState(false);
-  const [newEntryName, setNewEntryName] = useState("");
   const [newEntryDate, setNewEntryDate] = useState("");
   const [newEntryTime, setNewEntryTime] = useState("");
   const [newEntryDesc, setNewEntryDesc] = useState("");
@@ -583,6 +1523,8 @@ const ProjectDashboard = () => {
           meeting_time: newMeetingTime || null,
           location: newMeetingLocation || null,
           description: newMeetingDesc,
+          customer_side: newMeetingCustomerSide || null,
+          cm_side: newMeetingCMSide || null,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -591,6 +1533,8 @@ const ProjectDashboard = () => {
         setNewMeetingTime("");
         setNewMeetingLocation("");
         setNewMeetingDesc("");
+        setNewMeetingCustomerSide("");
+        setNewMeetingCMSide("");
         setShowAddMeeting(false);
         fetchMeetings();
       }
@@ -613,15 +1557,39 @@ const ProjectDashboard = () => {
     }
   };
 
-  // ADMIN ONLY can edit meetings
-  const handleUpdateMeeting = (id: number, field: string, value: string) => {
-    if (!isAdmin) {
-      alert("Only admins can edit meetings");
-      return;
-    }
+  const handleUpdateMeeting = async (
+    id: number,
+    field: string,
+    value: string,
+  ) => {
+    const meeting = meetings.find((m) => m.id === id);
+    if (!meeting) return;
+
+    // Update local state immediately
     setMeetings(
       meetings.map((m) => (m.id === id ? { ...m, [field]: value } : m)),
     );
+
+    try {
+      const token = localStorage.getItem("token");
+      await axios.put(
+        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/meetings/${id}`,
+        {
+          date: field === "date" ? value : meeting.date,
+          meeting_time: field === "meeting_time" ? value : meeting.meeting_time,
+          location: field === "location" ? value : meeting.location,
+          description: field === "description" ? value : meeting.description,
+          customer_side:
+            field === "customer_side" ? value : meeting.customer_side,
+          cm_side: field === "cm_side" ? value : meeting.cm_side,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+    } catch (error: any) {
+      console.error("Error updating meeting:", error);
+      alert(error.response?.data?.error || "Failed to save meeting");
+      fetchMeetings(); // revert on error
+    }
   };
 
   const handleDeleteMeeting = (id: number) => {
@@ -635,8 +1603,8 @@ const ProjectDashboard = () => {
   };
 
   const handleAddEntry = async () => {
-    if (!newEntryDate || !newEntryDesc) {
-      alert("Date and Description are required");
+    if (!newEntryDesc.trim()) {
+      alert("Description is required");
       return;
     }
 
@@ -645,8 +1613,8 @@ const ProjectDashboard = () => {
       const response = await axios.post(
         `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/activities`,
         {
-          activity_date: newEntryDate,
-          activity_time: newEntryTime || null,
+          // activity_date: newEntryDate,
+          // activity_time: newEntryTime || null,
           description: newEntryDesc,
         },
         { headers: { Authorization: `Bearer ${token}` } },
@@ -655,8 +1623,6 @@ const ProjectDashboard = () => {
       if (response.data.success) {
         alert("Activity added successfully!");
         setShowAddEntry(false);
-        setNewEntryDate("");
-        setNewEntryTime("");
         setNewEntryDesc("");
         fetchActivities();
       }
@@ -951,9 +1917,9 @@ const ProjectDashboard = () => {
                 <th style={{ width: "140px" }}>Assigned To</th>
                 <th>Job Description</th>
                 <th style={{ width: "110px" }}>Due Date</th>
-                <th style={{ width: "200px" }}>Update</th>
                 <th style={{ width: "110px" }}>Status</th>
                 <th style={{ width: "110px" }}>Finish Date</th>
+                <th style={{ minWidth: "280px" }}>Update Log</th>
                 {isAdmin && <th style={{ width: "70px" }}>Actions</th>}
               </tr>
             </thead>
@@ -1112,40 +2078,7 @@ const ProjectDashboard = () => {
                       )}
                     </td>
 
-                    {/* Update - only assigned user or admin can edit */}
-                    <td>
-                      {canEditUpdate ? (
-                        <textarea
-                          value={member.update_note || ""}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "update_note",
-                              e.target.value,
-                            )
-                          }
-                          className="table-textarea"
-                          rows={2}
-                          placeholder={
-                            isAssignedToMe
-                              ? "Add your update..."
-                              : "Update notes..."
-                          }
-                        />
-                      ) : (
-                        <span
-                          style={{
-                            fontSize: "15px",
-                            color: member.update_note ? "#333" : "#bbb",
-                            fontStyle: member.update_note ? "normal" : "italic",
-                          }}
-                        >
-                          {member.update_note || "—"}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Status - assigned user or admin can change */}
+                    {/* Status */}
                     <td>
                       {canEditUpdate ? (
                         <select
@@ -1192,9 +2125,9 @@ const ProjectDashboard = () => {
                       )}
                     </td>
 
-                    {/* Finish Date - assigned user or admin can set */}
+                    {/* Finish Date — only editable if not yet set (non-admin) or always (admin) */}
                     <td>
-                      {canEditUpdate ? (
+                      {isAdmin || (!member.finish_date && canEditUpdate) ? (
                         <input
                           type="date"
                           value={toDateInput(member.finish_date)}
@@ -1208,7 +2141,13 @@ const ProjectDashboard = () => {
                           className="table-input"
                         />
                       ) : (
-                        <span style={{ fontSize: "15px" }}>
+                        <span
+                          style={{
+                            fontSize: "14px",
+                            color: member.finish_date ? "#2e7d32" : "#bbb",
+                            fontWeight: member.finish_date ? 600 : 400,
+                          }}
+                        >
                           {member.finish_date
                             ? new Date(member.finish_date).toLocaleDateString(
                                 "en-GB",
@@ -1221,6 +2160,16 @@ const ProjectDashboard = () => {
                             : "—"}
                         </span>
                       )}
+                    </td>
+                    {/* Update Log */}
+                    <td style={{ padding: "8px" }}>
+                      <MemberUpdateLog
+                        customerId={customerId}
+                        projectId={projectId}
+                        memberId={member.id}
+                        canEdit={canEditUpdate}
+                        isAdmin={isAdmin}
+                      />
                     </td>
 
                     {/* Actions - admin only */}
@@ -1242,7 +2191,7 @@ const ProjectDashboard = () => {
               {assignedMembers.length === 0 && (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 10 : 9}
+                    colSpan={isAdmin ? 8 : 7}
                     style={{
                       textAlign: "center",
                       color: "#999",
@@ -1273,26 +2222,13 @@ const ProjectDashboard = () => {
           {showAddEntry && (
             <div className="add-meeting-form">
               <input
-                type="date"
-                value={newEntryDate}
-                onChange={(e) => setNewEntryDate(e.target.value)}
-                placeholder="Date"
-                className="meeting-input"
-              />
-              <input
-                type="time"
-                value={newEntryTime}
-                onChange={(e) => setNewEntryTime(e.target.value)}
-                placeholder="Time (optional)"
-                className="meeting-input"
-              />
-              <input
                 type="text"
                 value={newEntryDesc}
                 onChange={(e) => setNewEntryDesc(e.target.value)}
                 placeholder="Description"
                 className="meeting-input"
                 style={{ flex: 2 }}
+                onKeyDown={(e) => e.key === "Enter" && handleAddEntry()}
               />
               <button className="btn-add-meeting" onClick={handleAddEntry}>
                 Add
@@ -1305,7 +2241,6 @@ const ProjectDashboard = () => {
               </button>
             </div>
           )}
-
           <table className="meetings-table">
             <thead>
               <tr>
@@ -1360,7 +2295,9 @@ const ProjectDashboard = () => {
                       />
                     ) : (
                       <p style={{ fontSize: "16px" }}>
-                        {entry.activity_time || "—"}
+                        {entry.activity_time
+                          ? entry.activity_time.substring(0, 5)
+                          : "—"}
                       </p>
                     )}
                   </td>
@@ -1372,14 +2309,16 @@ const ProjectDashboard = () => {
                   <td>
                     {isAdmin ? (
                       <textarea
-                        value={entry.description}
-                        onChange={(e) =>
-                          handleUpdateEntry(
-                            entry.id,
-                            "description",
-                            e.target.value,
-                          )
-                        }
+                        defaultValue={entry.description}
+                        onBlur={(e) => {
+                          if (e.target.value !== entry.description) {
+                            handleUpdateEntry(
+                              entry.id,
+                              "description",
+                              e.target.value,
+                            );
+                          }
+                        }}
                         className="table-textarea"
                         rows={2}
                       />
@@ -1387,16 +2326,23 @@ const ProjectDashboard = () => {
                       <p style={{ fontSize: "16px" }}>{entry.description}</p>
                     )}
                   </td>
+
                   <td>
                     {isAdmin ? (
                       <textarea
-                        value={entry.remarks || ""}
-                        onChange={(e) =>
-                          handleUpdateEntry(entry.id, "remarks", e.target.value)
-                        }
+                        defaultValue={entry.remarks || ""}
+                        onBlur={(e) => {
+                          if (e.target.value !== (entry.remarks || "")) {
+                            handleUpdateEntry(
+                              entry.id,
+                              "remarks",
+                              e.target.value,
+                            );
+                          }
+                        }}
                         className="table-textarea"
                         rows={2}
-                        placeholder="Add remarks..."
+                        placeholder="Add remarks then click away to save..."
                       />
                     ) : (
                       <p
@@ -1410,6 +2356,7 @@ const ProjectDashboard = () => {
                       </p>
                     )}
                   </td>
+
                   {isAdmin && (
                     <td>
                       <button
@@ -1466,15 +2413,15 @@ const ProjectDashboard = () => {
                 <span className="btn-indicator"> ▼</span>
               )}
             </button>
-            {/* <button
-              className={`boq-btn ${activeBOQCategory === "mechanical" ? "active" : ""}`}
-              onClick={() => handleBOQCategoryClick("mechanical")}
+            <button
+              className={`boq-btn ${activeBOQCategory === "invoice" ? "active" : ""}`}
+              onClick={() => handleBOQCategoryClick("invoice")}
             >
-              Mechanical BOQ
-              {activeBOQCategory === "mechanical" && (
+              Invoice
+              {activeBOQCategory === "invoice" && (
                 <span className="btn-indicator"> ▼</span>
               )}
-            </button> */}
+            </button>
             <button
               className={`boq-btn ${activeBOQCategory === "quotation" ? "active" : ""}`}
               onClick={() => handleBOQCategoryClick("quotation")}
@@ -1493,8 +2440,7 @@ const ProjectDashboard = () => {
                 <h4>
                   {activeBOQCategory === "electrical" &&
                     "Electrical BOQ Documents"}
-                  {activeBOQCategory === "mechanical" &&
-                    "Mechanical BOQ Documents"}
+                  {activeBOQCategory === "invoice" && "Invoice BOQ Documents"}
                   {activeBOQCategory === "quotation" && "Quotation Documents"}
                 </h4>
                 <button
@@ -1619,7 +2565,7 @@ const ProjectDashboard = () => {
             <table className="meetings-table attachments-table">
               <thead>
                 <tr>
-                  <th style={{ width: "50px" }}>Type</th>
+                  {/* <th style={{ width: "50px" }}>Type</th> */}
                   <th>File Name</th>
                   <th style={{ width: "120px" }}>Size</th>
                   <th style={{ width: "140px" }}>Date</th>
@@ -1629,9 +2575,9 @@ const ProjectDashboard = () => {
               <tbody>
                 {attachments.map((attachment) => (
                   <tr key={attachment.id}>
-                    <td style={{ fontSize: "1rem", textAlign: "center" }}>
+                    {/* <td style={{ fontSize: "1rem", textAlign: "center" }}>
                       {getFileIcon(attachment.file_type)}
-                    </td>
+                    </td> */}
                     <td>
                       <div style={{ fontWeight: 500, fontSize: "16px" }}>
                         {attachment.original_filename}
@@ -1691,66 +2637,195 @@ const ProjectDashboard = () => {
           </div>
 
           {showAddMeeting && (
-            <div className="add-meeting-form">
-              <input
-                type="date"
-                value={newMeetingDate}
-                onChange={(e) => setNewMeetingDate(e.target.value)}
-                className="meeting-input"
-              />
-              <input
-                type="time"
-                value={newMeetingTime}
-                onChange={(e) => setNewMeetingTime(e.target.value)}
-                className="meeting-input"
-                placeholder="Time (optional)"
-              />
-              <input
-                type="text"
-                value={newMeetingLocation}
-                onChange={(e) => setNewMeetingLocation(e.target.value)}
-                className="meeting-input"
-                placeholder="Location (optional)"
-              />
-              <input
-                type="text"
-                value={newMeetingDesc}
-                onChange={(e) => setNewMeetingDesc(e.target.value)}
-                placeholder="Description"
-                className="meeting-input"
-                style={{ flex: 2 }}
-              />
-              <button className="btn-add-meeting" onClick={handleAddMeeting}>
-                Add
-              </button>
-              <button
-                className="btn-cancel-meeting"
-                onClick={() => setShowAddMeeting(false)}
+            <div
+              style={{
+                background: "#f8f9ff",
+                border: "1px solid #e0e0e0",
+                borderRadius: "10px",
+                padding: "16px 20px",
+                marginBottom: "16px",
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                  gap: "12px",
+                  marginBottom: "12px",
+                }}
               >
-                Cancel
-              </button>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={newMeetingDate}
+                    onChange={(e) => setNewMeetingDate(e.target.value)}
+                    className="meeting-input"
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={newMeetingTime}
+                    onChange={(e) => setNewMeetingTime(e.target.value)}
+                    className="meeting-input"
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    value={newMeetingLocation}
+                    onChange={(e) => setNewMeetingLocation(e.target.value)}
+                    placeholder="Location (optional)"
+                    className="meeting-input"
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div style={{ gridColumn: "span 2" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    Description *
+                  </label>
+                  <input
+                    type="text"
+                    value={newMeetingDesc}
+                    onChange={(e) => setNewMeetingDesc(e.target.value)}
+                    placeholder="Meeting description"
+                    className="meeting-input"
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div style={{ gridColumn: "span 2" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    Customer Side Notes
+                  </label>
+                  <textarea
+                    value={newMeetingCustomerSide}
+                    onChange={(e) => setNewMeetingCustomerSide(e.target.value)}
+                    placeholder="Notes from customer side..."
+                    className="meeting-input"
+                    rows={2}
+                    style={{ width: "100%", resize: "vertical" as const }}
+                  />
+                </div>
+                <div style={{ gridColumn: "span 2" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    CM Side Notes
+                  </label>
+                  <textarea
+                    value={newMeetingCMSide}
+                    onChange={(e) => setNewMeetingCMSide(e.target.value)}
+                    placeholder="Notes from CM side..."
+                    className="meeting-input"
+                    rows={2}
+                    style={{ width: "100%", resize: "vertical" as const }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button className="btn-add-meeting" onClick={handleAddMeeting}>
+                  Add Meeting
+                </button>
+                <button
+                  className="btn-cancel-meeting"
+                  onClick={() => {
+                    setShowAddMeeting(false);
+                    setNewMeetingDate("");
+                    setNewMeetingTime("");
+                    setNewMeetingLocation("");
+                    setNewMeetingDesc("");
+                    setNewMeetingCustomerSide("");
+                    setNewMeetingCMSide("");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
 
           <table className="meetings-table">
             <thead>
               <tr>
-                <th style={{ width: "55px" }}>No</th>
+                {/* <th style={{ width: "55px" }}>No</th> */}
                 <th style={{ width: "120px" }}>Date</th>
                 <th style={{ width: "100px" }}>Time</th>
                 <th style={{ width: "140px" }}>Location</th>
                 <th style={{ width: "120px" }}>User</th>
                 <th>Description</th>
-                <th style={{ width: "180px" }}>Customer Side</th>
-                <th style={{ width: "180px" }}>CM Side</th>
-                {isAdmin && <th style={{ width: "80px" }}>Actions</th>}
+                <th style={{ width: "120px" }}>Details</th>
+                {isAdmin && <th style={{ width: "60px" }}>Actions</th>}
+                {isAdmin && <th style={{ width: "60px" }}>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {meetings.map((meeting) => (
                 <tr key={meeting.id}>
                   {/* No */}
-                  <td
+                  {/* <td
                     style={{
                       textAlign: "center",
                       fontWeight: 600,
@@ -1759,7 +2834,7 @@ const ProjectDashboard = () => {
                     }}
                   >
                     {meeting.meeting_no}
-                  </td>
+                  </td> */}
 
                   {/* Date */}
                   <td>
@@ -1862,64 +2937,73 @@ const ProjectDashboard = () => {
                   </td>
 
                   {/* Customer Side - admin only editable */}
+                  {/* 
                   <td>
-                    {isAdmin ? (
-                      <textarea
-                        value={meeting.customer_side || ""}
-                        onChange={(e) =>
+                    <textarea
+                      defaultValue={meeting.customer_side || ""}
+                      onBlur={(e) => {
+                        if (e.target.value !== (meeting.customer_side || "")) {
                           handleUpdateMeeting(
                             meeting.id,
                             "customer_side",
                             e.target.value,
-                          )
+                          );
                         }
-                        className="table-textarea"
-                        rows={2}
-                        placeholder="Customer side notes..."
-                      />
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: "16px",
-                          color: meeting.customer_side ? "#333" : "#bbb",
-                          fontStyle: meeting.customer_side
-                            ? "normal"
-                            : "italic",
-                        }}
-                      >
-                        {meeting.customer_side || "—"}
-                      </span>
-                    )}
-                  </td>
+                      }}
+                      className="table-textarea"
+                      rows={2}
+                      placeholder="Customer side notes..."
+                    />
+                  </td> */}
 
-                  {/* CM Side - admin only editable */}
-                  <td>
-                    {isAdmin ? (
-                      <textarea
-                        value={meeting.cm_side || ""}
-                        onChange={(e) =>
+                  {/* CM Side - all users can edit */}
+                  {/* <td>
+                    <textarea
+                      defaultValue={meeting.cm_side || ""}
+                      onBlur={(e) => {
+                        if (e.target.value !== (meeting.cm_side || "")) {
                           handleUpdateMeeting(
                             meeting.id,
                             "cm_side",
                             e.target.value,
-                          )
+                          );
                         }
-                        className="table-textarea"
-                        rows={2}
-                        placeholder="CM side notes..."
-                      />
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: "16px",
-                          color: meeting.cm_side ? "#333" : "#bbb",
-                          fontStyle: meeting.cm_side ? "normal" : "italic",
-                        }}
-                      >
-                        {meeting.cm_side || "—"}
-                      </span>
-                    )}
+                      }}
+                      className="table-textarea"
+                      rows={2}
+                      placeholder="CM side notes..."
+                    />
+                  </td> */}
+
+                  {/* Updates */}
+                  {/* <td style={{ padding: "8px" }}>
+                    <MeetingUpdateLog
+                      customerId={customerId}
+                      projectId={projectId}
+                      meetingId={meeting.id}
+                      isAdmin={isAdmin}
+                    />
+                  </td> */}
+                  <td style={{ padding: "8px" }}>
+                    <MeetingDetailPanel
+                      meeting={meeting}
+                      customerId={customerId}
+                      projectId={projectId}
+                      isAdmin={isAdmin}
+                      onUpdate={handleUpdateMeeting}
+                    />
                   </td>
+
+                  {isAdmin && (
+                    <td>
+                      <button
+                        className="btn-delete"
+                        onClick={() => handleDeleteMeeting(meeting.id)}
+                      >
+                        🗑️
+                      </button>
+                    </td>
+                  )}
 
                   {isAdmin && (
                     <td>
