@@ -254,10 +254,10 @@ function App() {
           path="/customers/:customerId/jobcards"
           element={<JobCardsList />}
         />
-        <Route
+        {/* <Route
           path="/customers/:customerId/jobcards/:jobCardId"
           element={<JobCardDetail />}
-        />
+        /> */}
 
         <Route path="/purchasing" element={<PurchasingPortal />} />
 
@@ -296,6 +296,11 @@ function App() {
               <CustomerPurchasingDashboard />
             </ProtectedRoute>
           }
+        />
+
+        <Route
+          path="/purchasing/customers/:customerId/entries"
+          element={<PurchasingDashboard />}
         />
 
         <Route

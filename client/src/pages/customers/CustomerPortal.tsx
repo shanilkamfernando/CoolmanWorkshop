@@ -161,13 +161,13 @@ const CustomerPortal = () => {
       description: "Regular system inspections",
       path: `/customers/${customerId}/system-inspection`,
     },
-    {
-      id: "spare-parts",
-      name: "Spare Parts",
-      icon: "🔩",
-      description: "Spare parts management",
-      path: `/customers/${customerId}/spare-parts`,
-    },
+    // {
+    //   id: "spare-parts",
+    //   name: "Spare Parts",
+    //   icon: "🔩",
+    //   description: "Spare parts management",
+    //   path: `/customers/${customerId}/spare-parts`,
+    // },
     {
       id: "documents",
       name: "Documents",

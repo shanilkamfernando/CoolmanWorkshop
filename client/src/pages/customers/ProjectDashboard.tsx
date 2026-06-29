@@ -8,6 +8,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./ProjectDashboard.css";
 import companyLogo from "../../assets/mainlogo.jpeg";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -82,7 +83,6 @@ interface SystemUser {
   role: string;
 }
 
-// ── Meeting Detail Panel ──────────────────────────────────────
 const MeetingDetailPanel = ({
   meeting,
   customerId,
@@ -161,267 +161,299 @@ const MeetingDetailPanel = ({
           borderRadius: "20px",
           border: "none",
           cursor: "pointer",
-          background: open ? "#667eea" : hasContent ? "#e8f0fe" : "#f0f0f0",
-          color: open ? "#fff" : hasContent ? "#667eea" : "#888",
           fontSize: "12px",
           fontWeight: 600,
+          background: open ? "#667eea" : hasContent ? "#e8f0fe" : "#f0f0f0",
+          color: open ? "#fff" : hasContent ? "#667eea" : "#888",
           transition: "all 0.2s",
         }}
       >
-        {hasContent ? "📋" : "+"} View {open ? "▲" : "▼"}
+        {hasContent ? "📋" : "+"} Details {open ? "▲" : "▼"}
       </button>
 
       {open && (
         <div
           style={{
-            marginTop: "10px",
-            background: "#fafbff",
-            border: "1px solid #e8e8e8",
-            borderRadius: "10px",
-            padding: "14px",
-            minWidth: "320px",
+            position: "absolute" as const,
+            zIndex: 100,
+            marginTop: "6px",
+            background: "#fff",
+            border: "1px solid #e0e0e0",
+            borderRadius: "12px",
+            padding: "16px",
+            width: "340px",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
           }}
         >
+          {/* Header */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "14px",
+            }}
+          >
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#333" }}>
+              Meeting Details
+            </span>
+            <button
+              onClick={() => setOpen(false)}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#999",
+                fontSize: "18px",
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          </div>
+
           {/* Customer Side */}
           <div style={{ marginBottom: "12px" }}>
-            <label
+            <div
               style={{
-                display: "block",
-                fontSize: "11px",
+                fontSize: "10px",
                 fontWeight: 700,
                 color: "#667eea",
                 textTransform: "uppercase" as const,
-                letterSpacing: "0.5px",
+                letterSpacing: "0.6px",
                 marginBottom: "5px",
               }}
             >
               Customer Side
-            </label>
-            <textarea
-              defaultValue={meeting.customer_side || ""}
-              onBlur={(e) => {
-                if (e.target.value !== (meeting.customer_side || ""))
-                  onUpdate(meeting.id, "customer_side", e.target.value);
-              }}
-              rows={2}
-              placeholder="Notes from customer side..."
-              style={{
-                width: "100%",
-                padding: "6px 8px",
-                fontSize: "13px",
-                border: "1px solid #d0d5ff",
-                borderRadius: "6px",
-                resize: "vertical" as const,
-                fontFamily: "inherit",
-                boxSizing: "border-box" as const,
-              }}
-            />
+            </div>
+            {isAdmin ? (
+              <textarea
+                defaultValue={meeting.customer_side || ""}
+                onBlur={(e) => {
+                  if (e.target.value !== (meeting.customer_side || ""))
+                    onUpdate(meeting.id, "customer_side", e.target.value);
+                }}
+                rows={2}
+                placeholder="Notes from customer side..."
+                style={{
+                  width: "100%",
+                  padding: "7px 10px",
+                  fontSize: "13px",
+                  border: "1px solid #e0e0e0",
+                  borderRadius: "6px",
+                  resize: "none" as const,
+                  fontFamily: "inherit",
+                  boxSizing: "border-box" as const,
+                  background: "#fff",
+                }}
+              />
+            ) : meeting.customer_side ? (
+              <div
+                style={{
+                  padding: "8px 10px",
+                  background: "#f8f9ff",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  color: "#333",
+                  lineHeight: 1.5,
+                }}
+              >
+                {meeting.customer_side}
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: "8px 10px",
+                  background: "#f9f9f9",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  color: "#bbb",
+                  fontStyle: "italic",
+                }}
+              >
+                No notes added
+              </div>
+            )}
           </div>
 
           {/* CM Side */}
           <div style={{ marginBottom: "14px" }}>
-            <label
+            <div
               style={{
-                display: "block",
-                fontSize: "11px",
+                fontSize: "10px",
                 fontWeight: 700,
                 color: "#667eea",
                 textTransform: "uppercase" as const,
-                letterSpacing: "0.5px",
+                letterSpacing: "0.6px",
                 marginBottom: "5px",
               }}
             >
               CM Side
-            </label>
-            <textarea
-              defaultValue={meeting.cm_side || ""}
-              onBlur={(e) => {
-                if (e.target.value !== (meeting.cm_side || ""))
-                  onUpdate(meeting.id, "cm_side", e.target.value);
-              }}
-              rows={2}
-              placeholder="Notes from CM side..."
-              style={{
-                width: "100%",
-                padding: "6px 8px",
-                fontSize: "13px",
-                border: "1px solid #d0d5ff",
-                borderRadius: "6px",
-                resize: "vertical" as const,
-                fontFamily: "inherit",
-                boxSizing: "border-box" as const,
-              }}
-            />
+            </div>
+            {isAdmin ? (
+              <textarea
+                defaultValue={meeting.cm_side || ""}
+                onBlur={(e) => {
+                  if (e.target.value !== (meeting.cm_side || ""))
+                    onUpdate(meeting.id, "cm_side", e.target.value);
+                }}
+                rows={2}
+                placeholder="Notes from CM side..."
+                style={{
+                  width: "100%",
+                  padding: "7px 10px",
+                  fontSize: "13px",
+                  border: "1px solid #e0e0e0",
+                  borderRadius: "6px",
+                  resize: "none" as const,
+                  fontFamily: "inherit",
+                  boxSizing: "border-box" as const,
+                  background: "#fff",
+                }}
+              />
+            ) : meeting.cm_side ? (
+              <div
+                style={{
+                  padding: "8px 10px",
+                  background: "#f8f9ff",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  color: "#333",
+                  lineHeight: 1.5,
+                }}
+              >
+                {meeting.cm_side}
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: "8px 10px",
+                  background: "#f9f9f9",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  color: "#bbb",
+                  fontStyle: "italic",
+                }}
+              >
+                No notes added
+              </div>
+            )}
           </div>
+
+          {/* Divider */}
+          <div
+            style={{ borderTop: "1px solid #f0f0f0", marginBottom: "12px" }}
+          />
 
           {/* Update Log */}
           <div>
-            <label
+            <div
               style={{
-                display: "block",
-                fontSize: "11px",
+                fontSize: "10px",
                 fontWeight: 700,
                 color: "#667eea",
                 textTransform: "uppercase" as const,
-                letterSpacing: "0.5px",
+                letterSpacing: "0.6px",
                 marginBottom: "8px",
               }}
             >
               Update Log
-            </label>
+            </div>
 
-            {updates.length > 0 && (
-              <table
-                style={{
-                  width: "100%",
-                  borderCollapse: "collapse",
-                  fontSize: "12px",
-                  marginBottom: "8px",
-                }}
-              >
-                <thead>
-                  <tr style={{ background: "#eef0ff" }}>
-                    <th
-                      style={{
-                        padding: "4px 6px",
-                        textAlign: "left" as const,
-                        color: "#667eea",
-                        fontWeight: 600,
-                        width: "80px",
-                      }}
-                    >
-                      Date
-                    </th>
-                    <th
-                      style={{
-                        padding: "4px 6px",
-                        textAlign: "left" as const,
-                        color: "#667eea",
-                        fontWeight: 600,
-                        width: "45px",
-                      }}
-                    >
-                      Time
-                    </th>
-                    <th
-                      style={{
-                        padding: "4px 6px",
-                        textAlign: "left" as const,
-                        color: "#667eea",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Note
-                    </th>
-                    <th
-                      style={{
-                        padding: "4px 6px",
-                        textAlign: "left" as const,
-                        color: "#667eea",
-                        fontWeight: 600,
-                        width: "55px",
-                      }}
-                    >
-                      By
-                    </th>
-                    {isAdmin && <th style={{ width: "24px" }}></th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {updates.map((u, idx) => (
-                    <tr
-                      key={u.id}
-                      style={{ background: idx % 2 === 0 ? "#fff" : "#f5f6ff" }}
-                    >
-                      <td
+            {/* Updates list */}
+            <div
+              style={{
+                maxHeight: "160px",
+                overflowY: "auto" as const,
+                marginBottom: "8px",
+              }}
+            >
+              {updates.length === 0 ? (
+                <div
+                  style={{
+                    padding: "10px",
+                    textAlign: "center" as const,
+                    color: "#bbb",
+                    fontSize: "12px",
+                    fontStyle: "italic",
+                  }}
+                >
+                  No updates yet
+                </div>
+              ) : (
+                updates.map((u, idx) => (
+                  <div
+                    key={u.id}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: "6px",
+                      marginBottom: "4px",
+                      background: idx % 2 === 0 ? "#f8f9ff" : "#fff",
+                      border: "1px solid #eef0ff",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div
                         style={{
-                          padding: "4px 6px",
-                          color: "#555",
-                          fontSize: "11px",
-                          borderBottom: "1px solid #f0f0f0",
-                        }}
-                      >
-                        {fmtD(u.update_date || u.created_at)}
-                      </td>
-                      <td
-                        style={{
-                          padding: "4px 6px",
-                          color: "#555",
-                          fontSize: "11px",
-                          borderBottom: "1px solid #f0f0f0",
-                        }}
-                      >
-                        {fmtT(
-                          u.update_time || u.created_at?.split("T")[1] || "",
-                        )}
-                      </td>
-                      <td
-                        style={{
-                          padding: "4px 6px",
+                          fontSize: "13px",
                           color: "#333",
-                          borderBottom: "1px solid #f0f0f0",
+                          marginBottom: "3px",
                         }}
                       >
                         {u.update_note}
-                      </td>
-                      <td
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#aaa" }}>
+                        {fmtD(u.update_date || u.created_at)} ·{" "}
+                        {fmtT(
+                          u.update_time || u.created_at?.split("T")[1] || "",
+                        )}{" "}
+                        · {u.created_by || "—"}
+                      </div>
+                    </div>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDeleteUpdate(u.id)}
                         style={{
-                          padding: "4px 6px",
-                          color: "#888",
-                          fontSize: "11px",
-                          borderBottom: "1px solid #f0f0f0",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          color: "#ddd",
+                          fontSize: "13px",
+                          marginLeft: "6px",
+                          flexShrink: 0,
                         }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.color = "#ef4444")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.color = "#ddd")
+                        }
                       >
-                        {u.created_by || "—"}
-                      </td>
-                      {isAdmin && (
-                        <td
-                          style={{
-                            padding: "4px 6px",
-                            borderBottom: "1px solid #f0f0f0",
-                            textAlign: "center" as const,
-                          }}
-                        >
-                          <button
-                            onClick={() => handleDeleteUpdate(u.id)}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              cursor: "pointer",
-                              color: "#ddd",
-                              fontSize: "12px",
-                            }}
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.color = "#ef4444")
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.color = "#ddd")
-                            }
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+                        🗑️
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
 
-            {/* Add update input */}
+            {/* Add update */}
             <div style={{ display: "flex", gap: "6px" }}>
               <input
                 type="text"
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                placeholder="Add update note..."
+                placeholder="Add update..."
                 style={{
                   flex: 1,
-                  padding: "5px 8px",
+                  padding: "6px 10px",
                   fontSize: "12px",
-                  border: "1px solid #c7d0ff",
-                  borderRadius: "5px",
+                  border: "1px solid #d0d5ff",
+                  borderRadius: "6px",
                   outline: "none",
                 }}
               />
@@ -429,11 +461,11 @@ const MeetingDetailPanel = ({
                 onClick={handleAdd}
                 disabled={saving || !newNote.trim()}
                 style={{
-                  padding: "5px 10px",
+                  padding: "6px 12px",
                   background: "#667eea",
                   color: "#fff",
                   border: "none",
-                  borderRadius: "5px",
+                  borderRadius: "6px",
                   cursor: "pointer",
                   fontSize: "12px",
                   fontWeight: 600,
@@ -1713,7 +1745,7 @@ const ProjectDashboard = () => {
   return (
     <div className="project-dashboard">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div className="logo-container" onClick={handleBackToDashboard}>
             <img
@@ -1740,7 +1772,8 @@ const ProjectDashboard = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       {/* Main Content */}
       <div className="project-main-content">
@@ -2751,14 +2784,13 @@ const ProjectDashboard = () => {
                       textTransform: "uppercase" as const,
                     }}
                   >
-                    Customer Side Notes
+                    Customer Side
                   </label>
-                  <textarea
+                  <input
                     value={newMeetingCustomerSide}
                     onChange={(e) => setNewMeetingCustomerSide(e.target.value)}
-                    placeholder="Notes from customer side..."
+                    placeholder="Customer Side..."
                     className="meeting-input"
-                    rows={2}
                     style={{ width: "100%", resize: "vertical" as const }}
                   />
                 </div>
@@ -2773,14 +2805,13 @@ const ProjectDashboard = () => {
                       textTransform: "uppercase" as const,
                     }}
                   >
-                    CM Side Notes
+                    CM Side
                   </label>
-                  <textarea
+                  <input
                     value={newMeetingCMSide}
                     onChange={(e) => setNewMeetingCMSide(e.target.value)}
-                    placeholder="Notes from CM side..."
+                    placeholder=" CM Side"
                     className="meeting-input"
-                    rows={2}
                     style={{ width: "100%", resize: "vertical" as const }}
                   />
                 </div>
@@ -2984,7 +3015,7 @@ const ProjectDashboard = () => {
                       isAdmin={isAdmin}
                     />
                   </td> */}
-                  <td style={{ padding: "8px" }}>
+                  <td style={{ padding: "8px", position: "relative" as const }}>
                     <MeetingDetailPanel
                       meeting={meeting}
                       customerId={customerId}

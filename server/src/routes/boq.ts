@@ -15,110 +15,248 @@ interface AuthRequest extends Request {
 const getPool = (req: Request): Pool => req.app.locals.pool;
 
 // GET all BOQ items
+// router.get(
+//   "/boq",
+//   authenticateToken,
+//   async (req: AuthRequest, res: Response): Promise<void> => {
+//     const pool = getPool(req);
+//     const { customer_id } = req.query;
+//     try {
+//       const result = await pool.query(
+//         `SELECT b.*,
+//         (b.available_quantity - COALESCE(SUM(cpe.required_quantity) FILTER (WHERE cpe.entry_type = 'boq'), 0)) AS remaining_quantity
+//        FROM boq_items b
+//        LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id
+//        GROUP BY b.id
+//        ORDER BY b.item_no ASC`,
+//       );
+//       res.json({ success: true, items: result.rows });
+//     } catch (error: any) {
+//       res.status(500).json({ success: false, error: error?.message });
+//     }
+//   },
+// );
+
 router.get(
   "/boq",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
+    const { customer_id } = req.query;
     try {
-      const result = await pool.query(
-        `SELECT b.*,
-        (b.available_quantity - COALESCE(SUM(cpe.required_quantity) FILTER (WHERE cpe.entry_type = 'boq'), 0)) AS remaining_quantity
-       FROM boq_items b
-       LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id
-       GROUP BY b.id
-       ORDER BY b.item_no ASC`,
-      );
+      let result;
+      if (customer_id) {
+        result = await pool.query(
+          `SELECT b.*,
+            (b.available_quantity - COALESCE(SUM(cpe.required_quantity)
+              FILTER (WHERE cpe.entry_type = 'boq'), 0)) AS remaining_quantity
+           FROM boq_items b
+           LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id
+           WHERE b.customer_id = $1
+           GROUP BY b.id
+           ORDER BY b.item_name ASC, b.specification ASC`,
+          [customer_id],
+        );
+      } else {
+        result = await pool.query(
+          `SELECT b.*,
+            (b.available_quantity - COALESCE(SUM(cpe.required_quantity)
+              FILTER (WHERE cpe.entry_type = 'boq'), 0)) AS remaining_quantity
+           FROM boq_items b
+           LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id
+           GROUP BY b.id
+           ORDER BY b.item_name ASC, b.specification ASC`,
+        );
+      }
       res.json({ success: true, items: result.rows });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error?.message });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to fetch BOQ items" });
     }
   },
 );
 
 // POST create BOQ item (data_entry, admin only)
+// router.post(
+//   "/boq",
+//   authenticateToken,
+//   async (req: AuthRequest, res: Response): Promise<void> => {
+//     const role = req.user?.role;
+//     if (!["admin", "data_entry"].includes(role || "")) {
+//       res.status(403).json({
+//         success: false,
+//         error: "Only data entry or admin can add BOQ items",
+//       });
+//       return;
+//     }
+//     const {
+//       item_no,
+//       item_name,
+//       part_number,
+//       boq_quantity,
+//       available_quantity,
+//     } = req.body;
+//     const pool = getPool(req);
+//     if (!item_name?.trim()) {
+//       res.status(400).json({ success: false, error: "Item name is required" });
+//       return;
+//     }
+//     try {
+//       const result = await pool.query(
+//         `INSERT INTO boq_items (item_no, item_name, part_number, boq_quantity, available_quantity, created_by)
+//        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+//         [
+//           item_no || "",
+//           item_name.trim(),
+//           part_number || "",
+//           boq_quantity || 0,
+//           available_quantity || 0,
+//           req.user?.username,
+//         ],
+//       );
+//       res.status(201).json({ success: true, item: result.rows[0] });
+//     } catch (error: any) {
+//       res.status(500).json({ success: false, error: error?.message });
+//     }
+//   },
+// );
+
 router.post(
   "/boq",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
-    const role = req.user?.role;
-    if (!["admin", "data_entry"].includes(role || "")) {
+    const pool = getPool(req);
+    if (!["admin", "data_entry"].includes(req.user?.role || "")) {
       res.status(403).json({
         success: false,
-        error: "Only data entry or admin can add BOQ items",
+        error: "Only admin or data entry can add BOQ items",
       });
       return;
     }
     const {
-      item_no,
+      customer_id,
       item_name,
+      specification,
       part_number,
       boq_quantity,
       available_quantity,
     } = req.body;
-    const pool = getPool(req);
+
     if (!item_name?.trim()) {
       res.status(400).json({ success: false, error: "Item name is required" });
       return;
     }
+    if (!customer_id) {
+      res.status(400).json({ success: false, error: "Customer is required" });
+      return;
+    }
+
     try {
       const result = await pool.query(
-        `INSERT INTO boq_items (item_no, item_name, part_number, boq_quantity, available_quantity, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+        `INSERT INTO boq_items
+          (customer_id, item_name, specification, part_number, boq_quantity, available_quantity, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
         [
-          item_no || "",
+          customer_id,
           item_name.trim(),
-          part_number || "",
+          specification || null,
+          part_number || null,
           boq_quantity || 0,
           available_quantity || 0,
-          req.user?.username,
+          req.user?.username || "Unknown",
         ],
       );
       res.status(201).json({ success: true, item: result.rows[0] });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error?.message });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to create BOQ item" });
     }
   },
 );
 
 // PUT update BOQ item (data_entry, admin only)
+// router.put(
+//   "/boq/:itemId",
+//   authenticateToken,
+//   async (req: AuthRequest, res: Response): Promise<void> => {
+//     const role = req.user?.role;
+//     if (!["admin", "data_entry"].includes(role || "")) {
+//       res.status(403).json({
+//         success: false,
+//         error: "Only data entry or admin can edit BOQ items",
+//       });
+//       return;
+//     }
+//     const { itemId } = req.params;
+//     const {
+//       item_no,
+//       item_name,
+//       part_number,
+//       boq_quantity,
+//       available_quantity,
+//     } = req.body;
+//     const pool = getPool(req);
+//     try {
+//       const result = await pool.query(
+//         `UPDATE boq_items SET item_no=$1, item_name=$2, part_number=$3, boq_quantity=$4, available_quantity=$5, updated_at=NOW()
+//        WHERE id=$6 RETURNING *`,
+//         [
+//           item_no || "",
+//           item_name,
+//           part_number || "",
+//           boq_quantity || 0,
+//           available_quantity || 0,
+//           itemId,
+//         ],
+//       );
+//       res.json({ success: true, item: result.rows[0] });
+//     } catch (error: any) {
+//       res.status(500).json({ success: false, error: error?.message });
+//     }
+//   },
+// );
 router.put(
-  "/boq/:itemId",
+  "/boq/:id",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
-    const role = req.user?.role;
-    if (!["admin", "data_entry"].includes(role || "")) {
-      res.status(403).json({
-        success: false,
-        error: "Only data entry or admin can edit BOQ items",
-      });
+    const pool = getPool(req);
+
+    if (req.user?.role !== "admin") {
+      res
+        .status(403)
+        .json({ success: false, error: "Only admins can edit BOQ items" });
       return;
     }
-    const { itemId } = req.params;
+    const { id } = req.params;
     const {
-      item_no,
       item_name,
+      specification,
       part_number,
       boq_quantity,
       available_quantity,
     } = req.body;
-    const pool = getPool(req);
     try {
       const result = await pool.query(
-        `UPDATE boq_items SET item_no=$1, item_name=$2, part_number=$3, boq_quantity=$4, available_quantity=$5, updated_at=NOW()
-       WHERE id=$6 RETURNING *`,
+        `UPDATE boq_items SET
+          item_name = $1, specification = $2, part_number = $3,
+          boq_quantity = $4, available_quantity = $5, updated_at = NOW()
+         WHERE id = $6 RETURNING *`,
         [
-          item_no || "",
           item_name,
-          part_number || "",
+          specification || null,
+          part_number || null,
           boq_quantity || 0,
           available_quantity || 0,
-          itemId,
+          id,
         ],
       );
       res.json({ success: true, item: result.rows[0] });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error?.message });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to update BOQ item" });
     }
   },
 );
@@ -152,8 +290,11 @@ router.get(
     const pool = getPool(req);
     try {
       const result = await pool.query(
-        `SELECT cpe.*, b.item_no, b.part_number, b.boq_quantity,
-              b.available_quantity as boq_available
+        `SELECT cpe.*,
+       COALESCE(cpe.specification, b.specification) AS specification,
+       COALESCE(cpe.part_number, b.part_number) AS part_number,
+       b.boq_quantity,
+       b.available_quantity as boq_available
        FROM customer_purchasing_entries cpe
        LEFT JOIN boq_items b ON b.id = cpe.boq_item_id
        WHERE cpe.customer_id = $1
@@ -178,6 +319,8 @@ router.post(
       entry_type,
       boq_item_id,
       product,
+      specification,
+      part_number,
       required_quantity,
       required_date,
       description,
@@ -217,13 +360,15 @@ router.post(
 
       const result = await pool.query(
         `INSERT INTO customer_purchasing_entries
-    (customer_id, entry_type, boq_item_id, product, available_quantity, required_quantity, shortage_quantity, required_date, description, requested_by)
-   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+    (customer_id, entry_type, boq_item_id, product, specification, part_number, available_quantity, required_quantity, shortage_quantity, required_date, description, requested_by)
+   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
         [
           customerId,
           entry_type || "boq",
           boq_item_id || null,
           product.trim(),
+          specification || null,
+          part_number || null,
           available_quantity,
           required_quantity || 0,
           shortage_quantity,
@@ -232,36 +377,100 @@ router.post(
           req.user?.username,
         ],
       );
-
-      // Auto-create BOQ item if this is a non-BOQ entry
-      if (entry_type === "non_boq") {
-        // Check if a BOQ item with this product name already exists
-        const existing = await pool.query(
-          `SELECT id FROM boq_items WHERE LOWER(item_name) = LOWER($1)`,
-          [product.trim()],
-        );
-
-        if (existing.rows.length === 0) {
-          // Create new BOQ item with blank item_no and part_number
-          // data_entry/admin can fill those in later from the BOQ page
-          await pool.query(
-            `INSERT INTO boq_items (item_no, item_name, part_number, boq_quantity, available_quantity, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-            [
-              "", // item_no — to be filled later
-              product.trim(),
-              "", // part_number — to be filled later
-              0, // boq_quantity — to be filled later
-              0, // available_quantity — to be filled later
-              req.user?.username,
-            ],
-          );
-        }
-      }
-
       res.status(201).json({ success: true, entry: result.rows[0] });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error?.message });
+    }
+  },
+);
+
+// PUT update entry stage (order / approve / po / invoice / driver)
+router.put(
+  "/boq/customer/:customerId/entries/:entryId/:action",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { entryId, action } = req.params;
+    const pool = getPool(req);
+    const username = req.user?.username || "Unknown";
+    const role = req.user?.role || "";
+
+    try {
+      let result;
+      if (action === "order") {
+        result = await pool.query(
+          `UPDATE customer_purchasing_entries
+           SET order_form_no = $1, order_notes = $2,
+               order_saved_at = NOW(), order_saved_by = $3
+           WHERE id = $4 RETURNING *`,
+          [
+            req.body.order_form_no || null,
+            req.body.order_notes || null,
+            username,
+            entryId,
+          ],
+        );
+      } else if (action === "approve") {
+        if (!["admin", "office_admin"].includes(role)) {
+          res
+            .status(403)
+            .json({
+              success: false,
+              error: "Only admin/office_admin can approve",
+            });
+          return;
+        }
+        result = await pool.query(
+          `UPDATE customer_purchasing_entries
+           SET approved = TRUE, approved_by = $1, approved_at = NOW(),
+               approved_quantity = $2
+           WHERE id = $3 RETURNING *`,
+          [username, req.body.approved_quantity ?? null, entryId],
+        );
+      } else if (action === "po") {
+        result = await pool.query(
+          `UPDATE customer_purchasing_entries
+           SET po_no = $1, po_saved_at = NOW(), po_saved_by = $2
+           WHERE id = $3 RETURNING *`,
+          [req.body.po_no || null, username, entryId],
+        );
+      } else if (action === "invoice") {
+        result = await pool.query(
+          `UPDATE customer_purchasing_entries
+           SET invoice_no = $1, invoice_saved_at = NOW(), invoice_saved_by = $2
+           WHERE id = $3 RETURNING *`,
+          [req.body.invoice_no || null, username, entryId],
+        );
+      } else if (action === "driver") {
+        result = await pool.query(
+          `UPDATE customer_purchasing_entries
+           SET purchase_date = $1, drivers_name = $2, vehicle_no = $3,
+               received = $4, delivery_notes = $5,
+               driver_saved_at = NOW(), driver_saved_by = $6
+           WHERE id = $7 RETURNING *`,
+          [
+            req.body.purchase_date || null,
+            req.body.drivers_name || null,
+            req.body.vehicle_no || null,
+            req.body.received || null,
+            req.body.delivery_notes || null,
+            username,
+            entryId,
+          ],
+        );
+      } else {
+        res.status(400).json({ success: false, error: "Invalid action" });
+        return;
+      }
+
+      res.json({ success: true, entry: result.rows[0] });
+    } catch (error: any) {
+      console.error(
+        "Update customer entry stage error:",
+        error?.message || error,
+      );
+      res
+        .status(500)
+        .json({ success: false, error: error?.message || "Failed to update" });
     }
   },
 );

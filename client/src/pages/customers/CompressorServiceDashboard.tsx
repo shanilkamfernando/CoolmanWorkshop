@@ -8,6 +8,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./CompressorServiceDashboard.css";
 import "./ProjectDashboard.css";
+import AppHeader from "../../components/AppHeader";
 import companyLogo from "../../assets/mainlogo.jpeg";
 
 interface User {
@@ -955,7 +956,7 @@ const CompressorServiceDashboard = () => {
   return (
     <div className="project-dashboard">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left" onClick={() => navigate("/dashboard")}>
           <img src={companyLogo} alt="Logo" className="company-logo" />
           <h1 className="portal-title">
@@ -992,7 +993,8 @@ const CompressorServiceDashboard = () => {
             Logout
           </button>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       {/* Main */}
       <div className="project-main-content">

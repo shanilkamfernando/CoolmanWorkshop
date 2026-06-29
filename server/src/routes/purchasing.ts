@@ -147,12 +147,28 @@ router.get(
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
+    const { workshop_customer_id } = req.query;
     const pool = getPool(req);
     try {
-      const result = await pool.query(
-        `SELECT * FROM purchasing_entries WHERE customer_id = $1 ORDER BY created_at ASC`,
-        [customerId],
-      );
+      let result;
+      if (workshop_customer_id) {
+        // Coming from workshop side — fetch by workshop_customer_id
+        result = await pool.query(
+          `SELECT * FROM purchasing_entries 
+           WHERE workshop_customer_id = $1 
+           ORDER BY created_at ASC`,
+          [workshop_customer_id],
+        );
+      } else {
+        // Fetch by customer_id OR any entries whose workshop customer
+        // maps to this purchasing customer
+        result = await pool.query(
+          `SELECT * FROM purchasing_entries 
+           WHERE customer_id = $1
+           ORDER BY created_at ASC`,
+          [customerId],
+        );
+      }
       res.json({ success: true, entries: result.rows });
     } catch (error) {
       res
@@ -161,15 +177,21 @@ router.get(
     }
   },
 );
-
 // POST create entry — auto creates a workshop job card
 router.post(
   "/purchasing/customers/:customerId/entries",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
-    const { product, quantity, description, due_date, workshop_customer_id } =
-      req.body;
+    const {
+      product,
+      quantity,
+      description,
+      due_date,
+      workshop_customer_id,
+      job_card_id,
+      job_card_number,
+    } = req.body;
     const pool = getPool(req);
 
     if (!product?.trim()) {
@@ -178,36 +200,6 @@ router.post(
     }
 
     try {
-      // Step 1: Auto-generate job card number — Format: CMR.PUR.XXXX@YYYY
-      const year = new Date().getFullYear();
-      const countResult = await pool.query(
-        `SELECT COUNT(*) FROM workshop_job_cards WHERE EXTRACT(YEAR FROM created_at) = $1`,
-        [year],
-      );
-      const count = parseInt(countResult.rows[0].count) + 1;
-      const paddedCount = String(count).padStart(4, "0");
-      const generatedJobCardNumber = `CMR.PUR.${paddedCount}@${year}`;
-
-      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
-
-      const jobCardResult = await pool.query(
-        `INSERT INTO workshop_job_cards
-    (workshop_customer_id, job_card_number, item, job_description, date, status, created_by, created_at)
-   VALUES ($1, $2, $3, $4, $5, 'open', $6, NOW())
-   RETURNING id, job_card_number`,
-        [
-          workshop_customer_id || null,
-          generatedJobCardNumber,
-          product.trim(),
-          description || "",
-          today,
-          req.user?.username,
-        ],
-      );
-
-      const newJobCard = jobCardResult.rows[0];
-
-      // Step 3: Create the purchasing entry linked to the job card
       const result = await pool.query(
         `INSERT INTO purchasing_entries
           (customer_id, user_name, product, quantity, description, due_date,
@@ -222,8 +214,8 @@ router.post(
           description || null,
           due_date || null,
           workshop_customer_id || null,
-          newJobCard.id,
-          newJobCard.job_card_number,
+          job_card_id || null,
+          job_card_number || null,
           req.user?.username,
         ],
       );
@@ -349,30 +341,6 @@ router.put(
   },
 );
 
-// DELETE entry (admin only)
-router.delete(
-  "/purchasing/customers/:customerId/entries/:entryId",
-  authenticateToken,
-  async (req: AuthRequest, res: Response): Promise<void> => {
-    const { entryId } = req.params;
-    const pool = getPool(req);
-
-    if (req.user?.role !== "admin") {
-      res
-        .status(403)
-        .json({ success: false, error: "Only admins can delete entries" });
-      return;
-    }
-
-    try {
-      await pool.query("DELETE FROM purchasing_entries WHERE id=$1", [entryId]);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(500).json({ success: false, error: "Failed to delete entry" });
-    }
-  },
-);
-
 // ─── WORKSHOP CUSTOMER & JOB CARD DROPDOWNS ──────────────────────
 
 // GET workshop customers for dropdown
@@ -414,6 +382,184 @@ router.get(
       res
         .status(500)
         .json({ success: false, error: "Failed to fetch job cards" });
+    }
+  },
+);
+
+// Add this new route in purchasing.ts — GET entries by workshop_customer_id
+router.get(
+  "/purchasing/workshop-customers/:workshopCustomerId/entries",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { workshopCustomerId } = req.params;
+    const pool = getPool(req);
+    try {
+      const result = await pool.query(
+        `SELECT * FROM purchasing_entries 
+         WHERE workshop_customer_id = $1 
+         ORDER BY created_at ASC`,
+        [workshopCustomerId],
+      );
+      res.json({ success: true, entries: result.rows });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to fetch entries" });
+    }
+  },
+);
+
+// GET all product rows for a purchasing entry
+router.get(
+  "/purchasing/entries/:entryId/products",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { entryId } = req.params;
+    const pool = getPool(req);
+    try {
+      const result = await pool.query(
+        `SELECT * FROM purchasing_flow_products
+         WHERE purchasing_entry_id = $1
+         ORDER BY job_card_item_id ASC, id ASC`,
+        [entryId],
+      );
+      res.json({ success: true, products: result.rows });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error?.message || "Failed to fetch products",
+      });
+    }
+  },
+);
+
+// PUT batch-update per-product stage fields for an entry
+// body: { stage: "order"|"po"|"invoice"|"driver", products: [{ id, ...fields }] }
+router.put(
+  "/purchasing/entries/:entryId/products",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { entryId } = req.params;
+    const { stage, products } = req.body;
+    const pool = getPool(req);
+    const username = req.user?.username || "Unknown";
+    const role = req.user?.role || "";
+
+    if (!Array.isArray(products)) {
+      res
+        .status(400)
+        .json({ success: false, error: "products array required" });
+      return;
+    }
+
+    try {
+      for (const p of products) {
+        if (stage === "order") {
+          await pool.query(
+            `UPDATE purchasing_flow_products
+             SET order_form_no = $1, order_notes = $2,
+                 order_saved_at = NOW(), order_saved_by = $3, updated_at = NOW()
+             WHERE id = $4 AND purchasing_entry_id = $5`,
+            [
+              p.order_form_no || null,
+              p.order_notes || null,
+              username,
+              p.id,
+              entryId,
+            ],
+          );
+        } else if (stage === "po") {
+          await pool.query(
+            `UPDATE purchasing_flow_products
+             SET po_no = $1,
+                 po_saved_at = NOW(), po_saved_by = $2, updated_at = NOW()
+             WHERE id = $3 AND purchasing_entry_id = $4`,
+            [p.po_no || null, username, p.id, entryId],
+          );
+        } else if (stage === "invoice") {
+          await pool.query(
+            `UPDATE purchasing_flow_products
+             SET invoice_no = $1,
+                 invoice_saved_at = NOW(), invoice_saved_by = $2, updated_at = NOW()
+             WHERE id = $3 AND purchasing_entry_id = $4`,
+            [p.invoice_no || null, username, p.id, entryId],
+          );
+        } else if (stage === "driver") {
+          await pool.query(
+            `UPDATE purchasing_flow_products
+             SET purchase_date = $1, drivers_name = $2, vehicle_no = $3,
+                 received = $4, delivery_notes = $5,
+                 driver_saved_at = NOW(), driver_saved_by = $6, updated_at = NOW()
+             WHERE id = $7 AND purchasing_entry_id = $8`,
+            [
+              p.purchase_date || null,
+              p.drivers_name || null,
+              p.vehicle_no || null,
+              p.received || null,
+              p.delivery_notes || null,
+              username,
+              p.id,
+              entryId,
+            ],
+          );
+        } else if (stage === "approve") {
+          if (!["admin", "office_admin"].includes(role)) {
+            res
+              .status(403)
+              .json({
+                success: false,
+                error: "Only admin/office_admin can approve",
+              });
+            return;
+          }
+          await pool.query(
+            `UPDATE purchasing_flow_products
+             SET approved = TRUE,
+                 approved_by = $1,
+                 approved_at = NOW(),
+                 approved_quantity = $2,
+                 updated_at = NOW()
+             WHERE id = $3 AND purchasing_entry_id = $4`,
+            [username, p.approved_quantity ?? null, p.id, entryId],
+          );
+        }
+      }
+
+      const result = await pool.query(
+        `SELECT * FROM purchasing_flow_products
+         WHERE purchasing_entry_id = $1 ORDER BY job_card_item_id ASC, id ASC`,
+        [entryId],
+      );
+      res.json({ success: true, products: result.rows });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error?.message || "Failed to update products",
+      });
+    }
+  },
+);
+
+// DELETE entry (admin only)
+router.delete(
+  "/purchasing/customers/:customerId/entries/:entryId",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { entryId } = req.params;
+    const pool = getPool(req);
+
+    if (req.user?.role !== "admin") {
+      res
+        .status(403)
+        .json({ success: false, error: "Only admins can delete entries" });
+      return;
+    }
+
+    try {
+      await pool.query("DELETE FROM purchasing_entries WHERE id=$1", [entryId]);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ success: false, error: "Failed to delete entry" });
     }
   },
 );

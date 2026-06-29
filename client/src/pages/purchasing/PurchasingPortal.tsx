@@ -52,18 +52,18 @@ const PurchasingPortal = () => {
       path: "/purchasing/customer-list",
       color: "#2196F3",
     },
-    ...(user?.role === "admin" || user?.role === "data_entry"
-      ? [
-          {
-            id: 3,
-            title: "BOQ",
-            description: "Bill of Quantities data entry",
-            icon: "📊",
-            path: "/purchasing/boq",
-            color: "#0891b2",
-          },
-        ]
-      : []),
+    // ...(user?.role === "admin" || user?.role === "data_entry"
+    //   ? [
+    //       {
+    //         id: 3,
+    //         title: "BOQ",
+    //         description: "Bill of Quantities data entry",
+    //         icon: "📊",
+    //         path: "/purchasing/boq",
+    //         color: "#0891b2",
+    //       },
+    //     ]
+    //   : []),
   ];
 
   const handlePortalClick = (path: string) => {

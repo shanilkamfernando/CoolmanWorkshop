@@ -394,7 +394,10 @@ const PurchasingCustomerList = () => {
                   }}
                   onClick={() =>
                     navigate(`/purchasing/customers/${customer.id}/dashboard`, {
-                      state: { customer },
+                      state: {
+                        customer: { id: customer.id, name: customer.name },
+                        // workshopCustomerId: customer.workshop_customer_id, // ← add this
+                      },
                     })
                   }
                 >

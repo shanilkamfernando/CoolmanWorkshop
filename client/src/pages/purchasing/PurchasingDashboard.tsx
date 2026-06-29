@@ -53,12 +53,34 @@ interface WorkshopCustomer {
   id: number;
   name: string;
 }
-// interface JobCard {
-//   id: number;
-//   job_card_number: string;
-//   item: string;
-//   status: string;
-// }
+
+interface FlowProduct {
+  id: number;
+  product: string;
+  item_number: string;
+  quantity: string;
+  order_form_no: string;
+  order_notes: string;
+  po_no: string;
+  invoice_no: string;
+  purchase_date: string;
+  drivers_name: string;
+  vehicle_no: string;
+  received: string;
+  delivery_notes: string;
+  order_saved_at: string;
+  order_saved_by: string;
+  po_saved_at: string;
+  po_saved_by: string;
+  invoice_saved_at: string;
+  invoice_saved_by: string;
+  driver_saved_at: string;
+  driver_saved_by: string;
+  approved: boolean;
+  approved_at: string;
+  approved_by: string;
+  approved_quantity: string;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────
 const getInitials = (name: string) => {
@@ -83,6 +105,28 @@ const getColor = (name: string) => {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
   return colors[Math.abs(h) % colors.length];
+};
+// Renders qty cell — strikethrough original + show approved if admin changed it
+const renderQty = (r: FlowProduct) => {
+  const orig = r.quantity || "";
+  const approved = r.approved_quantity || "";
+  if (approved && approved !== orig) {
+    return (
+      <span>
+        <span
+          style={{
+            textDecoration: "line-through",
+            color: "#9ca3af",
+            marginRight: "6px",
+          }}
+        >
+          {orig || "—"}
+        </span>
+        <strong style={{ color: "#059669" }}>{approved}</strong>
+      </span>
+    );
+  }
+  return <span>{orig || "—"}</span>;
 };
 const fmtDate = (d: string) => {
   if (!d) return "—";
@@ -109,7 +153,6 @@ const STEPS = [
   { label: "Delivered", icon: "🚚", color: "#16a34a" },
 ];
 
-// Which step has been completed (0 = only request done, 5 = all done)
 const getCompletedStep = (entry: Entry): number => {
   if (entry.drivers_name || entry.purchase_date) return 5;
   if (entry.invoice_no) return 4;
@@ -118,115 +161,294 @@ const getCompletedStep = (entry: Entry): number => {
   if (entry.order_form_no) return 1;
   return 0;
 };
+// ── Helper: format saved-at info ──
+const fmtSavedAt = (at: string, by: string) => {
+  if (!at) return null;
+  return `Saved ${fmtDT(at)} by ${by || "?"}`;
+};
 
-// ── Progress Bar (display only, not clickable) ────────────────────
-const StepBar = ({ entry }: { entry: Entry }) => {
-  const completed = getCompletedStep(entry);
+// ── Per-row product table component (OUTSIDE StagePanel to keep input focus) ──
+const ProductRowsTable = ({
+  rows,
+  stage,
+  columns,
+  isAdmin,
+  isStageEditor,
+  onSaveRow,
+  onApproveRow,
+  showApprove,
+  editableQty,
+}: {
+  rows: FlowProduct[];
+  stage: string;
+  columns: { field: keyof FlowProduct; label: string; type?: string }[];
+  isAdmin: boolean;
+  isStageEditor: boolean;
+  onSaveRow: (row: FlowProduct) => void;
+  onApproveRow?: (row: FlowProduct) => void;
+  showApprove?: boolean;
+  editableQty?: boolean;
+}) => {
+  // local editable copy — keyed by row id so React preserves input focus
+  const [edits, setEdits] = useState<Record<number, Partial<FlowProduct>>>({});
+
+  // reset edits when the underlying rows change (after a save)
+  useEffect(() => {
+    setEdits({});
+  }, [
+    rows
+      .map((r) => r.id + ":" + r[`${stage}_saved_at` as keyof FlowProduct])
+      .join("|"),
+  ]);
+
+  const getVal = (r: FlowProduct, f: keyof FlowProduct) =>
+    edits[r.id]?.[f] !== undefined
+      ? (edits[r.id]![f] as string)
+      : (r[f] as string) || "";
+
+  const setCell = (id: number, field: keyof FlowProduct, value: string) =>
+    setEdits((e) => ({ ...e, [id]: { ...(e[id] || {}), [field]: value } }));
+
+  const isRowLocked = (r: FlowProduct) => {
+    // Locked = this stage's saved_at is set. Admins can always edit.
+    if (isAdmin) return false;
+    const savedAtKey = `${stage}_saved_at` as keyof FlowProduct;
+    return !!r[savedAtKey];
+  };
+
+  if (rows.length === 0) {
+    return (
+      <div
+        style={{
+          color: "#9ca3af",
+          fontSize: "13px",
+          fontStyle: "italic",
+          padding: "12px 0",
+        }}
+      >
+        No products yet. Save the job card's item list to generate product rows.
+      </div>
+    );
+  }
+
+  const thS: React.CSSProperties = {
+    padding: "8px 10px",
+    fontSize: "11px",
+    fontWeight: 700,
+    color: "#6b7280",
+    textTransform: "uppercase",
+    textAlign: "left",
+    borderBottom: "1px solid #e5e7eb",
+    background: "#f9fafb",
+  };
+  const tdS: React.CSSProperties = {
+    padding: "6px 10px",
+    fontSize: "13px",
+    borderBottom: "1px solid #f3f4f6",
+    verticalAlign: "top",
+  };
+
   return (
-    <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
-      {STEPS.map((s, i) => {
-        const done = i <= completed;
-        const active = i === completed;
-        return (
-          <div
-            key={i}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              flex: i < STEPS.length - 1 ? 1 : "none",
-            }}
-          >
-            <div
-              title={s.label}
-              style={{
-                width: active ? "28px" : "22px",
-                height: active ? "28px" : "22px",
-                borderRadius: "50%",
-                background: done
-                  ? i === 5 && done
-                    ? "#16a34a"
-                    : "#1f2937"
-                  : "#e5e7eb",
-                color: done ? "#fff" : "#9ca3af",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: active ? "12px" : "9px",
-                fontWeight: 700,
-                flexShrink: 0,
-                boxShadow: active ? "0 0 0 3px rgba(0,0,0,0.12)" : "none",
-                transition: "all 0.2s",
-              }}
-            >
-              {done && i < completed ? "✓" : s.icon}
-            </div>
-            {i < STEPS.length - 1 && (
-              <div
-                style={{
-                  flex: 1,
-                  height: "3px",
-                  background: i < completed ? "#1f2937" : "#e5e7eb",
-                  margin: "0 2px",
-                  transition: "background 0.3s",
-                }}
-              />
-            )}
-          </div>
-        );
-      })}
+    <div
+      style={{
+        overflowX: "auto",
+        border: "1px solid #e5e7eb",
+        borderRadius: "8px",
+      }}
+    >
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr>
+            <th style={thS}>Product</th>
+            <th style={thS}>Item No</th>
+            <th style={thS}>Qty</th>
+            {columns.map((c) => (
+              <th key={String(c.field)} style={thS}>
+                {c.label}
+              </th>
+            ))}
+            <th style={thS}>Saved</th>
+            <th style={thS}>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const locked = isRowLocked(r);
+            const savedAt = r[
+              `${stage}_saved_at` as keyof FlowProduct
+            ] as string;
+            const savedBy = r[
+              `${stage}_saved_by` as keyof FlowProduct
+            ] as string;
+            return (
+              <tr key={r.id}>
+                <td style={{ ...tdS, fontWeight: 500 }}>{r.product || "—"}</td>
+                <td style={tdS}>{r.item_number || "—"}</td>
+                <td style={tdS}>
+                  {editableQty && (isAdmin || isStageEditor) && !r.approved ? (
+                    <input
+                      type="text"
+                      value={
+                        edits[r.id]?.approved_quantity !== undefined
+                          ? (edits[r.id]!.approved_quantity as string)
+                          : r.approved_quantity || r.quantity || ""
+                      }
+                      onChange={(e) =>
+                        setCell(r.id, "approved_quantity", e.target.value)
+                      }
+                      style={{
+                        width: "80px",
+                        padding: "5px 8px",
+                        fontSize: "13px",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "5px",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  ) : (
+                    renderQty(r)
+                  )}
+                </td>
+                {columns.map((c) => (
+                  <td key={String(c.field)} style={tdS}>
+                    {!isStageEditor || locked ? (
+                      <span>{(r[c.field] as string) || "—"}</span>
+                    ) : (
+                      <input
+                        type={c.type || "text"}
+                        value={getVal(r, c.field)}
+                        onChange={(e) => setCell(r.id, c.field, e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "5px 8px",
+                          fontSize: "13px",
+                          border: "1px solid #d1d5db",
+                          borderRadius: "5px",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    )}
+                  </td>
+                ))}
+                <td style={{ ...tdS, fontSize: "11px", color: "#6b7280" }}>
+                  {savedAt ? fmtSavedAt(savedAt, savedBy) : "—"}
+                </td>
+                <td style={tdS}>
+                  {showApprove ? (
+                    r.approved ? (
+                      <span
+                        style={{
+                          fontSize: "11px",
+                          color: "#059669",
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✓ {r.approved_by}
+                        <br />
+                        {fmtDT(r.approved_at)}
+                      </span>
+                    ) : isAdmin || isStageEditor ? (
+                      <button
+                        onClick={() => {
+                          const merged = {
+                            ...r,
+                            ...(edits[r.id] || {}),
+                          } as FlowProduct;
+                          // If admin didn't touch the qty, default approved_quantity to the original
+                          if (!merged.approved_quantity) {
+                            merged.approved_quantity = r.quantity;
+                          }
+                          onApproveRow?.(merged);
+                        }}
+                        style={{
+                          background: "#059669",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: "5px",
+                          padding: "5px 12px",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✓ Approve
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: "11px", color: "#9ca3af" }}>
+                        Pending
+                      </span>
+                    )
+                  ) : isStageEditor && !locked ? (
+                    <button
+                      onClick={() => {
+                        const merged = {
+                          ...r,
+                          ...(edits[r.id] || {}),
+                        } as FlowProduct;
+                        onSaveRow(merged);
+                      }}
+                      style={{
+                        background: "#1f2937",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: "5px",
+                        padding: "5px 12px",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Save
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: "11px", color: "#9ca3af" }}>
+                      {locked ? "🔒 Saved" : "—"}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 };
 
-// ── Stage Panel with clickable tabs ──────────────────────────────
+// ── Stage Panel ───────────────────────────────────────────────────
 const StagePanel = ({
   entry,
   userRole,
   onUpdate,
   inp,
   setInp,
+  products,
+  onSaveProductRow,
+  onApproveProductRow,
 }: {
   entry: Entry;
   userRole: string;
   onUpdate: (id: number, action: string, data: any) => void;
   inp: any;
   setInp: (field: string, value: string) => void;
+  products: FlowProduct[];
+  onSaveProductRow: (entryId: number, stage: string, row: FlowProduct) => void;
+  onApproveProductRow: (entryId: number, row: FlowProduct) => void;
 }) => {
   const completed = getCompletedStep(entry);
   const [selectedTab, setSelectedTab] = useState(completed);
 
-  // Keep selected tab in sync when entry updates
   useEffect(() => {
     setSelectedTab(getCompletedStep(entry));
   }, [entry.id]);
 
-  // Role flags
+  const isAdmin = userRole === "admin";
   const isOffice = ["office", "office_admin", "admin"].includes(userRole);
   const canApprove = ["admin", "office_admin"].includes(userRole);
   const isStores = ["stores", "office", "office_admin", "admin"].includes(
     userRole,
   );
 
-  const fieldStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "7px 10px",
-    fontSize: "13px",
-    border: "1px solid #d1d5db",
-    borderRadius: "6px",
-    background: "#fff",
-    boxSizing: "border-box",
-  };
-  const saveBtn = (_bg: string): React.CSSProperties => ({
-    background: "#1f2937",
-    color: "#fff",
-    border: "none",
-    borderRadius: "6px",
-    padding: "8px 20px",
-    cursor: "pointer",
-    fontSize: "13px",
-    fontWeight: 600,
-    marginTop: "4px",
-  });
   const lbl: React.CSSProperties = {
     fontSize: "11px",
     fontWeight: 600,
@@ -260,412 +482,147 @@ const StagePanel = ({
     </div>
   );
 
-  const waiting = (msg: string) => (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
-        padding: "12px 0",
-        color: "#9ca3af",
-      }}
-    >
-      <span style={{ fontSize: "20px" }}>⏳</span>
-      <span style={{ fontSize: "13px", fontStyle: "italic" }}>{msg}</span>
-    </div>
-  );
-
-  // ── Stage content per tab ─────────────────────────────────────
   const renderTab = (tab: number) => {
     switch (tab) {
-      // ── 0: Request ──────────────────────────────────────────
       case 0:
         return (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-              gap: "16px",
-            }}
-          >
-            <ReadRow label="Requested By" value={entry.user_name} />
-            <ReadRow label="Product" value={entry.product} />
-            <ReadRow label="Quantity" value={entry.quantity} />
-            <ReadRow label="Requested On" value={fmtDT(entry.user_datetime)} />
-            <div>
-              <span style={lbl}>Due Date</span>
-              <span
-                style={{
-                  ...val,
-                  color:
-                    entry.due_date &&
-                    new Date(entry.due_date) < new Date() &&
-                    completed < 5
-                      ? "#dc2626"
-                      : "#111827",
-                }}
-              >
-                {entry.due_date ? fmtDate(entry.due_date) : "—"}
-              </span>
+          <div>
+            {/* Entry-level info */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
+                gap: "16px",
+                marginBottom: "20px",
+              }}
+            >
+              <ReadRow label="Requested By" value={entry.user_name} />
+              <ReadRow
+                label="Requested On"
+                value={fmtDT(entry.user_datetime)}
+              />
+              <div>
+                <span style={lbl}>Due Date</span>
+                <span
+                  style={{
+                    ...val,
+                    color:
+                      entry.due_date &&
+                      new Date(entry.due_date) < new Date() &&
+                      completed < 5
+                        ? "#dc2626"
+                        : "#111827",
+                  }}
+                >
+                  {entry.due_date ? fmtDate(entry.due_date) : "—"}
+                </span>
+              </div>
+              {entry.description && (
+                <div style={{ gridColumn: "span 2" }}>
+                  <ReadRow label="Description" value={entry.description} />
+                </div>
+              )}
             </div>
-            <div style={{ gridColumn: "span 2" }}>
-              <ReadRow label="Description" value={entry.description} />
+
+            {/* Per-product requested list */}
+            <div
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "#6b7280",
+                textTransform: "uppercase",
+                letterSpacing: "0.4px",
+                marginBottom: "8px",
+              }}
+            >
+              Requested Items ({products.length})
             </div>
+            <ProductRowsTable
+              rows={products}
+              stage="request"
+              isAdmin={false}
+              isStageEditor={false}
+              columns={[]}
+              onSaveRow={() => {}}
+            />
           </div>
         );
-
-      // ── 1: Order Form ────────────────────────────────────────
       case 1:
-        if (entry.order_form_no) {
-          // Filled — everyone sees read-only
-          return (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-                gap: "16px",
-              }}
-            >
-              <ReadRow label="Officer" value={entry.office_user_1} />
-              <ReadRow label="Order Form No" value={entry.order_form_no} />
-              <ReadRow label="Notes" value={entry.notes} />
-              <ReadRow label="Date" value={fmtDT(entry.office_datetime_1)} />
-            </div>
-          );
-        }
-        if (isOffice) {
-          return (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "12px",
-                maxWidth: "500px",
-              }}
-            >
-              <div>
-                <span style={lbl}>Order Form No *</span>
-                <input
-                  placeholder="Enter order form number"
-                  value={inp.order_form_no || ""}
-                  style={fieldStyle}
-                  onChange={(e) => setInp("order_form_no", e.target.value)}
-                />
-              </div>
-              <div>
-                <span style={lbl}>Notes</span>
-                <input
-                  placeholder="Notes (optional)"
-                  value={inp.notes || ""}
-                  style={fieldStyle}
-                  onChange={(e) => setInp("notes", e.target.value)}
-                />
-              </div>
-              <div style={{ gridColumn: "span 2" }}>
-                <button
-                  style={saveBtn("#7c3aed")}
-                  onClick={() =>
-                    onUpdate(entry.id, "orderform", {
-                      order_form_no: inp.order_form_no,
-                      notes: inp.notes,
-                    })
-                  }
-                >
-                  Save Order Form
-                </button>
-              </div>
-            </div>
-          );
-        }
-        return waiting("Waiting for office to fill the order form.");
-
-      // ── 2: Approval ──────────────────────────────────────────
+        return (
+          <ProductRowsTable
+            rows={products}
+            stage="order"
+            isAdmin={isAdmin}
+            isStageEditor={isOffice}
+            columns={[
+              { field: "order_form_no", label: "Order Form No" },
+              { field: "order_notes", label: "Notes" },
+            ]}
+            onSaveRow={(row) => onSaveProductRow(entry.id, "order", row)}
+          />
+        );
       case 2:
-        if (entry.approved) {
-          return (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-                gap: "16px",
-              }}
-            >
-              <ReadRow
-                label="Approved By"
-                value={`✓ ${entry.approved_by}`}
-                highlight
-              />
-              <ReadRow label="Approved On" value={fmtDT(entry.approved_at)} />
-              {entry.remarks && (
-                <div style={{ gridColumn: "span 2" }}>
-                  <ReadRow label="Remarks" value={entry.remarks} />
-                </div>
-              )}
-            </div>
-          );
-        }
-        if (canApprove) {
-          return (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "12px",
-                maxWidth: "400px",
-              }}
-            >
-              <div>
-                <span style={lbl}>Remarks (optional)</span>
-                <textarea
-                  placeholder="Add remarks before approving..."
-                  value={inp.remarks || ""}
-                  rows={3}
-                  style={{ ...fieldStyle, resize: "none" as const }}
-                  onChange={(e) => setInp("remarks", e.target.value)}
-                />
-              </div>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button
-                  style={{ ...saveBtn(""), background: "#059669" }}
-                  onClick={() =>
-                    onUpdate(entry.id, "approve", { approved: true })
-                  }
-                >
-                  ✓ Approve
-                </button>
-                {inp.remarks && (
-                  <button
-                    style={saveBtn("#6b7280")}
-                    onClick={() =>
-                      onUpdate(entry.id, "remarks", { remarks: inp.remarks })
-                    }
-                  >
-                    Save Remarks Only
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        }
-        return waiting("Waiting for approval.");
-
-      // ── 3: Purchase Order ────────────────────────────────────
+        // Approval — per product (editable qty for admin/office_admin)
+        return (
+          <ProductRowsTable
+            rows={products}
+            stage="approve"
+            isAdmin={isAdmin}
+            isStageEditor={canApprove}
+            columns={[]}
+            showApprove
+            editableQty
+            onSaveRow={() => {}}
+            onApproveRow={(row) => onApproveProductRow(entry.id, row)}
+          />
+        );
       case 3:
-        if (entry.po_no) {
-          return (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-                gap: "16px",
-              }}
-            >
-              <ReadRow label="Officer" value={entry.office_user_2} />
-              <ReadRow label="PO Number" value={entry.po_no} />
-              <ReadRow label="Date" value={fmtDT(entry.office_datetime_2)} />
-            </div>
-          );
-        }
-        if (isOffice && entry.approved) {
-          return (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "12px",
-                maxWidth: "300px",
-              }}
-            >
-              <div>
-                <span style={lbl}>PO Number *</span>
-                <input
-                  placeholder="Enter PO number"
-                  value={inp.po_no || ""}
-                  style={fieldStyle}
-                  onChange={(e) => setInp("po_no", e.target.value)}
-                />
-              </div>
-              <button
-                style={saveBtn("#0284c7")}
-                onClick={() => onUpdate(entry.id, "po", { po_no: inp.po_no })}
-              >
-                Save PO
-              </button>
-            </div>
-          );
-        }
-        return waiting(
-          entry.approved
-            ? "Waiting for office to enter PO."
-            : "Requires approval first.",
+        return (
+          <ProductRowsTable
+            rows={products}
+            stage="po"
+            isAdmin={isAdmin}
+            isStageEditor={isOffice}
+            columns={[{ field: "po_no", label: "PO Number" }]}
+            onSaveRow={(row) => onSaveProductRow(entry.id, "po", row)}
+          />
         );
-
-      // ── 4: Invoice ───────────────────────────────────────────
       case 4:
-        if (entry.invoice_no) {
-          return (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-                gap: "16px",
-              }}
-            >
-              <ReadRow label="Officer" value={entry.office_user_3} />
-              <ReadRow label="Invoice Number" value={entry.invoice_no} />
-              <ReadRow label="Date" value={fmtDT(entry.office_datetime_3)} />
-            </div>
-          );
-        }
-        if (isOffice && entry.po_no) {
-          return (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "12px",
-                maxWidth: "300px",
-              }}
-            >
-              <div>
-                <span style={lbl}>Invoice Number *</span>
-                <input
-                  placeholder="Enter invoice number"
-                  value={inp.invoice_no || ""}
-                  style={fieldStyle}
-                  onChange={(e) => setInp("invoice_no", e.target.value)}
-                />
-              </div>
-              <button
-                style={saveBtn("#d97706")}
-                onClick={() =>
-                  onUpdate(entry.id, "invoice", { invoice_no: inp.invoice_no })
-                }
-              >
-                Save Invoice
-              </button>
-            </div>
-          );
-        }
-        return waiting(
-          entry.po_no ? "Waiting for invoice." : "Requires PO first.",
+        return (
+          <ProductRowsTable
+            rows={products}
+            stage="invoice"
+            isAdmin={isAdmin}
+            isStageEditor={isOffice}
+            columns={[{ field: "invoice_no", label: "Invoice Number" }]}
+            onSaveRow={(row) => onSaveProductRow(entry.id, "invoice", row)}
+          />
         );
-
-      // ── 5: Delivery ──────────────────────────────────────────
       case 5:
-        if (entry.drivers_name || entry.purchase_date) {
-          return (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-                gap: "16px",
-              }}
-            >
-              <ReadRow
-                label="Purchase Date"
-                value={entry.purchase_date ? fmtDate(entry.purchase_date) : ""}
-              />
-              <ReadRow label="Driver" value={entry.drivers_name} />
-              <ReadRow label="Vehicle" value={entry.vehicle_no} />
-              <ReadRow label="Received By (Stores)" value={entry.received} />
-              {entry.driver_description && (
-                <div style={{ gridColumn: "span 2" }}>
-                  <ReadRow label="Notes" value={entry.driver_description} />
-                </div>
-              )}
-            </div>
-          );
-        }
-        if (isStores && entry.invoice_no) {
-          return (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "12px",
-                maxWidth: "520px",
-              }}
-            >
-              <div>
-                <span style={lbl}>Purchase Date</span>
-                <input
-                  type="date"
-                  value={inp.purchase_date || ""}
-                  style={fieldStyle}
-                  onChange={(e) => setInp("purchase_date", e.target.value)}
-                />
-              </div>
-              <div>
-                <span style={lbl}>Driver Name</span>
-                <input
-                  placeholder="Driver name"
-                  value={inp.drivers_name || ""}
-                  style={fieldStyle}
-                  onChange={(e) => setInp("drivers_name", e.target.value)}
-                />
-              </div>
-              <div>
-                <span style={lbl}>Vehicle No</span>
-                <input
-                  placeholder="Vehicle number"
-                  value={inp.vehicle_no || ""}
-                  style={fieldStyle}
-                  onChange={(e) => setInp("vehicle_no", e.target.value)}
-                />
-              </div>
-              <div>
-                <span style={lbl}>Received By (Stores)</span>
-                <input
-                  placeholder="Stores person"
-                  value={inp.received || ""}
-                  style={fieldStyle}
-                  onChange={(e) => setInp("received", e.target.value)}
-                />
-              </div>
-              <div style={{ gridColumn: "span 2" }}>
-                <span style={lbl}>Notes</span>
-                <textarea
-                  placeholder="Delivery notes"
-                  value={inp.driver_description || ""}
-                  rows={2}
-                  style={{ ...fieldStyle, resize: "none" as const }}
-                  onChange={(e) => setInp("driver_description", e.target.value)}
-                />
-              </div>
-              <div style={{ gridColumn: "span 2" }}>
-                <button
-                  style={saveBtn("#16a34a")}
-                  onClick={() =>
-                    onUpdate(entry.id, "driver", {
-                      purchase_date: inp.purchase_date,
-                      drivers_name: inp.drivers_name,
-                      vehicle_no: inp.vehicle_no,
-                      received: inp.received,
-                      driver_description: inp.driver_description,
-                    })
-                  }
-                >
-                  Save Delivery
-                </button>
-              </div>
-            </div>
-          );
-        }
-        return waiting(
-          entry.invoice_no
-            ? "Waiting for delivery details."
-            : "Requires invoice first.",
+        return (
+          <ProductRowsTable
+            rows={products}
+            stage="driver"
+            isAdmin={isAdmin}
+            isStageEditor={isStores}
+            columns={[
+              { field: "purchase_date", label: "Purchase Date", type: "date" },
+              { field: "drivers_name", label: "Driver" },
+              { field: "vehicle_no", label: "Vehicle" },
+              { field: "received", label: "Received By" },
+              { field: "delivery_notes", label: "Notes" },
+            ]}
+            onSaveRow={(row) => onSaveProductRow(entry.id, "driver", row)}
+          />
         );
-
       default:
         return null;
     }
   };
 
+  // The sidebar layout stays the same as before — copy from your existing render
   return (
     <div style={{ display: "flex", minHeight: "180px" }}>
-      {/* ── Left sidebar: clickable stage tabs ── */}
       <div
         style={{
           display: "flex",
@@ -702,38 +659,16 @@ const StagePanel = ({
                 textAlign: "left" as const,
                 transition: "all 0.15s",
               }}
-              onMouseEnter={(e) => {
-                if (!isSelected) e.currentTarget.style.background = "#f3f4f6";
-              }}
-              onMouseLeave={(e) => {
-                if (!isSelected)
-                  e.currentTarget.style.background = "transparent";
-              }}
             >
               <span style={{ fontSize: "14px" }}>
                 {done && i < completed ? "✓" : s.icon}
               </span>
               <span>{s.label}</span>
-              {i === completed && (
-                <span
-                  style={{
-                    marginLeft: "auto",
-                    width: "7px",
-                    height: "7px",
-                    borderRadius: "50%",
-                    background: "#1f2937",
-                    flexShrink: 0,
-                  }}
-                />
-              )}
             </button>
           );
         })}
       </div>
-
-      {/* ── Right: selected tab content ── */}
       <div style={{ flex: 1, padding: "18px 22px" }}>
-        {/* Tab title */}
         <div
           style={{
             display: "flex",
@@ -748,70 +683,88 @@ const StagePanel = ({
               fontSize: "13px",
               fontWeight: 700,
               color: "#111827",
-              textTransform: "uppercase" as const,
+              textTransform: "uppercase",
               letterSpacing: "0.5px",
             }}
           >
             {STEPS[selectedTab].label}
           </span>
-          {selectedTab <= completed && selectedTab !== completed && (
-            <span
-              style={{
-                fontSize: "11px",
-                background: "#f0fdf4",
-                color: "#15803d",
-                border: "1px solid #bbf7d0",
-                borderRadius: "12px",
-                padding: "1px 8px",
-                fontWeight: 600,
-              }}
-            >
-              Completed
-            </span>
-          )}
-          {selectedTab === completed && completed < 5 && (
-            <span
-              style={{
-                fontSize: "11px",
-                background: STEPS[selectedTab].color + "15",
-                color: STEPS[selectedTab].color,
-                border: `1px solid ${STEPS[selectedTab].color}33`,
-                borderRadius: "12px",
-                padding: "1px 8px",
-                fontWeight: 600,
-              }}
-            >
-              Active
-            </span>
-          )}
-          {selectedTab > completed && (
-            <span
-              style={{
-                fontSize: "11px",
-                background: "#f9fafb",
-                color: "#9ca3af",
-                border: "1px solid #e5e7eb",
-                borderRadius: "12px",
-                padding: "1px 8px",
-                fontWeight: 600,
-              }}
-            >
-              Pending
-            </span>
-          )}
         </div>
-
         {renderTab(selectedTab)}
       </div>
     </div>
   );
 };
 
+// ── Progress Bar ─────────────────────────────────────────────────
+const StepBar = ({ entry }: { entry: Entry }) => {
+  const completed = getCompletedStep(entry);
+  return (
+    <div style={{ display: "flex", alignItems: "center", width: "100%" }}>
+      {STEPS.map((s, i) => {
+        const done = i <= completed;
+        const active = i === completed;
+        return (
+          <div
+            key={i}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              flex: i < STEPS.length - 1 ? 1 : "none",
+            }}
+          >
+            <div
+              title={s.label}
+              style={{
+                width: active ? "28px" : "22px",
+                height: active ? "28px" : "22px",
+                borderRadius: "50%",
+                background: done
+                  ? i === 5
+                    ? "#16a34a"
+                    : "#1f2937"
+                  : "#e5e7eb",
+                color: done ? "#fff" : "#9ca3af",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: active ? "12px" : "9px",
+                fontWeight: 700,
+                flexShrink: 0,
+                boxShadow: active ? "0 0 0 3px rgba(0,0,0,0.12)" : "none",
+                transition: "all 0.2s",
+              }}
+            >
+              {done && i < completed ? "✓" : s.icon}
+            </div>
+            {i < STEPS.length - 1 && (
+              <div
+                style={{
+                  flex: 1,
+                  height: "3px",
+                  background: i < completed ? "#1f2937" : "#e5e7eb",
+                  margin: "0 2px",
+                  transition: "background 0.3s",
+                }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 // ── Main Component ────────────────────────────────────────────────
+// NOTE: ALL hooks must be inside this component — nothing outside
 const PurchasingDashboard = () => {
   const navigate = useNavigate();
-  const { customerId } = useParams();
+  const { customerId } = useParams(); // ← ONLY here, never outside
   const location = useLocation();
+
+  const workshopCustomerId: string | undefined =
+    location.state?.workshopCustomerId;
+  const highlightEntryId: number | undefined = location.state?.highlightEntryId;
 
   const [user, setUser] = useState<User | null>(null);
   const [customerName, setCustomerName] = useState(
@@ -821,8 +774,10 @@ const PurchasingDashboard = () => {
   const [workshopCustomers, setWorkshopCustomers] = useState<
     WorkshopCustomer[]
   >([]);
-  //   const [jobCards, setJobCards] = useState<JobCard[]>([]);
   const [entryInputs, setEntryInputs] = useState<Record<number, any>>({});
+  const [productsByEntry, setProductsByEntry] = useState<
+    Record<number, FlowProduct[]>
+  >({});
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -849,19 +804,46 @@ const PurchasingDashboard = () => {
     fetchWorkshopCustomers();
   }, [customerId]);
 
+  // Scroll to highlighted entry once entries are rendered
+  useEffect(() => {
+    if (highlightEntryId && entries.length > 0) {
+      const el = document.getElementById(`entry-${highlightEntryId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [entries, highlightEntryId]);
+
   const fetchCustomer = async () => {
     try {
+      // Try workshop customers first (this is the workshop route)
       const r = await axios.get(
+        `http://localhost:5000/api/workshop/customers`,
+        { headers: hdr() },
+      );
+      const found = r.data.customers?.find(
+        (c: any) => c.id === Number(customerId),
+      );
+      if (found) {
+        setCustomerName(found.name);
+        return;
+      }
+
+      // Fallback to purchasing customers
+      const r2 = await axios.get(
         `http://localhost:5000/api/purchasing/customers/${customerId}`,
         { headers: hdr() },
       );
-      if (r.data.customer) setCustomerName(r.data.customer.name);
+      if (r2.data.customer) setCustomerName(r2.data.customer.name);
     } catch {}
   };
 
   const fetchEntries = async () => {
     try {
-      const r = await axios.get(BASE, { headers: hdr() });
+      const url = `http://localhost:5000/api/purchasing/workshop-customers/${customerId}/entries`;
+      console.log("Fetching entries from:", url);
+      const r = await axios.get(url, { headers: hdr() });
+      console.log("Entries response:", r.data);
       const data: Entry[] = r.data.entries || [];
       setEntries(data);
       const map: Record<number, any> = {};
@@ -880,6 +862,13 @@ const PurchasingDashboard = () => {
         };
       });
       setEntryInputs(map);
+
+      // Auto-expand and scroll to highlighted entry
+      // Auto-expand and scroll to highlighted entry
+      if (highlightEntryId) {
+        setExpandedId(highlightEntryId);
+        fetchProducts(highlightEntryId); // ← also fetch products
+      }
     } catch {}
   };
 
@@ -892,20 +881,6 @@ const PurchasingDashboard = () => {
       setWorkshopCustomers(r.data.customers || []);
     } catch {}
   };
-
-  //   const fetchJobCards = async (wsId: string) => {
-  //     if (!wsId) {
-  //       setJobCards([]);
-  //       return;
-  //     }
-  //     try {
-  //       const r = await axios.get(
-  //         `http://localhost:5000/api/purchasing/workshop-customers/${wsId}/jobcards`,
-  //         { headers: hdr() },
-  //       );
-  //       setJobCards(r.data.jobcards || []);
-  //     } catch {}
-  //   };
 
   const handleAddEntry = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -922,8 +897,6 @@ const PurchasingDashboard = () => {
         description: "",
         due_date: "",
         workshop_customer_id: "",
-        // job_card_id: "",
-        // job_card_number: "",
       });
       setShowAddForm(false);
       fetchEntries();
@@ -960,6 +933,62 @@ const PurchasingDashboard = () => {
     }
   };
 
+  const fetchProducts = async (entryId: number) => {
+    console.log(`[FETCH] fetchProducts called for entryId=${entryId}`);
+    try {
+      const r = await axios.get(
+        `http://localhost:5000/api/purchasing/entries/${entryId}/products`,
+        { headers: hdr() },
+      );
+      console.log(`[FETCH] response for entryId=${entryId}:`, r.data);
+      setProductsByEntry((prev) => ({
+        ...prev,
+        [entryId]: r.data.products || [],
+      }));
+    } catch (err) {
+      console.error(`[FETCH] failed for entryId=${entryId}:`, err);
+    }
+  };
+
+  const handleSaveProductRow = async (
+    entryId: number,
+    stage: string,
+    row: FlowProduct,
+  ) => {
+    try {
+      const r = await axios.put(
+        `http://localhost:5000/api/purchasing/entries/${entryId}/products`,
+        { stage, products: [row] },
+        { headers: hdr() },
+      );
+      setProductsByEntry((prev) => ({
+        ...prev,
+        [entryId]: r.data.products || [],
+      }));
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to save row");
+    }
+  };
+
+  const handleApproveProductRow = async (entryId: number, row: FlowProduct) => {
+    try {
+      const r = await axios.put(
+        `http://localhost:5000/api/purchasing/entries/${entryId}/products`,
+        {
+          stage: "approve",
+          products: [{ id: row.id, approved_quantity: row.approved_quantity }],
+        },
+        { headers: hdr() },
+      );
+      setProductsByEntry((prev) => ({
+        ...prev,
+        [entryId]: r.data.products || [],
+      }));
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to approve");
+    }
+  };
+
   const handleDelete = async (id: number, product: string) => {
     if (!confirm(`Delete "${product}"? This cannot be undone.`)) return;
     try {
@@ -990,7 +1019,6 @@ const PurchasingDashboard = () => {
 
   return (
     <div className="project-dashboard">
-      {/* Header */}
       <div className="portal-header">
         <div className="header-left">
           <div
@@ -1020,7 +1048,6 @@ const PurchasingDashboard = () => {
       </div>
 
       <div className="project-main-content">
-        {/* Page header */}
         <div className="project-header-row">
           <div>
             <h2 style={{ margin: 0 }}>Purchasing</h2>
@@ -1053,7 +1080,6 @@ const PurchasingDashboard = () => {
           </div>
         </div>
 
-        {/* Add Entry Form */}
         {showAddForm && (
           <div
             style={{
@@ -1104,32 +1130,6 @@ const PurchasingDashboard = () => {
                     ))}
                   </select>
                 </div>
-                {/* <div>
-                  <label style={lbl}>Job Card</label>
-                  <select
-                    value={form.job_card_id}
-                    style={inp2}
-                    disabled={!form.workshop_customer_id}
-                    onChange={(e) => {
-                      const s = jobCards.find(
-                        (j) => j.id === parseInt(e.target.value),
-                      );
-                      setForm((p) => ({
-                        ...p,
-                        job_card_id: e.target.value,
-                        job_card_number: s?.job_card_number || "",
-                      }));
-                    }}
-                  >
-                    <option value="">Select job card...</option>
-                    {jobCards.map((j) => (
-                      <option key={j.id} value={j.id}>
-                        {j.job_card_number}
-                        {j.item ? ` — ${j.item}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div> */}
                 <div>
                   <label style={lbl}>Product *</label>
                   <input
@@ -1207,7 +1207,6 @@ const PurchasingDashboard = () => {
           </div>
         )}
 
-        {/* Info banner for regular users */}
         {user?.role === "user" && entries.length > 0 && (
           <div
             style={{
@@ -1225,7 +1224,6 @@ const PurchasingDashboard = () => {
           </div>
         )}
 
-        {/* Entry Cards */}
         {entries.length === 0 ? (
           <div
             style={{
@@ -1259,25 +1257,50 @@ const PurchasingDashboard = () => {
                 entry.due_date &&
                 new Date(entry.due_date) < new Date() &&
                 step < 5;
-              const stepColor = STEPS[step].color;
 
               return (
                 <div
                   key={entry.id}
+                  id={`entry-${entry.id}`}
                   style={{
                     background: "#fff",
-                    border: `1px solid ${isExpanded ? "#d1d5db" : "#e5e7eb"}`,
+                    border: `1px solid ${
+                      entry.id === highlightEntryId
+                        ? "#667eea"
+                        : isExpanded
+                          ? "#d1d5db"
+                          : "#e5e7eb"
+                    }`,
                     borderRadius: "12px",
                     overflow: "hidden",
-                    boxShadow: isExpanded
-                      ? "0 2px 8px rgba(0,0,0,0.08)"
-                      : "0 1px 4px rgba(0,0,0,0.04)",
+                    boxShadow:
+                      entry.id === highlightEntryId
+                        ? "0 0 0 3px #667eea30"
+                        : isExpanded
+                          ? "0 2px 8px rgba(0,0,0,0.08)"
+                          : "0 1px 4px rgba(0,0,0,0.04)",
                     transition: "border-color 0.2s",
                   }}
                 >
-                  {/* Card summary — click to expand */}
                   <div
-                    onClick={() => setExpandedId(isExpanded ? null : entry.id)}
+                    onClick={() => {
+                      const next = isExpanded ? null : entry.id;
+                      console.log(
+                        `[EXPAND] entry.id=${entry.id} next=${next} alreadyFetched=`,
+                        productsByEntry[entry.id],
+                      );
+                      setExpandedId(next);
+                      if (next && !productsByEntry[entry.id]) {
+                        console.log(
+                          `[EXPAND] calling fetchProducts(${entry.id})`,
+                        );
+                        fetchProducts(entry.id);
+                      } else if (next) {
+                        console.log(
+                          `[EXPAND] skipping fetch — already have products`,
+                        );
+                      }
+                    }}
                     style={{
                       padding: "14px 18px",
                       cursor: "pointer",
@@ -1287,17 +1310,6 @@ const PurchasingDashboard = () => {
                       flexWrap: "wrap" as const,
                     }}
                   >
-                    {/* <span
-                      style={{
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        color: "#9ca3af",
-                        minWidth: "24px",
-                      }}
-                    >
-                      #{entry.id}
-                    </span> */}
-
                     <div style={{ flex: 1, minWidth: "160px" }}>
                       <div
                         style={{
@@ -1427,7 +1439,6 @@ const PurchasingDashboard = () => {
                     </span>
                   </div>
 
-                  {/* Expanded panel */}
                   {isExpanded && (
                     <div style={{ borderTop: "1px solid #f3f4f6" }}>
                       <StagePanel
@@ -1441,6 +1452,9 @@ const PurchasingDashboard = () => {
                             [entry.id]: { ...prev[entry.id], [field]: value },
                           }))
                         }
+                        products={productsByEntry[entry.id] || []}
+                        onSaveProductRow={handleSaveProductRow}
+                        onApproveProductRow={handleApproveProductRow}
                       />
                     </div>
                   )}

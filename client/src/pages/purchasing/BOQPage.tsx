@@ -6,7 +6,7 @@ import "../customers/ProjectDashboard.css";
 
 interface BOQItem {
   id: number;
-  item_no: string;
+  specification: string;
   item_name: string;
   part_number: string;
   boq_quantity: number;
@@ -21,8 +21,8 @@ const BOQPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<BOQItem | null>(null);
   const [form, setForm] = useState({
-    item_no: "",
     item_name: "",
+    specification: "",
     part_number: "",
     boq_quantity: "",
     available_quantity: "",
@@ -65,8 +65,8 @@ const BOQPage = () => {
         });
       }
       setForm({
-        item_no: "",
         item_name: "",
+        specification: "",
         part_number: "",
         boq_quantity: "",
         available_quantity: "",
@@ -96,8 +96,8 @@ const BOQPage = () => {
   const startEdit = (item: BOQItem) => {
     setEditingItem(item);
     setForm({
-      item_no: item.item_no,
       item_name: item.item_name,
+      specification: item.specification,
       part_number: item.part_number,
       boq_quantity: String(item.boq_quantity),
       available_quantity: String(item.available_quantity),
@@ -179,8 +179,8 @@ const BOQPage = () => {
                   setShowForm(true);
                   setEditingItem(null);
                   setForm({
-                    item_no: "",
                     item_name: "",
+                    specification: "",
                     part_number: "",
                     boq_quantity: "",
                     available_quantity: "",
@@ -231,17 +231,6 @@ const BOQPage = () => {
                 }}
               >
                 <div>
-                  <label style={lbl}>Item No</label>
-                  <input
-                    value={form.item_no}
-                    style={inp}
-                    placeholder="e.g. 001"
-                    onChange={(e) =>
-                      setForm((p) => ({ ...p, item_no: e.target.value }))
-                    }
-                  />
-                </div>
-                <div>
                   <label style={lbl}>Item Name *</label>
                   <input
                     value={form.item_name}
@@ -251,6 +240,17 @@ const BOQPage = () => {
                       setForm((p) => ({ ...p, item_name: e.target.value }))
                     }
                     required
+                  />
+                </div>
+                <div>
+                  <label style={lbl}>Specification</label>
+                  <input
+                    value={form.specification}
+                    style={inp}
+                    placeholder="e.g. 001"
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, specification: e.target.value }))
+                    }
                   />
                 </div>
                 <div>
@@ -377,10 +377,10 @@ const BOQPage = () => {
                         (e.currentTarget.style.background = "#fff")
                       }
                     >
-                      <td style={td}>{item.item_no || "—"}</td>
+                      <td style={td}>{item.specification || "—"}</td>
                       <td style={{ ...td, fontWeight: 500 }}>
                         {item.item_name}
-                        {!item.item_no &&
+                        {!item.specification &&
                           !item.part_number &&
                           item.boq_quantity == 0 && (
                             <span

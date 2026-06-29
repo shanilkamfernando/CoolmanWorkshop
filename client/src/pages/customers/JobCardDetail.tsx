@@ -8,6 +8,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./ProjectDashboard.css";
 import companyLogo from "../../assets/mainlogo.jpeg";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -473,7 +474,7 @@ const JobCardDetail = () => {
   return (
     <div className="project-dashboard">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div
             className="logo-container"
@@ -499,7 +500,8 @@ const JobCardDetail = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       <div className="project-main-content">
         <div className="project-header-row">

@@ -1,5 +1,5 @@
 // ============================================
-// Job Cards List Page
+// Customer Job Cards — File Attachments Page
 // Save as: client/src/pages/customers/JobCardsList.tsx
 // ============================================
 
@@ -8,42 +8,71 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./ProjectDashboard.css";
 import companyLogo from "../../assets/mainlogo.jpeg";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
-  firstName: string;
-  lastName: string;
   role: string;
 }
 interface Customer {
   id: number;
   name: string;
 }
-interface JobCard {
+interface JobCardFile {
   id: number;
-  job_card_number: string;
-  date: string;
-  item: string;
-  item_number: string;
-  vehicle_number: string;
-  company_reference: string;
-  status: string;
-  created_by: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  uploaded_by: string;
   created_at: string;
-  has_item_list: boolean;
-  has_labor_sheet: boolean;
-  has_grn: boolean;
-  has_dispatch_note: boolean;
 }
 
-const STATUS_COLORS: Record<
-  string,
-  { bg: string; color: string; label: string }
-> = {
-  open: { bg: "#e3f2fd", color: "#1565c0", label: "Open" },
-  in_progress: { bg: "#fff8e1", color: "#e65100", label: "In Progress" },
-  completed: { bg: "#e8f5e9", color: "#2e7d32", label: "Completed" },
-  dispatched: { bg: "#f3e5f5", color: "#6a1b9a", label: "Dispatched" },
+const getInitials = (name: string) => {
+  const w = name.trim().split(" ");
+  return w.length === 1
+    ? w[0].substring(0, 2).toUpperCase()
+    : (w[0][0] + w[w.length - 1][0]).toUpperCase();
+};
+const getColor = (name: string) => {
+  const colors = [
+    "#667eea",
+    "#2196F3",
+    "#4CAF50",
+    "#FF9800",
+    "#E91E63",
+    "#00BCD4",
+    "#9C27B0",
+    "#FF5722",
+    "#009688",
+    "#3F51B5",
+  ];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return colors[Math.abs(h) % colors.length];
+};
+const fmtSize = (bytes: number) => {
+  if (!bytes) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+const fmtDate = (d: string) => {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+const fileIcon = (type: string) => {
+  if (!type) return "📄";
+  if (type.includes("pdf")) return "📕";
+  if (type.includes("image")) return "🖼️";
+  if (type.includes("word") || type.includes("document")) return "📘";
+  if (type.includes("sheet") || type.includes("excel")) return "📗";
+  return "📄";
 };
 
 const JobCardsList = () => {
@@ -52,80 +81,117 @@ const JobCardsList = () => {
   const location = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
-  const [jobCards, setJobCards] = useState<JobCard[]>([]);
+  const [files, setFiles] = useState<JobCardFile[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+
+  const token = () => localStorage.getItem("token");
+  const hdr = () => ({ Authorization: `Bearer ${token()}` });
+  const isAdmin = user?.role === "admin";
+  const BASE = `http://localhost:5000/api/customers/${customerId}/jobcard-files`;
 
   useEffect(() => {
     const u = localStorage.getItem("user");
     if (u) setUser(JSON.parse(u));
     if (location.state?.customer) setCustomer(location.state.customer);
-    fetchJobCards();
+    else fetchCustomer();
+    fetchFiles();
   }, [customerId]);
 
-  const fetchJobCards = async () => {
+  const fetchCustomer = async () => {
     try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/jobcards`,
-        { headers: { Authorization: `Bearer ${token}` } },
+      const r = await axios.get(
+        `http://localhost:5000/api/customers/${customerId}`,
+        { headers: hdr() },
       );
-      setJobCards(res.data.jobcards || []);
-    } catch (e) {
-      console.error(e);
-      setJobCards([]);
+      if (r.data.customer) setCustomer(r.data.customer);
+    } catch {}
+  };
+
+  const fetchFiles = async () => {
+    try {
+      const r = await axios.get(BASE, { headers: hdr() });
+      setFiles(r.data.files || []);
+    } catch {
+      setFiles([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Delete this job card? This cannot be undone.")) return;
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files;
+    if (!selected || selected.length === 0) return;
+    setUploading(true);
     try {
-      const token = localStorage.getItem("token");
-      await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/jobcards/${id}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
-      fetchJobCards();
-    } catch (e) {
-      alert("Failed to delete job card");
+      for (const file of Array.from(selected)) {
+        const base64: string = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(",")[1]); // strip data:...;base64, prefix
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        await axios.post(
+          BASE,
+          {
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            file_data: base64,
+          },
+          { headers: hdr() },
+        );
+      }
+      fetchFiles();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to upload");
+    } finally {
+      setUploading(false);
+      e.target.value = ""; // reset input
     }
   };
 
-  const isAdmin = user?.role === "admin";
+  const handleDownload = async (f: JobCardFile) => {
+    try {
+      const r = await axios.get(`${BASE}/${f.id}`, { headers: hdr() });
+      const { file_name, file_type, file_data } = r.data.file;
+      // rebuild blob from base64
+      const byteChars = atob(file_data);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++)
+        byteNumbers[i] = byteChars.charCodeAt(i);
+      const blob = new Blob([new Uint8Array(byteNumbers)], {
+        type: file_type || "application/octet-stream",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = file_name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Failed to download");
+    }
+  };
 
-  const filtered = jobCards.filter(
-    (jc) =>
-      jc.job_card_number.toLowerCase().includes(search.toLowerCase()) ||
-      (jc.item || "").toLowerCase().includes(search.toLowerCase()) ||
-      (jc.vehicle_number || "").toLowerCase().includes(search.toLowerCase()),
+  const handleDelete = async (id: number) => {
+    if (!confirm("Delete this file? This cannot be undone.")) return;
+    try {
+      await axios.delete(`${BASE}/${id}`, { headers: hdr() });
+      fetchFiles();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to delete");
+    }
+  };
+
+  const filtered = files.filter((f) =>
+    f.file_name.toLowerCase().includes(search.toLowerCase()),
   );
-
-  const getInitials = (name: string) => {
-    const w = name.trim().split(" ");
-    return w.length === 1
-      ? w[0].substring(0, 2).toUpperCase()
-      : (w[0][0] + w[w.length - 1][0]).toUpperCase();
-  };
-  const getColor = (name: string) => {
-    const colors = [
-      "#667eea",
-      "#2196F3",
-      "#4CAF50",
-      "#FF9800",
-      "#E91E63",
-      "#00BCD4",
-      "#9C27B0",
-      "#FF5722",
-      "#009688",
-      "#3F51B5",
-    ];
-    let h = 0;
-    for (let i = 0; i < name.length; i++)
-      h = name.charCodeAt(i) + ((h << 5) - h);
-    return colors[Math.abs(h) % colors.length];
-  };
 
   if (!customer) return <div className="loading-center">Loading...</div>;
   const initials = getInitials(customer.name);
@@ -133,7 +199,7 @@ const JobCardsList = () => {
 
   return (
     <div className="project-dashboard">
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div
             className="logo-container"
@@ -159,11 +225,12 @@ const JobCardsList = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       <div className="project-main-content">
         <div className="project-header-row">
-          <h2>🗂️ Workshop Job Cards</h2>
+          <h2>🗂️ Job Cards</h2>
           <button
             className="btn-back"
             onClick={() =>
@@ -187,7 +254,7 @@ const JobCardsList = () => {
           >
             <input
               type="text"
-              placeholder="🔍 Search by job number, item, vehicle..."
+              placeholder="🔍 Search files..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               style={{
@@ -204,44 +271,24 @@ const JobCardsList = () => {
               onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
             />
             <span style={{ color: "#888", fontSize: "0.9rem" }}>
-              {filtered.length} card{filtered.length !== 1 ? "s" : ""}
+              {filtered.length} file{filtered.length !== 1 ? "s" : ""}
             </span>
-            <button
+            <label
               className="btn-add-small"
-              onClick={() =>
-                navigate(`/customers/${customerId}/jobcards/new`, {
-                  state: { customer },
-                })
-              }
+              style={{
+                cursor: uploading ? "not-allowed" : "pointer",
+                opacity: uploading ? 0.6 : 1,
+              }}
             >
-              + New Job Card
-            </button>
-          </div>
-
-          {/* Status legend */}
-          <div
-            style={{
-              display: "flex",
-              gap: "10px",
-              marginBottom: "16px",
-              flexWrap: "wrap",
-            }}
-          >
-            {Object.entries(STATUS_COLORS).map(([key, val]) => (
-              <span
-                key={key}
-                style={{
-                  padding: "3px 10px",
-                  borderRadius: "12px",
-                  fontSize: "0.8rem",
-                  fontWeight: 600,
-                  background: val.bg,
-                  color: val.color,
-                }}
-              >
-                {val.label}
-              </span>
-            ))}
+              {uploading ? "⏳ Uploading..." : "⬆️ Upload Job Card"}
+              <input
+                type="file"
+                multiple
+                onChange={handleUpload}
+                disabled={uploading}
+                style={{ display: "none" }}
+              />
+            </label>
           </div>
 
           {loading ? (
@@ -260,20 +307,27 @@ const JobCardsList = () => {
             >
               <div style={{ fontSize: "4rem", marginBottom: "16px" }}>🗂️</div>
               <h3 style={{ color: "#666", marginBottom: "8px" }}>
-                {search ? "No job cards match your search" : "No job cards yet"}
+                {search
+                  ? "No files match your search"
+                  : "No job cards uploaded yet"}
               </h3>
               {!search && (
-                <button
+                <label
                   className="btn-add-meeting"
-                  style={{ marginTop: "16px" }}
-                  onClick={() =>
-                    navigate(`/customers/${customerId}/jobcards/new`, {
-                      state: { customer },
-                    })
-                  }
+                  style={{
+                    marginTop: "16px",
+                    cursor: "pointer",
+                    display: "inline-block",
+                  }}
                 >
-                  + Create First Job Card
-                </button>
+                  ⬆️ Upload First Job Card
+                  <input
+                    type="file"
+                    multiple
+                    onChange={handleUpload}
+                    style={{ display: "none" }}
+                  />
+                </label>
               )}
             </div>
           ) : (
@@ -281,177 +335,76 @@ const JobCardsList = () => {
               <thead>
                 <tr>
                   <th style={{ width: "48px" }}>No</th>
-                  <th style={{ width: "200px" }}>Job Card #</th>
-                  <th style={{ width: "110px" }}>Date</th>
-                  <th>Item</th>
-                  <th style={{ width: "120px" }}>Vehicle</th>
-                  <th style={{ width: "100px" }}>Status</th>
-                  <th style={{ width: "120px" }}>Linked Docs</th>
-                  <th style={{ width: "100px" }}>Actions</th>
+                  <th>File Name</th>
+                  <th style={{ width: "100px" }}>Size</th>
+                  <th style={{ width: "160px" }}>Uploaded By</th>
+                  <th style={{ width: "170px" }}>Date</th>
+                  <th style={{ width: "120px" }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((jc, idx) => {
-                  const st = STATUS_COLORS[jc.status] || STATUS_COLORS.open;
-                  return (
-                    <tr
-                      key={jc.id}
+                {filtered.map((f, idx) => (
+                  <tr
+                    key={f.id}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "#f8f9ff")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "")
+                    }
+                  >
+                    <td
                       style={{
-                        cursor: "pointer",
-                        transition: "background 0.15s",
+                        textAlign: "center",
+                        color: "#888",
+                        fontWeight: 600,
                       }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.background = "#f8f9ff")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.background = "")
-                      }
                     >
-                      <td
+                      {idx + 1}
+                    </td>
+                    <td>
+                      <span style={{ marginRight: "8px" }}>
+                        {fileIcon(f.file_type)}
+                      </span>
+                      <span style={{ fontWeight: 500 }}>{f.file_name}</span>
+                    </td>
+                    <td style={{ fontSize: "14px", color: "#555" }}>
+                      {fmtSize(f.file_size)}
+                    </td>
+                    <td style={{ fontSize: "14px", color: "#555" }}>
+                      {f.uploaded_by || "—"}
+                    </td>
+                    <td style={{ fontSize: "14px", color: "#555" }}>
+                      {fmtDate(f.created_at)}
+                    </td>
+                    <td>
+                      <div
                         style={{
-                          textAlign: "center",
-                          color: "#888",
-                          fontWeight: 600,
-                          fontSize: "14px",
+                          display: "flex",
+                          gap: "6px",
+                          justifyContent: "center",
                         }}
                       >
-                        {idx + 1}
-                      </td>
-                      <td>
                         <button
-                          onClick={() =>
-                            navigate(
-                              `/customers/${customerId}/jobcards/${jc.id}`,
-                              { state: { customer } },
-                            )
-                          }
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            padding: 0,
-                            color: "#2563eb",
-                            fontWeight: 600,
-                            fontSize: "14px",
-                            textDecoration: "underline",
-                            textUnderlineOffset: "3px",
-                            textAlign: "left",
-                          }}
+                          className="btn-download-small"
+                          title="Download"
+                          onClick={() => handleDownload(f)}
                         >
-                          {jc.job_card_number}
+                          ⬇️
                         </button>
-                      </td>
-                      <td style={{ fontSize: "14px", color: "#555" }}>
-                        {jc.date
-                          ? new Date(jc.date).toLocaleDateString("en-GB", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "—"}
-                      </td>
-                      <td style={{ fontSize: "14px", color: "#333" }}>
-                        <div style={{ fontWeight: 500 }}>{jc.item || "—"}</div>
-                        {jc.item_number && (
-                          <div style={{ fontSize: "12px", color: "#888" }}>
-                            {jc.item_number}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ fontSize: "14px", color: "#555" }}>
-                        {jc.vehicle_number || "—"}
-                      </td>
-                      <td>
-                        <span
-                          style={{
-                            padding: "3px 10px",
-                            borderRadius: "12px",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            background: st.bg,
-                            color: st.color,
-                            whiteSpace: "nowrap",
-                          }}
-                        >
-                          {st.label}
-                        </span>
-                      </td>
-                      <td>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "4px",
-                            flexWrap: "wrap",
-                          }}
-                        >
-                          {jc.has_item_list && (
-                            <span
-                              title="Item List"
-                              style={{ fontSize: "16px" }}
-                            >
-                              📋
-                            </span>
-                          )}
-                          {jc.has_labor_sheet && (
-                            <span
-                              title="Labor Sheet"
-                              style={{ fontSize: "16px" }}
-                            >
-                              👷
-                            </span>
-                          )}
-                          {jc.has_grn && (
-                            <span
-                              title="Good Received Note"
-                              style={{ fontSize: "16px" }}
-                            >
-                              📥
-                            </span>
-                          )}
-                          {jc.has_dispatch_note && (
-                            <span
-                              title="Dispatch Note"
-                              style={{ fontSize: "16px" }}
-                            >
-                              🚚
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "6px",
-                            justifyContent: "center",
-                          }}
-                        >
+                        {isAdmin && (
                           <button
-                            className="btn-download-small"
-                            title="Open"
-                            onClick={() =>
-                              navigate(
-                                `/customers/${customerId}/jobcards/${jc.id}`,
-                                { state: { customer } },
-                              )
-                            }
+                            className="btn-delete-small"
+                            title="Delete"
+                            onClick={() => handleDelete(f.id)}
                           >
-                            📂
+                            🗑️
                           </button>
-                          {isAdmin && (
-                            <button
-                              className="btn-delete-small"
-                              title="Delete"
-                              onClick={() => handleDelete(jc.id)}
-                            >
-                              🗑️
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}

@@ -17,7 +17,7 @@ interface User {
 }
 
 const emptyItem = () => ({
-  date: "",
+  date: new Date().toISOString().split("T")[0],
   of_number: "",
   of_date: "",
   in_number: "",
@@ -171,6 +171,62 @@ const CompanyHeader = ({ subtitle }: { subtitle: string }) => (
   </div>
 );
 
+// ── Download button ──────────────────────────────────────────────
+const DownloadBtn = ({
+  section,
+  label,
+  onDownload,
+}: {
+  section: string;
+  label: string;
+  onDownload: (section: string) => void;
+}) => (
+  <button
+    onClick={() => onDownload(section)}
+    style={{
+      padding: "6px 14px",
+      background: "#fff",
+      border: "1.5px solid #667eea",
+      color: "#667eea",
+      borderRadius: "6px",
+      cursor: "pointer",
+      fontSize: "12px",
+      fontWeight: 600,
+    }}
+  >
+    🖨️ Print / PDF {label}
+  </button>
+);
+
+// ── Table input cell ─────────────────────────────────────────────
+const TI = ({
+  value,
+  onChange,
+  type = "text",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  type?: string;
+}) => (
+  <td style={{ border: "1px solid #ccc", padding: "2px" }}>
+    <input
+      type={type}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{
+        width: "100%",
+        padding: "4px 6px",
+        fontSize: "13px",
+        border: "none",
+        outline: "none",
+        background: "transparent",
+        fontFamily: "inherit",
+        boxSizing: "border-box",
+      }}
+    />
+  </td>
+);
+
 const WorkshopJobCardDetail = () => {
   const navigate = useNavigate();
   const { customerId, jobCardId } = useParams();
@@ -181,11 +237,19 @@ const WorkshopJobCardDetail = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [saving, setSaving] = useState(false);
   const [jobCardNumber, setJobCardNumber] = useState("");
+  const [purchasingEntryId, setPurchasingEntryId] = useState<number | null>(
+    null,
+  );
+  const [purchasingCustId, setPurchasingCustId] = useState<number | null>(null);
 
   // ── Main card ──
   const [main, setMain] = useState({
     date: new Date().toISOString().split("T")[0],
-    time: "",
+    time: new Date().toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    job_card_name: "",
     customer_name: "",
     contact_number: "",
     item: "",
@@ -220,10 +284,14 @@ const WorkshopJobCardDetail = () => {
   });
 
   // ── Item list ──
-  const [items, setItems] = useState(Array(10).fill(null).map(emptyItem));
+  const [items, setItems] = useState(() =>
+    Array.from({ length: 10 }, emptyItem),
+  );
 
   // ── Labor sheet ──
-  const [labor, setLabor] = useState(Array(10).fill(null).map(emptyLabor));
+  const [labor, setLabor] = useState(() =>
+    Array.from({ length: 10 }, emptyLabor),
+  );
 
   // ── GRN ──
   const [grn, setGrn] = useState({
@@ -262,12 +330,12 @@ const WorkshopJobCardDetail = () => {
     const u = localStorage.getItem("user");
     if (u) setUser(JSON.parse(u));
     fetchCustomerName();
-
-    if (location.state?.jobCardNumber) {
+    if (!isNew) {
+      fetchJobCard();
+    } else if (location.state?.jobCardNumber) {
       setJobCardNumber(location.state.jobCardNumber);
     }
-    if (!isNew) fetchJobCard();
-  }, [jobCardId]);
+  }, [jobCardId, isNew]);
 
   const fetchCustomerName = async () => {
     try {
@@ -289,9 +357,12 @@ const WorkshopJobCardDetail = () => {
       });
       const { jobcard, items: its, labor: lab, grn: g, dispatch: d } = res.data;
       setJobCardNumber(jobcard.job_card_number);
+      setPurchasingEntryId(jobcard.purchasing_entry_id || null);
+      setPurchasingCustId(jobcard.purchasing_customer_id || null);
       setMain({
         date: jobcard.date?.split("T")[0] || "",
         time: jobcard.time || "",
+        job_card_name: jobcard.job_card_name || "",
         customer_name: jobcard.customer_name || "",
         contact_number: jobcard.contact_number || "",
         item: jobcard.item || "",
@@ -514,6 +585,7 @@ const WorkshopJobCardDetail = () => {
       html += `<h2>Workshop Job Card</h2>
     <table>
       <tr><td class="label">Job Card No</td><td colspan="3"><strong>${jobCardNumber}</strong></td><td class="label">Date</td><td>${main.date}</td><td class="label">Time</td><td>${main.time || ""}</td></tr>
+      <tr><td class="label">Job Card Name</td><td colspan="7"><strong>${main.job_card_name || ""}</strong></td></tr>
       <tr><td class="label">Customer</td><td colspan="3">${main.customer_name || ""}</td><td class="label">Contact No</td><td colspan="3">${main.contact_number || ""}</td></tr>
       <tr><td class="label">Item</td><td colspan="3">${main.item || ""}</td><td class="label">Item Number</td><td colspan="3">${main.item_number || ""}</td></tr>
       <tr><td class="label">Vehicle Number</td><td colspan="7">${main.vehicle_number || ""}</td></tr>
@@ -628,60 +700,6 @@ const WorkshopJobCardDetail = () => {
   const clr = customerName ? getColor(customerName) : "#667eea";
   const initials = customerName ? getInitials(customerName) : "WS";
 
-  // ── Download button ──────────────────────────────────────────────
-  const DownloadBtn = ({
-    section,
-    label,
-  }: {
-    section: string;
-    label: string;
-  }) => (
-    <button
-      onClick={() => handleDownload(section)}
-      style={{
-        padding: "6px 14px",
-        background: "#fff",
-        border: "1.5px solid #667eea",
-        color: "#667eea",
-        borderRadius: "6px",
-        cursor: "pointer",
-        fontSize: "12px",
-        fontWeight: 600,
-      }}
-    >
-      🖨️ Print / PDF {label}
-    </button>
-  );
-
-  // ── Table input cell ─────────────────────────────────────────────
-  const TI = ({
-    value,
-    onChange,
-    type = "text",
-  }: {
-    value: string;
-    onChange: (v: string) => void;
-    type?: string;
-  }) => (
-    <td style={{ border: "1px solid #ccc", padding: "2px" }}>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "4px 6px",
-          fontSize: "13px",
-          border: "none",
-          outline: "none",
-          background: "transparent",
-          fontFamily: "inherit",
-          boxSizing: "border-box",
-        }}
-      />
-    </td>
-  );
-
   return (
     <div className="project-dashboard">
       {/* Header */}
@@ -717,7 +735,25 @@ const WorkshopJobCardDetail = () => {
         <div className="project-header-row">
           <div>
             <h2 style={{ margin: 0 }}>
-              {isNew ? "🆕 New Job Card" : `🗂️ ${jobCardNumber}`}
+              {isNew ? (
+                "🆕 New Job Card"
+              ) : (
+                <>
+                  🗂️ {jobCardNumber}
+                  {main.job_card_name && (
+                    <span
+                      style={{
+                        marginLeft: "12px",
+                        fontSize: "0.9em",
+                        color: "#4f46e5",
+                        fontWeight: 500,
+                      }}
+                    >
+                      — {main.job_card_name}
+                    </span>
+                  )}
+                </>
+              )}
             </h2>
             {!isNew && (
               <select
@@ -797,18 +833,71 @@ const WorkshopJobCardDetail = () => {
         {!isNew && (
           <div
             style={{
-              padding: "8px 14px",
-              background: "#f0f4ff",
-              borderRadius: "8px",
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
               marginBottom: "16px",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "#667eea",
-              display: "inline-block",
-              border: "1.5px solid #c7d7ff",
+              flexWrap: "wrap",
             }}
           >
-            🗂️ Job Card: {jobCardNumber}
+            <div
+              style={{
+                padding: "8px 14px",
+                background: "#f0f4ff",
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "#667eea",
+                border: "1.5px solid #c7d7ff",
+                display: "inline-block",
+              }}
+            >
+              🗂️ Job Card: {jobCardNumber}
+            </div>
+            {purchasingEntryId && purchasingCustId && (
+              <button
+                onClick={() =>
+                  navigate(
+                    `/purchasing/workshop/customers/${customerId}/dashboard`,
+                    {
+                      state: {
+                        customer: {
+                          id: Number(customerId),
+                          name: customerName,
+                        },
+                        highlightEntryId: purchasingEntryId,
+                      },
+                    },
+                  )
+                }
+                // onClick={() =>
+                //   navigate(
+                //     `/purchasing/customers/${purchasingCustId}/entries`,
+                //     {
+                //       state: {
+                //         customer: { id: purchasingCustId, name: customerName },
+                //         highlightEntryId: purchasingEntryId,
+                //       },
+                //     },
+                //   )
+                // }
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "8px 16px",
+                  background: "#667eea",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                }}
+              >
+                🛒 View Purchasing Entry
+              </button>
+            )}
           </div>
         )}
 
@@ -822,6 +911,25 @@ const WorkshopJobCardDetail = () => {
             {/* Row 1: Date + Time */}
             <table style={tableStyle}>
               <tbody>
+                <tr>
+                  <td style={labelStyle} width="120">
+                    Job Card Name
+                  </td>
+                  <td colSpan={3} style={cellStyle}>
+                    <input
+                      type="text"
+                      value={main.job_card_name}
+                      onChange={(e) =>
+                        setMain((s) => ({
+                          ...s,
+                          job_card_name: e.target.value,
+                        }))
+                      }
+                      style={inputStyle}
+                      placeholder="Give this job card a name (e.g. 'AC Compressor Repair')"
+                    />
+                  </td>
+                </tr>
                 <tr>
                   <td style={labelStyle} width="120">
                     Date
@@ -1365,7 +1473,13 @@ const WorkshopJobCardDetail = () => {
                 flexWrap: "wrap",
               }}
             >
-              {!isNew && <DownloadBtn section="jobcard" label="Job Card" />}
+              {!isNew && (
+                <DownloadBtn
+                  section="jobcard"
+                  label="Job Card"
+                  onDownload={handleDownload}
+                />
+              )}
               <button
                 className="btn-save-project"
                 onClick={handleSaveMain}
@@ -1490,7 +1604,11 @@ const WorkshopJobCardDetail = () => {
                 + Add Row
               </button>
               <div style={{ display: "flex", gap: "10px" }}>
-                <DownloadBtn section="items" label="Item List" />
+                <DownloadBtn
+                  section="items"
+                  label="Item List"
+                  onDownload={handleDownload}
+                />
                 <button
                   className="btn-save-project"
                   onClick={handleSaveItems}
@@ -1630,7 +1748,11 @@ const WorkshopJobCardDetail = () => {
                 + Add Row
               </button>
               <div style={{ display: "flex", gap: "10px" }}>
-                <DownloadBtn section="labor" label="Labor Sheet" />
+                <DownloadBtn
+                  section="labor"
+                  label="Labor Sheet"
+                  onDownload={handleDownload}
+                />
                 <button
                   className="btn-save-project"
                   onClick={handleSaveLabor}
@@ -1822,7 +1944,11 @@ const WorkshopJobCardDetail = () => {
                 marginTop: "12px",
               }}
             >
-              <DownloadBtn section="grn" label="GRN" />
+              <DownloadBtn
+                section="grn"
+                label="GRN"
+                onDownload={handleDownload}
+              />
               <button
                 className="btn-save-project"
                 onClick={handleSaveGRN}
@@ -2033,7 +2159,11 @@ const WorkshopJobCardDetail = () => {
                 justifyContent: "flex-end",
               }}
             >
-              <DownloadBtn section="dispatch" label="Dispatch Note" />
+              <DownloadBtn
+                section="dispatch"
+                label="Dispatch Note"
+                onDownload={handleDownload}
+              />
               <button
                 className="btn-save-project"
                 onClick={handleSaveDispatch}
