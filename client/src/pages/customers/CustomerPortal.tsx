@@ -10,6 +10,7 @@ import "./Customers.css";
 
 // Import logo
 import companyLogo from "../../assets/mainlogo.jpeg";
+import { API_BASE } from "../../config";
 
 interface User {
   username: string;
@@ -50,10 +51,9 @@ const CustomerPortal = () => {
   const fetchCustomer = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const response = await axios.get(`${API_BASE}/customers/${customerId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (response.data.customer) {
         setCustomer(response.data.customer);

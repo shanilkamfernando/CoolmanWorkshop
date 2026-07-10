@@ -3,7 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import pool from "./db";
-import authRoutes from "../src/routes/auth";
+import authRoutes from "./routes/auth";
 import customers from "./routes/customers";
 import projects from "./routes/projects";
 import attachments from "./routes/attachments";

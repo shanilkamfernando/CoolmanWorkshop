@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import companyLogo from "../../assets/mainlogo.jpeg";
 import "../customers/ProjectDashboard.css";
+import { API_BASE } from "../../config";
 
 interface BOQItem {
   id: number;
@@ -608,7 +609,7 @@ const CustomerPurchasingDashboard = () => {
 
   const token = () => localStorage.getItem("token");
   const hdr = () => ({ Authorization: `Bearer ${token()}` });
-  const BASE = `http://localhost:5000/api/boq/customer/${customerId}/entries`;
+  const BASE = `${API_BASE}/boq/customer/${customerId}/entries`;
 
   const isAdmin = user?.role === "admin";
   const canAddBOQ = ["admin", "data_entry"].includes(user?.role || ""); // add new items
@@ -626,7 +627,7 @@ const CustomerPurchasingDashboard = () => {
   const fetchCustomer = async () => {
     try {
       const r = await axios.get(
-        `http://localhost:5000/api/purchasing/customers/${customerId}`,
+        `${API_BASE}/purchasing/customers/${customerId}`,
         { headers: hdr() },
       );
       if (r.data.customer) setCustomerName(r.data.customer.name);
@@ -642,7 +643,7 @@ const CustomerPurchasingDashboard = () => {
 
   // const fetchBOQItems = async () => {
   //   try {
-  //     const r = await axios.get("http://localhost:5000/api/boq", {
+  //     const r = await axios.get("${API_BASE}/boq", {
   //       headers: hdr(),
   //     });
   //     setBOQItems(r.data.items || []);
@@ -650,10 +651,9 @@ const CustomerPurchasingDashboard = () => {
   // };
   const fetchBOQItems = async () => {
     try {
-      const r = await axios.get(
-        `http://localhost:5000/api/boq?customer_id=${customerId}`,
-        { headers: hdr() },
-      );
+      const r = await axios.get(`${API_BASE}/boq?customer_id=${customerId}`, {
+        headers: hdr(),
+      });
       setBOQItems(r.data.items || []);
     } catch {}
   };
@@ -798,14 +798,12 @@ const CustomerPurchasingDashboard = () => {
     setSavingBOQMaster(true);
     try {
       if (editingBOQItem) {
-        await axios.put(
-          `http://localhost:5000/api/boq/${editingBOQItem.id}`,
-          boqMasterForm,
-          { headers: hdr() },
-        );
+        await axios.put(`${API_BASE}/boq/${editingBOQItem.id}`, boqMasterForm, {
+          headers: hdr(),
+        });
       } else {
         await axios.post(
-          "http://localhost:5000/api/boq",
+          "${API_BASE}/boq",
           { ...boqMasterForm, customer_id: customerId },
           { headers: hdr() },
         );
@@ -830,7 +828,7 @@ const CustomerPurchasingDashboard = () => {
   const handleBOQMasterDelete = async (id: number, name: string) => {
     if (!confirm(`Delete "${name}"?`)) return;
     try {
-      await axios.delete(`http://localhost:5000/api/boq/${id}`, {
+      await axios.delete(`${API_BASE}/boq/${id}`, {
         headers: hdr(),
       });
       fetchBOQItems();
