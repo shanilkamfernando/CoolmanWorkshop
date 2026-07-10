@@ -153,7 +153,7 @@ const UserManagement = () => {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
-        <p>Loading users...</p>
+        <p>Loading users....</p>
       </div>
     );
   }
