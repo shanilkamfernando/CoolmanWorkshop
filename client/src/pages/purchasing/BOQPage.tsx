@@ -42,9 +42,12 @@ const BOQPage = () => {
 
   const fetchItems = async () => {
     try {
-      const r = await axios.get("http://localhost:5000/api/boq", {
-        headers: hdr(),
-      });
+      const r = await axios.get(
+        "https://coolmanworkshop-production.up.railway.app/api/boq",
+        {
+          headers: hdr(),
+        },
+      );
       setItems(r.data.items || []);
     } catch {}
   };
@@ -55,14 +58,18 @@ const BOQPage = () => {
     try {
       if (editingItem) {
         await axios.put(
-          `http://localhost:5000/api/boq/${editingItem.id}`,
+          `https://coolmanworkshop-production.up.railway.app/api/boq/${editingItem.id}`,
           form,
           { headers: hdr() },
         );
       } else {
-        await axios.post("http://localhost:5000/api/boq", form, {
-          headers: hdr(),
-        });
+        await axios.post(
+          "https://coolmanworkshop-production.up.railway.app/api/boq",
+          form,
+          {
+            headers: hdr(),
+          },
+        );
       }
       setForm({
         item_name: "",
@@ -84,9 +91,12 @@ const BOQPage = () => {
   const handleDelete = async (id: number, name: string) => {
     if (!confirm(`Delete "${name}"?`)) return;
     try {
-      await axios.delete(`http://localhost:5000/api/boq/${id}`, {
-        headers: hdr(),
-      });
+      await axios.delete(
+        `https://coolmanworkshop-production.up.railway.app/api/boq/${id}`,
+        {
+          headers: hdr(),
+        },
+      );
       fetchItems();
     } catch (err: any) {
       alert(err.response?.data?.error || "Failed to delete");

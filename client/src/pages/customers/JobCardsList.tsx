@@ -89,7 +89,7 @@ const JobCardsList = () => {
   const token = () => localStorage.getItem("token");
   const hdr = () => ({ Authorization: `Bearer ${token()}` });
   const isAdmin = user?.role === "admin";
-  const BASE = `http://localhost:5000/api/customers/${customerId}/jobcard-files`;
+  const BASE = `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/jobcard-files`;
 
   useEffect(() => {
     const u = localStorage.getItem("user");
@@ -102,7 +102,7 @@ const JobCardsList = () => {
   const fetchCustomer = async () => {
     try {
       const r = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}`,
         { headers: hdr() },
       );
       if (r.data.customer) setCustomer(r.data.customer);

@@ -236,7 +236,7 @@ const AppHeader = ({ customerName: customerNameProp }: AppHeaderProps) => {
       try {
         if (isWorkshopPath) {
           const r = await axios.get(
-            "http://localhost:5000/api/workshop/customers",
+            "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
             { headers: hdr },
           );
           const found = r.data.customers?.find(
@@ -248,7 +248,7 @@ const AppHeader = ({ customerName: customerNameProp }: AppHeaderProps) => {
           }
         }
         const r2 = await axios.get(
-          `http://localhost:5000/api/purchasing/customers/${customerId}`,
+          `https://coolmanworkshop-production.up.railway.app/api/purchasing/customers/${customerId}`,
           { headers: hdr },
         );
         if (r2.data.customer) setCustomerName(r2.data.customer.name);

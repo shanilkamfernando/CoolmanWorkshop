@@ -71,7 +71,7 @@ const SignUp = () => {
 
       // Call backend API
       const response = await axios.post(
-        "http://localhost:5000/api/auth/signup",
+        "https://coolmanworkshop-production.up.railway.app/api/auth/signup",
         {
           username: formData.username,
           password: formData.password,

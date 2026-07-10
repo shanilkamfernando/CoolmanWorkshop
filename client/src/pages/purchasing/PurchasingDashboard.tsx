@@ -792,7 +792,7 @@ const PurchasingDashboard = () => {
   const isAdmin = user?.role === "admin";
   const token = () => localStorage.getItem("token");
   const hdr = () => ({ Authorization: `Bearer ${token()}` });
-  const BASE = `http://localhost:5000/api/purchasing/customers/${customerId}/entries`;
+  const BASE = `https://coolmanworkshop-production.up.railway.app/api/purchasing/customers/${customerId}/entries`;
   const custColor = getColor(customerName || "C");
   const custInitials = getInitials(customerName || "C");
 
@@ -818,7 +818,7 @@ const PurchasingDashboard = () => {
     try {
       // Try workshop customers first (this is the workshop route)
       const r = await axios.get(
-        `http://localhost:5000/api/workshop/customers`,
+        `https://coolmanworkshop-production.up.railway.app/api/workshop/customers`,
         { headers: hdr() },
       );
       const found = r.data.customers?.find(
@@ -831,7 +831,7 @@ const PurchasingDashboard = () => {
 
       // Fallback to purchasing customers
       const r2 = await axios.get(
-        `http://localhost:5000/api/purchasing/customers/${customerId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/purchasing/customers/${customerId}`,
         { headers: hdr() },
       );
       if (r2.data.customer) setCustomerName(r2.data.customer.name);
@@ -840,7 +840,7 @@ const PurchasingDashboard = () => {
 
   const fetchEntries = async () => {
     try {
-      const url = `http://localhost:5000/api/purchasing/workshop-customers/${customerId}/entries`;
+      const url = `https://coolmanworkshop-production.up.railway.app/api/purchasing/workshop-customers/${customerId}/entries`;
       console.log("Fetching entries from:", url);
       const r = await axios.get(url, { headers: hdr() });
       console.log("Entries response:", r.data);
@@ -875,7 +875,7 @@ const PurchasingDashboard = () => {
   const fetchWorkshopCustomers = async () => {
     try {
       const r = await axios.get(
-        "http://localhost:5000/api/purchasing/workshop-customers",
+        "https://coolmanworkshop-production.up.railway.app/api/purchasing/workshop-customers",
         { headers: hdr() },
       );
       setWorkshopCustomers(r.data.customers || []);
@@ -937,7 +937,7 @@ const PurchasingDashboard = () => {
     console.log(`[FETCH] fetchProducts called for entryId=${entryId}`);
     try {
       const r = await axios.get(
-        `http://localhost:5000/api/purchasing/entries/${entryId}/products`,
+        `https://coolmanworkshop-production.up.railway.app/api/purchasing/entries/${entryId}/products`,
         { headers: hdr() },
       );
       console.log(`[FETCH] response for entryId=${entryId}:`, r.data);
@@ -957,7 +957,7 @@ const PurchasingDashboard = () => {
   ) => {
     try {
       const r = await axios.put(
-        `http://localhost:5000/api/purchasing/entries/${entryId}/products`,
+        `https://coolmanworkshop-production.up.railway.app/api/purchasing/entries/${entryId}/products`,
         { stage, products: [row] },
         { headers: hdr() },
       );
@@ -973,7 +973,7 @@ const PurchasingDashboard = () => {
   const handleApproveProductRow = async (entryId: number, row: FlowProduct) => {
     try {
       const r = await axios.put(
-        `http://localhost:5000/api/purchasing/entries/${entryId}/products`,
+        `https://coolmanworkshop-production.up.railway.app/api/purchasing/entries/${entryId}/products`,
         {
           stage: "approve",
           products: [{ id: row.id, approved_quantity: row.approved_quantity }],

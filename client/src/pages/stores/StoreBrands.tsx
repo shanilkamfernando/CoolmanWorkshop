@@ -76,7 +76,7 @@ const StoreBrands = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `http://localhost:5000/api/stores/categories/${categoryKey}/brands`,
+        `https://coolmanworkshop-production.up.railway.app/api/stores/categories/${categoryKey}/brands`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setBrands(res.data.brands || []);
@@ -97,7 +97,7 @@ const StoreBrands = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/stores/categories/${categoryKey}/brands`,
+        `https://coolmanworkshop-production.up.railway.app/api/stores/categories/${categoryKey}/brands`,
         { name: newName.trim(), description: newDesc.trim() },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -116,7 +116,7 @@ const StoreBrands = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/stores/categories/${categoryKey}/brands/${brand.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/stores/categories/${categoryKey}/brands/${brand.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setDeleteTarget(null);

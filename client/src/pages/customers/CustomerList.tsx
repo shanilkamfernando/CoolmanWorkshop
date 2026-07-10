@@ -77,9 +77,12 @@ const CustomerList = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      const response = await axios.get("http://localhost:5000/api/customers", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.get(
+        "https://coolmanworkshop-production.up.railway.app/api/customers",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setCustomers(response.data.customers || []);
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -111,7 +114,7 @@ const CustomerList = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        "http://localhost:5000/api/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/customers",
         { name: newCustomerName },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -153,7 +156,7 @@ const CustomerList = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerToDelete.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("Customer deleted successfully!");

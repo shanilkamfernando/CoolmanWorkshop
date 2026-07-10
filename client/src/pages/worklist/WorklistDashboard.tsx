@@ -44,7 +44,7 @@ const WorklistDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        "http://localhost:5000/api/jobAssigned/years",
+        "https://coolmanworkshop-production.up.railway.app/api/jobAssigned/years",
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setYears(response.data.years || []);
@@ -75,7 +75,7 @@ const WorklistDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        "http://localhost:5000/api/jobAssigned/years",
+        "https://coolmanworkshop-production.up.railway.app/api/jobAssigned/years",
         { year: yearNum },
         { headers: { Authorization: `Bearer ${token}` } },
       );

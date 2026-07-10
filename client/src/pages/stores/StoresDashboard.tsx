@@ -91,8 +91,8 @@ const StoresDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const url = brandId
-        ? `http://localhost:5000/api/stores/items?brandId=${brandId}`
-        : "http://localhost:5000/api/stores/items";
+        ? `https://coolmanworkshop-production.up.railway.app/api/stores/items?brandId=${brandId}`
+        : "https://coolmanworkshop-production.up.railway.app/api/stores/items";
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -126,7 +126,7 @@ const StoresDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        "http://localhost:5000/api/stores/items",
+        "https://coolmanworkshop-production.up.railway.app/api/stores/items",
         {
           ...newItem,
           left_quantity: newItem.quantity,
@@ -180,7 +180,7 @@ const StoresDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/stores/items/${itemToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/stores/items/${itemToDelete.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setShowDeleteConfirm(false);
@@ -211,7 +211,7 @@ const StoresDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.put(
-        `http://localhost:5000/api/stores/items/${id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/stores/items/${id}`,
         { [field]: value },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -240,7 +240,7 @@ const StoresDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.put(
-        `http://localhost:5000/api/stores/items/${usageItem.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/stores/items/${usageItem.id}`,
         { ...usageForm, left_quantity: leftQuantity },
         { headers: { Authorization: `Bearer ${token}` } },
       );

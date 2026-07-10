@@ -60,7 +60,7 @@ const ProjectsPortal = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
@@ -117,7 +117,7 @@ const ProjectsPortal = () => {
       setLoading(true);
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/projects`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setProjects(response.data.projects || []);
@@ -171,7 +171,7 @@ const ProjectsPortal = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/projects`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects`,
         { name: newProjectName },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -213,7 +213,7 @@ const ProjectsPortal = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectToDelete.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("Project deleted successfully!");

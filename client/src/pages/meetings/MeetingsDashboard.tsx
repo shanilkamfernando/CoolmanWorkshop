@@ -111,9 +111,12 @@ const MeetingsDashboard = () => {
   const fetchMeetings = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/meetings", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await axios.get(
+        "https://coolmanworkshop-production.up.railway.app/api/meetings",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setMeetings(res.data.meetings || []);
     } catch (err) {
       console.error("Error fetching meetings:", err);
@@ -129,14 +132,18 @@ const MeetingsDashboard = () => {
       const token = localStorage.getItem("token");
       if (selectedMeeting) {
         await axios.put(
-          `http://localhost:5000/api/meetings/${selectedMeeting.id}`,
+          `https://coolmanworkshop-production.up.railway.app/api/meetings/${selectedMeeting.id}`,
           form,
           { headers: { Authorization: `Bearer ${token}` } },
         );
       } else {
-        await axios.post("http://localhost:5000/api/meetings", form, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await axios.post(
+          "https://coolmanworkshop-production.up.railway.app/api/meetings",
+          form,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
       }
       closeModal();
       fetchMeetings();
@@ -156,7 +163,7 @@ const MeetingsDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/meetings/${meetingToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/meetings/${meetingToDelete.id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },

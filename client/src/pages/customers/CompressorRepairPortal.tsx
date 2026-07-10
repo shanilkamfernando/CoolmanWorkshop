@@ -62,7 +62,7 @@ const CompressorRepairPortal = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
@@ -107,7 +107,7 @@ const CompressorRepairPortal = () => {
       setLoading(true);
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/compressor-repair`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-repair`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setRepairCompanies(response.data.companies || []);
@@ -142,7 +142,7 @@ const CompressorRepairPortal = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/compressor-repair`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-repair`,
         { name: newCompanyName },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -175,7 +175,7 @@ const CompressorRepairPortal = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/compressor-repair/${companyToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-repair/${companyToDelete.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("Repair company deleted successfully!");

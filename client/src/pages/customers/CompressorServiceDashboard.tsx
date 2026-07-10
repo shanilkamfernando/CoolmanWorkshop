@@ -95,7 +95,7 @@ const MasterPasswordModal = ({
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        "http://localhost:5000/api/attachments/master-password",
+        "https://coolmanworkshop-production.up.railway.app/api/attachments/master-password",
         { password },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -208,7 +208,7 @@ const UploadModal = ({
 
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/service-records/${recordId}/attachments`,
+        `https://coolmanworkshop-production.up.railway.app/api/service-records/${recordId}/attachments`,
         {
           attachment_type: type,
           original_name: file.name,
@@ -314,7 +314,7 @@ const DownloadModal = ({
     try {
       const token = localStorage.getItem("token");
       const res = await axios.post(
-        `http://localhost:5000/api/attachments/${attachment.id}/download`,
+        `https://coolmanworkshop-production.up.railway.app/api/attachments/${attachment.id}/download`,
         { password },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -514,7 +514,7 @@ const NameTagCell = ({
 
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/compressors/${compressor.id}/nametag`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/compressors/${compressor.id}/nametag`,
         { file_data: base64, filename: file.name, mime_type: file.type },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -547,7 +547,7 @@ const NameTagCell = ({
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/compressors/${compressor.id}/nametag`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/compressors/${compressor.id}/nametag`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       onRefresh();
@@ -636,7 +636,7 @@ const JobCardCell = ({
 
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/records/${record.id}/jobcard`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/records/${record.id}/jobcard`,
         { file_data: base64, filename: file.name, mime_type: file.type },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -669,7 +669,7 @@ const JobCardCell = ({
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/records/${record.id}/jobcard`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/records/${record.id}/jobcard`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       onRefresh();
@@ -783,7 +783,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        "http://localhost:5000/api/attachments/master-password/status",
+        "https://coolmanworkshop-production.up.railway.app/api/attachments/master-password/status",
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setHasMasterPwd(res.data.hasPassword);
@@ -796,7 +796,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/compressors`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/compressors`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setCompressors(res.data.compressors || []);
@@ -809,7 +809,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/records`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/records`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setServiceRecords(res.data.records || []);
@@ -826,7 +826,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/compressors`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/compressors`,
         newCompressor,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -850,7 +850,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/compressors/${id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/compressors/${id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       fetchCompressors();
@@ -867,7 +867,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/records`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/records`,
         { ...newService, service_instructor: user?.username || "Unknown" },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -893,7 +893,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/records/${id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/records/${id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       fetchServiceRecords();
@@ -906,9 +906,12 @@ const CompressorServiceDashboard = () => {
     if (!confirm("Delete this attachment permanently?")) return;
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`http://localhost:5000/api/attachments/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.delete(
+        `https://coolmanworkshop-production.up.railway.app/api/attachments/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       fetchServiceRecords();
     } catch {
       alert("Failed to delete attachment");

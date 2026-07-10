@@ -77,7 +77,7 @@ const SystemRepairJobCardCell = ({
       });
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/system-repair/records/${record.id}/jobcard`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/system-repair/records/${record.id}/jobcard`,
         { file_data: base64, filename: file.name, mime_type: file.type },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -110,7 +110,7 @@ const SystemRepairJobCardCell = ({
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/system-repair/records/${record.id}/jobcard`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/system-repair/records/${record.id}/jobcard`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       onRefresh();
@@ -226,7 +226,7 @@ const FileAttachmentCell = ({
       });
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/system-repair/records/${recordId}/${endpoint}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/system-repair/records/${recordId}/${endpoint}`,
         { file_data: base64, filename: file.name, mime_type: file.type },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -259,7 +259,7 @@ const FileAttachmentCell = ({
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/system-repair/records/${recordId}/${endpoint}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/system-repair/records/${recordId}/${endpoint}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       onRefresh();
@@ -377,7 +377,7 @@ const SystemRepairDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (response.data.customer) {
@@ -392,7 +392,7 @@ const SystemRepairDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/system-repair/records`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/system-repair/records`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setRepairRecords(response.data.records || []);
@@ -416,7 +416,7 @@ const SystemRepairDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/system-repair/records`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/system-repair/records`,
         repairRecordData,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -478,7 +478,7 @@ const SystemRepairDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/system-repair/records/${id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/system-repair/records/${id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("Repair record deleted!");

@@ -65,9 +65,12 @@ const UserManagement = () => {
       setLoading(true);
       const token = localStorage.getItem("token");
 
-      const response = await axios.get("http://localhost:5000/api/auth/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.get(
+        "https://coolmanworkshop-production.up.railway.app/api/auth/users",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       if (response.data.users) {
         setUsers(response.data.users);
@@ -116,7 +119,7 @@ const UserManagement = () => {
       const token = localStorage.getItem("token");
 
       await axios.put(
-        `http://localhost:5000/api/auth/users/${selectedUser.id}/permissions`,
+        `https://coolmanworkshop-production.up.railway.app/api/auth/users/${selectedUser.id}/permissions`,
         {
           permissions: { portals: selectedPortals },
           isActive: isUserActive,
@@ -138,9 +141,12 @@ const UserManagement = () => {
 
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`http://localhost:5000/api/auth/users/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.delete(
+        `https://coolmanworkshop-production.up.railway.app/api/auth/users/${userId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       alert("User deleted successfully!");
       fetchUsers();

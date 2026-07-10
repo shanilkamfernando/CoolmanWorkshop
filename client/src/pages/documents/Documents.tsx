@@ -57,7 +57,7 @@ const Documents = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        "http://localhost:5000/api/documents/files",
+        "https://coolmanworkshop-production.up.railway.app/api/documents/files",
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setDocuments(response.data.files || []);
@@ -95,7 +95,7 @@ const Documents = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        "http://localhost:5000/api/documents/upload",
+        "https://coolmanworkshop-production.up.railway.app/api/documents/upload",
         formData,
         {
           headers: {
@@ -133,7 +133,7 @@ const Documents = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/documents/files/${fileToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/documents/files/${fileToDelete.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("File deleted successfully!");
@@ -150,7 +150,7 @@ const Documents = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/documents/download/${file.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/documents/download/${file.id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",

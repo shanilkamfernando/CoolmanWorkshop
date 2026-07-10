@@ -63,7 +63,7 @@ const StoresLanding = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        "http://localhost:5000/api/stores/categories",
+        "https://coolmanworkshop-production.up.railway.app/api/stores/categories",
         {
           headers: { Authorization: `Bearer ${token}` },
         },

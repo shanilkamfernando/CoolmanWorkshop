@@ -319,7 +319,7 @@ const WorkshopJobCardDetail = () => {
     stores_person: "",
   });
 
-  const BASE = `http://localhost:5000/api/workshop/customers/${customerId}/jobcards`;
+  const BASE = `https://coolmanworkshop-production.up.railway.app/api/workshop/customers/${customerId}/jobcards`;
   const headers = () => ({
     Authorization: `Bearer ${localStorage.getItem("token")}`,
   });
@@ -340,7 +340,7 @@ const WorkshopJobCardDetail = () => {
   const fetchCustomerName = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:5000/api/workshop/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
         { headers: headers() },
       );
       const found = res.data.customers?.find(

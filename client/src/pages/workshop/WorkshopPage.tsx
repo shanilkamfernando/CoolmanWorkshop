@@ -86,7 +86,7 @@ const WorkshopPage = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        "http://localhost:5000/api/workshop/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -109,7 +109,7 @@ const WorkshopPage = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        "http://localhost:5000/api/workshop/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
         {
           name: newName.trim(),
           contact_number: newContact,
@@ -135,7 +135,7 @@ const WorkshopPage = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/workshop/customers/${customer.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/workshop/customers/${customer.id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },

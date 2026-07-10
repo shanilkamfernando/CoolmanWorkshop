@@ -115,7 +115,7 @@ const fmtTime = (t: string) => {
   return t.substring(0, 5);
 };
 
-const API = "http://localhost:5000/api";
+const API = "https://coolmanworkshop-production.up.railway.app/api";
 
 // ── Update Log Component ──────────────────────────────────────
 const TaskUpdateLog = ({
@@ -133,7 +133,7 @@ const TaskUpdateLog = ({
   const [newNote, setNewNote] = useState("");
   const [saving, setSaving] = useState(false);
 
-  const API = "http://localhost:5000/api";
+  const API = "https://coolmanworkshop-production.up.railway.app/api";
 
   useEffect(() => {
     fetchUpdates();

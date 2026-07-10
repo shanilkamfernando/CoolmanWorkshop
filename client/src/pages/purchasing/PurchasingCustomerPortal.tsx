@@ -81,8 +81,8 @@ const PurchasingCustomerPortal = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        "http://localhost:5000/api/workshop/customers",
-        // "http://localhost:5000/api/purchasing/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
+        // "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers",
         { headers: headers() },
       );
       setCustomers(res.data.customers || []);
@@ -101,8 +101,8 @@ const PurchasingCustomerPortal = () => {
     setSaving(true);
     try {
       await axios.post(
-        "http://localhost:5000/api/workshop/customers",
-        // "http://localhost:5000/api/purchasing/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
+        // "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers",
         {
           name: newName.trim(),
           contact_number: newContact,
@@ -127,8 +127,8 @@ const PurchasingCustomerPortal = () => {
   const handleDelete = async (customer: PurchasingCustomer) => {
     try {
       await axios.delete(
-        `http://localhost:5000/api/workshop/customers/${customer.id}`,
-        // `http://localhost:5000/api/purchasing/customers/${customer.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/workshop/customers/${customer.id}`,
+        // `https://coolmanworkshop-production.up.railway.app/api/purchasing/customers/${customer.id}`,
         { headers: headers() },
       );
       setDeleteTarget(null);
