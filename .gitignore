@@ -1,7 +1,29 @@
+# Dependencies
 node_modules/
+client/node_modules/
+server/node_modules/
+
+# Env files (ANY location)
 .env
 .env.local
-*.env
+.env.*.local
+client/.env
+server/.env
+
+# Build outputs
 dist/
 build/
+client/dist/
+server/dist/
+
+# Uploads
+server/uploads/*
+!server/uploads/.gitkeep
+
+# OS
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
