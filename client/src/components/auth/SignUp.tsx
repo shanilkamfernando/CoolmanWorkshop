@@ -111,12 +111,39 @@ const SignUp = () => {
 
   return (
     <div className="auth-container">
-      <div>
+      {/* <div>
         <div>Welcome to</div>
         <br />
         <span className="brand-cool">COOL</span>
         <span className="brand-man">Man</span> <br />
         <div>Refrigeration</div>
+      </div> */}
+
+      <div style={{ textAlign: "center", fontFamily: "Arial, sans-serif" }}>
+        <div
+          style={{
+            fontSize: "40px",
+            fontWeight: 400,
+            color: "#000",
+            marginBottom: "20px",
+          }}
+        >
+          Welcome to
+        </div>
+        <div
+          style={{
+            fontSize: "72px",
+            fontWeight: 700,
+            lineHeight: 1,
+            marginBottom: "10px",
+          }}
+        >
+          <span style={{ color: "#4a90d9" }}>COOL</span>
+          <span style={{ color: "#1e5faa" }}>Man</span>
+        </div>
+        <div style={{ fontSize: "48px", fontWeight: 600, color: "#000" }}>
+          Refrigeration
+        </div>
       </div>
       <div className="auth-box">
         <div className="auth-header">
