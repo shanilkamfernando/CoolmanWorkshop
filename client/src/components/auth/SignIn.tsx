@@ -83,12 +83,13 @@ const SignIn = () => {
 
   return (
     <div className="auth-container">
+      <h1>
+        Welcome to
+        <span className="brand-cool">COOL</span>
+        <span className="brand-man">Man</span> <br /> Refrigeration
+      </h1>
       <div className="auth-box">
         <div className="auth-header">
-          <h1>
-            <span className="brand-cool">COOL</span>
-            <span className="brand-man">Man</span> Refrigeration
-          </h1>
           <p className="auth-subtitle">Sign in to your account</p>
         </div>
 

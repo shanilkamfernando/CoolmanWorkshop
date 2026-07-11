@@ -41,13 +41,15 @@
 }
 
 .brand-cool {
-  color: #2196f3;
+  color: #5b9bd5;
   font-weight: 700;
+  font-size: 8rem;
 }
 
 .brand-man {
-  color: #333;
+  color: #0070c0;
   font-weight: 400;
+  font-size: 8rem;
 }
 
 .auth-subtitle {
