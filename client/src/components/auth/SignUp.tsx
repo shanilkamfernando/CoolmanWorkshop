@@ -111,11 +111,13 @@ const SignUp = () => {
 
   return (
     <div className="auth-container">
-      <h1>
-        Welcome to
+      <div>
+        <div>Welcome to</div>
+        <br />
         <span className="brand-cool">COOL</span>
-        <span className="brand-man">Man</span> <br /> Refrigeration
-      </h1>
+        <span className="brand-man">Man</span> <br />
+        <div>Refrigeration</div>
+      </div>
       <div className="auth-box">
         <div className="auth-header">
           <p className="auth-subtitle">Create your account</p>
