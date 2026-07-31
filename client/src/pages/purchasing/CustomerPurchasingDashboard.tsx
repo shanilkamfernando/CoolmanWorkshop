@@ -1915,7 +1915,7 @@ const CustomerPurchasingDashboard = () => {
                         }
                       />
                     </div>
-                    <div>
+                    {/* <div>
                       <label style={lbl}>BOQ Quantity</label>
                       <input
                         type="number"
@@ -1931,7 +1931,7 @@ const CustomerPurchasingDashboard = () => {
                           }))
                         }
                       />
-                    </div>
+                    </div> */}
                     <div>
                       <label style={lbl}>Available Quantity</label>
                       <input
