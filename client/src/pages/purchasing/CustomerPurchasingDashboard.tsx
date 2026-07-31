@@ -1993,7 +1993,7 @@ const CustomerPurchasingDashboard = () => {
                     <th style={th}>Item Name</th>
                     <th style={th}>Specification</th>
                     <th style={th}>Part Number</th>
-                    <th style={th}>BOQ Qty</th>
+                    {/* <th style={th}>BOQ Qty</th> */}
                     <th style={th}>Available Qty</th>
                     <th style={th}>Remaining Qty</th>
                     {isAdmin && (
@@ -2041,7 +2041,7 @@ const CustomerPurchasingDashboard = () => {
                           </td>
                           <td style={td()}>{item.specification || "—"}</td>
                           <td style={td()}>{item.part_number || "—"}</td>
-                          <td style={td()}>{fmtQty(item.boq_quantity)}</td>
+                          {/* <td style={td()}>{fmtQty(item.boq_quantity)}</td> */}
                           <td style={td()}>
                             {fmtQty(item.available_quantity)}
                           </td>
