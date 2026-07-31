@@ -803,7 +803,7 @@ const CustomerPurchasingDashboard = () => {
         });
       } else {
         await axios.post(
-          "${API_BASE}/boq",
+          `${API_BASE}/boq`,
           { ...boqMasterForm, customer_id: customerId },
           { headers: hdr() },
         );
