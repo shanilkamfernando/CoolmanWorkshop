@@ -66,6 +66,81 @@ const MONTHS = [
   "December",
 ];
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MINI_DAYS = ["S", "M", "T", "W", "T", "F", "S"];
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+// Small single-month calendar used inside the 12-month year grid.
+const MiniMonthCalendar = ({
+  year,
+  monthIndex,
+  meetings,
+  todayStr,
+  onDayClick,
+}: {
+  year: number;
+  monthIndex: number;
+  meetings: Meeting[];
+  todayStr: string;
+  onDayClick: (dateStr: string, dayMeetings: Meeting[]) => void;
+}) => {
+  const firstDay = new Date(year, monthIndex, 1).getDay();
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array(firstDay).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+
+  const getDayMeetings = (day: number) => {
+    const dateStr = `${year}-${pad2(monthIndex + 1)}-${pad2(day)}`;
+    return meetings.filter((m) => m.date?.split("T")[0] === dateStr);
+  };
+
+  return (
+    <div className="mini-month">
+      <div className="mini-month-title">{MONTHS[monthIndex]}</div>
+      <div className="mini-days-header">
+        {MINI_DAYS.map((d, i) => (
+          <span key={i}>{d}</span>
+        ))}
+      </div>
+      <div className="mini-grid">
+        {cells.map((day, idx) => {
+          if (!day) return <span key={`e-${idx}`} className="mini-empty" />;
+          const dateStr = `${year}-${pad2(monthIndex + 1)}-${pad2(day)}`;
+          const dayMeetings = getDayMeetings(day);
+          const isToday = dateStr === todayStr;
+          const primaryColor =
+            dayMeetings.length > 0
+              ? MEETING_COLORS[dayMeetings[0].type]?.bg || "#1976D2"
+              : undefined;
+          return (
+            <span
+              key={day}
+              className={`mini-day ${isToday ? "mini-today" : ""} ${dayMeetings.length > 0 ? "mini-has-meeting" : ""}`}
+              style={
+                dayMeetings.length > 0
+                  ? { background: primaryColor, color: "#fff" }
+                  : undefined
+              }
+              onClick={() => onDayClick(dateStr, dayMeetings)}
+              title={
+                dayMeetings.length > 0
+                  ? dayMeetings.map((m) => m.title).join(", ")
+                  : "Add meeting"
+              }
+            >
+              {day}
+              {dayMeetings.length > 1 && (
+                <span className="mini-count">{dayMeetings.length}</span>
+              )}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const MeetingsDashboard = () => {
   const navigate = useNavigate();
@@ -79,6 +154,10 @@ const MeetingsDashboard = () => {
   const [meetingToDelete, setMeetingToDelete] = useState<Meeting | null>(null);
   const [filterType, setFilterType] = useState<string>("All");
   const [filterStatus, setFilterStatus] = useState<string>("All");
+  const [dayPopup, setDayPopup] = useState<{
+    date: string;
+    meetings: Meeting[];
+  } | null>(null);
 
   const emptyForm = {
     title: "",
@@ -237,6 +316,8 @@ const MeetingsDashboard = () => {
   const todayStr = new Date().toISOString().split("T")[0];
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  const prevYear = () => setCurrentDate(new Date(year - 1, month, 1));
+  const nextYear = () => setCurrentDate(new Date(year + 1, month, 1));
 
   // ── Filtered list ─────────────────────────────────────────────────────────
   const filteredMeetings = meetings
@@ -309,7 +390,7 @@ const MeetingsDashboard = () => {
               className={`toggle-btn ${viewMode === "list" ? "active" : ""}`}
               onClick={() => setViewMode("list")}
             >
-              ☰ List
+              🗓️ Year
             </button>
           </div>
           <span className="total-count">
@@ -410,9 +491,19 @@ const MeetingsDashboard = () => {
           </div>
         )}
 
-        {/* ══ LIST VIEW ══════════════════════════════════════════════════════ */}
+        {/* ══ YEAR VIEW (was "List") ═══════════════════════════════════════════ */}
         {viewMode === "list" && (
-          <div className="list-container">
+          <div className="year-container">
+            <div className="year-nav">
+              <button className="nav-btn" onClick={prevYear}>
+                ‹
+              </button>
+              <h3 className="year-title">{year}</h3>
+              <button className="nav-btn" onClick={nextYear}>
+                ›
+              </button>
+            </div>
+
             <div className="list-filters">
               <select
                 className="filter-select"
@@ -437,98 +528,99 @@ const MeetingsDashboard = () => {
                 <option>Postponed</option>
               </select>
               <span className="filter-count">
-                {filteredMeetings.length} result
-                {filteredMeetings.length !== 1 ? "s" : ""}
+                {
+                  filteredMeetings.filter((m) =>
+                    m.date?.startsWith(String(year)),
+                  ).length
+                }{" "}
+                meeting{"s"} in {year}
               </span>
             </div>
 
-            {filteredMeetings.length === 0 ? (
-              <div className="empty-state">
-                <div className="empty-icon">📅</div>
-                <p>
-                  No meetings found. Click <strong>+ Add Meeting</strong> to get
-                  started.
-                </p>
-              </div>
-            ) : (
-              <div className="meeting-list">
-                {filteredMeetings.map((m) => {
+            <div className="year-grid">
+              {Array.from({ length: 12 }).map((_, m) => (
+                <MiniMonthCalendar
+                  key={m}
+                  year={year}
+                  monthIndex={m}
+                  meetings={filteredMeetings}
+                  todayStr={todayStr}
+                  onDayClick={(dateStr, dayMeetings) => {
+                    if (dayMeetings.length === 0) openAddModal(dateStr);
+                    else if (dayMeetings.length === 1)
+                      openEditModal(dayMeetings[0]);
+                    else setDayPopup({ date: dateStr, meetings: dayMeetings });
+                  }}
+                />
+              ))}
+            </div>
+            <p className="cal-hint">
+              💡 Click an empty date to add a meeting · Click a highlighted date
+              to view/edit
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ══ DAY POPUP (year grid — multiple meetings on one date) ══════════════ */}
+      {dayPopup && (
+        <div className="modal-overlay" onClick={() => setDayPopup(null)}>
+          <div
+            className="modal-box modal-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>{formatDateStr(dayPopup.date)}</h2>
+              <button className="close-btn" onClick={() => setDayPopup(null)}>
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="day-popup-list">
+                {dayPopup.meetings.map((m) => {
                   const typeColor =
                     MEETING_COLORS[m.type] || MEETING_COLORS["Customer Visit"];
-                  const statusColor =
-                    STATUS_COLORS[m.status] || STATUS_COLORS["Scheduled"];
                   return (
                     <div
                       key={m.id}
-                      className="meeting-card"
-                      onClick={() => openEditModal(m)}
+                      className="day-popup-item"
                       style={{ borderLeft: `4px solid ${typeColor.bg}` }}
+                      onClick={() => {
+                        setDayPopup(null);
+                        openEditModal(m);
+                      }}
                     >
-                      <div className="meeting-card-top">
-                        <div className="meeting-card-left">
-                          <span
-                            className="meeting-type-tag"
-                            style={{
-                              background: typeColor.light,
-                              color: typeColor.bg,
-                            }}
-                          >
-                            {m.type}
-                          </span>
-                          <h4 className="meeting-title">{m.title}</h4>
-                        </div>
-                        <span
-                          className="meeting-status-tag"
-                          style={{
-                            background: statusColor.bg,
-                            color: statusColor.text,
-                          }}
-                        >
-                          {m.status}
-                        </span>
-                      </div>
-                      <div className="meeting-card-meta">
-                        <span>
-                          🗓 {formatDateTime(m.date, m.start_time)}
-                          {m.end_time ? ` – ${m.end_time}` : ""}
-                        </span>
-                        {m.location && <span>📍 {m.location}</span>}
-                      </div>
+                      <strong>{m.title}</strong>
+                      {m.start_time && (
+                        <span> · {formatTime(m.start_time)}</span>
+                      )}
                       {m.customer && (
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#555",
-                            margin: "4px 0 0",
-                            fontWeight: 500,
-                          }}
-                        >
+                        <div className="day-popup-customer">
                           👤 {m.customer}
-                        </p>
-                      )}
-                      {m.remarks && (
-                        <p
-                          style={{
-                            fontSize: "13px",
-                            color: "#777",
-                            margin: "4px 0 0",
-                            fontStyle: "italic",
-                          }}
-                        >
-                          📝 {m.remarks}
-                        </p>
-                      )}
-                      {m.notes && (
-                        <p className="meeting-notes-preview">{m.notes}</p>
+                        </div>
                       )}
                     </div>
                   );
                 })}
               </div>
-            )}
+            </div>
+            <div className="modal-footer">
+              <div className="footer-right">
+                <button
+                  className="btn-save"
+                  onClick={() => {
+                    const d = dayPopup.date;
+                    setDayPopup(null);
+                    openAddModal(d);
+                  }}
+                >
+                  + Add Another Meeting
+                </button>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* ══ ADD / EDIT MODAL ═══════════════════════════════════════════════════ */}
       {showModal && (
