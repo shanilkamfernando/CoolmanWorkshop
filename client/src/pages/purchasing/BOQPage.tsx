@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import companyLogo from "../../assets/mainlogo.jpeg";
 import "../customers/ProjectDashboard.css";
+import AppHeader from "../../components/AppHeader";
 
 interface BOQItem {
   id: number;
@@ -148,7 +149,8 @@ const BOQPage = () => {
 
   return (
     <div className="project-dashboard">
-      <div className="portal-header">
+      {/* header */}
+      {/* <div className="portal-header">
         <div className="header-left">
           <div
             className="logo-container"
@@ -165,7 +167,8 @@ const BOQPage = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       <div className="project-main-content">
         <div className="project-header-row">

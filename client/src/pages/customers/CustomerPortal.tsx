@@ -11,6 +11,7 @@ import "./Customers.css";
 // Import logo
 import companyLogo from "../../assets/mainlogo.jpeg";
 import { API_BASE } from "../../config";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -198,7 +199,7 @@ const CustomerPortal = () => {
   return (
     <div className="customer-portal">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div className="logo-container" onClick={handleBackToDashboard}>
             <img
@@ -213,7 +214,7 @@ const CustomerPortal = () => {
           </h1>
         </div>
         <div className="header-right">
-          {/* Customer Logo Badge with Generated Initials */}
+        
           <div className="customer-logo-badge-with-icon">
             <div
               className="customer-badge-logo"
@@ -226,7 +227,8 @@ const CustomerPortal = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       {/* Main Content */}
       <div className="main-content-full">

@@ -7,6 +7,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./PurchasingPortal.css";
 import companyLogo from "../../assets/mainlogo.jpeg";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -77,7 +78,7 @@ const PurchasingPortal = () => {
   return (
     <div className="purchasing-portal">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div className="logo-container" onClick={handleBackToDashboard}>
             <img
@@ -95,7 +96,8 @@ const PurchasingPortal = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       {/* Main Content */}
       <div className="main-content">
