@@ -7,14 +7,29 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(
-    120% 100% at 50% 0%,
-    #0d1b30 0%,
-    #060c16 55%,
-    #04080f 100%
-  );
+  /* Background photo: "State-of-the-art HVAC system setup showcasing cooling and heating
+     technology" by namrata kotak on Pexels — Pexels License (free for commercial use,
+     no attribution required) https://www.pexels.com/photo/industrial-hvac-system-in-modern-facility-37604386/ */
+  background-image:
+    radial-gradient(
+      120% 100% at 50% 0%,
+      rgba(13, 27, 48, 0.88) 0%,
+      rgba(6, 12, 22, 0.93) 55%,
+      rgba(4, 8, 15, 0.96) 100%
+    ),
+    linear-gradient(180deg, rgba(4, 8, 15, 0.4) 0%, rgba(4, 8, 15, 0.75) 100%),
+    url("https://images.pexels.com/photos/37604386/pexels-photo-37604386.jpeg?auto=compress&cs=tinysrgb&w=2400");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   padding: 48px 20px 90px;
   overflow: hidden;
+}
+
+@media (min-width: 900px) {
+  .auth-container {
+    background-attachment: fixed;
+  }
 }
 
 .hex-corner {
@@ -230,7 +245,7 @@
   border: 1px solid rgba(100, 181, 246, 0.2);
   border-radius: 6px;
   font-size: 0.95rem;
-  color: #eaf2fb;
+  color: #555555;
   transition: all 0.25s;
 }
 

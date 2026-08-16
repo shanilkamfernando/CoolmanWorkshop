@@ -75,6 +75,19 @@ const fileIcon = (type: string) => {
   return "📄";
 };
 
+// Splits "invoice.final.pdf" into { base: "invoice.final", ext: ".pdf" }
+const splitFileName = (fullName: string) => {
+  const idx = fullName.lastIndexOf(".");
+  if (idx <= 0) return { base: fullName, ext: "" };
+  return { base: fullName.substring(0, idx), ext: fullName.substring(idx) };
+};
+
+interface PendingFile {
+  file: File;
+  base: string;
+  ext: string;
+}
+
 const JobCardsList = () => {
   const navigate = useNavigate();
   const { customerId } = useParams();
@@ -85,6 +98,10 @@ const JobCardsList = () => {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+
+  // Rename-before-upload state
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
+  const [showRenameModal, setShowRenameModal] = useState(false);
 
   const token = () => localStorage.getItem("token");
   const hdr = () => ({ Authorization: `Bearer ${token()}` });
@@ -120,12 +137,46 @@ const JobCardsList = () => {
     }
   };
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Step 1: user picks files — stage them for renaming instead of uploading immediately
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files;
     if (!selected || selected.length === 0) return;
+
+    const staged: PendingFile[] = Array.from(selected).map((file) => {
+      const { base, ext } = splitFileName(file.name);
+      return { file, base, ext };
+    });
+
+    setPendingFiles(staged);
+    setShowRenameModal(true);
+    e.target.value = ""; // reset input so selecting the same file again re-triggers onChange
+  };
+
+  const updatePendingName = (index: number, newBase: string) => {
+    setPendingFiles((prev) =>
+      prev.map((p, i) => (i === index ? { ...p, base: newBase } : p)),
+    );
+  };
+
+  const removePendingFile = (index: number) => {
+    setPendingFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const cancelUpload = () => {
+    setPendingFiles([]);
+    setShowRenameModal(false);
+  };
+
+  // Step 2: user confirms names in the modal — actually upload
+  const confirmUpload = async () => {
+    if (pendingFiles.length === 0) return;
     setUploading(true);
+    setShowRenameModal(false);
+
     try {
-      for (const file of Array.from(selected)) {
+      for (const { file, base, ext } of pendingFiles) {
+        const finalName = (base.trim() || file.name.replace(ext, "")) + ext;
+
         const base64: string = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => {
@@ -139,7 +190,7 @@ const JobCardsList = () => {
         await axios.post(
           BASE,
           {
-            file_name: file.name,
+            file_name: finalName,
             file_type: file.type,
             file_size: file.size,
             file_data: base64,
@@ -152,7 +203,7 @@ const JobCardsList = () => {
       alert(err.response?.data?.error || "Failed to upload");
     } finally {
       setUploading(false);
-      e.target.value = ""; // reset input
+      setPendingFiles([]);
     }
   };
 
@@ -199,33 +250,6 @@ const JobCardsList = () => {
 
   return (
     <div className="project-dashboard">
-      {/* <div className="portal-header">
-        <div className="header-left">
-          <div
-            className="logo-container"
-            onClick={() => navigate("/dashboard")}
-          >
-            <img src={companyLogo} alt="Logo" className="company-logo" />
-          </div>
-          <h1 className="portal-title" onClick={() => navigate("/dashboard")}>
-            <span className="brand-cool">COOL</span>
-            <span className="brand-man">Man</span> Refrigeration
-          </h1>
-        </div>
-        <div className="header-right">
-          <div className="customer-logo-badge-with-icon">
-            <div
-              className="customer-badge-logo"
-              style={{ backgroundColor: color }}
-            >
-              {initials}
-            </div>
-            <span className="customer-logo-text">{customer.name}</span>
-          </div>
-          <span className="user-icon">👤</span>
-          <span className="username">{user?.username || "User"}</span>
-        </div>
-      </div> */}
       <AppHeader />
 
       <div className="project-main-content">
@@ -284,7 +308,7 @@ const JobCardsList = () => {
               <input
                 type="file"
                 multiple
-                onChange={handleUpload}
+                onChange={handleFilesSelected}
                 disabled={uploading}
                 style={{ display: "none" }}
               />
@@ -324,7 +348,7 @@ const JobCardsList = () => {
                   <input
                     type="file"
                     multiple
-                    onChange={handleUpload}
+                    onChange={handleFilesSelected}
                     style={{ display: "none" }}
                   />
                 </label>
@@ -336,7 +360,6 @@ const JobCardsList = () => {
                 <tr>
                   <th style={{ width: "48px" }}>No</th>
                   <th>File Name</th>
-                  <th style={{ width: "100px" }}>Size</th>
                   <th style={{ width: "160px" }}>Uploaded By</th>
                   <th style={{ width: "170px" }}>Date</th>
                   <th style={{ width: "120px" }}>Actions</th>
@@ -363,13 +386,28 @@ const JobCardsList = () => {
                       {idx + 1}
                     </td>
                     <td>
-                      <span style={{ marginRight: "8px" }}>
-                        {fileIcon(f.file_type)}
+                      <span
+                        onClick={() => handleDownload(f)}
+                        title="Click to download"
+                        style={{
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.textDecoration = "underline")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.textDecoration = "none")
+                        }
+                      >
+                        <span style={{ marginRight: "8px" }}>
+                          {fileIcon(f.file_type)}
+                        </span>
+                        <span style={{ fontWeight: 500, color: "#1e5faa" }}>
+                          {f.file_name}
+                        </span>
                       </span>
-                      <span style={{ fontWeight: 500 }}>{f.file_name}</span>
-                    </td>
-                    <td style={{ fontSize: "14px", color: "#555" }}>
-                      {fmtSize(f.file_size)}
                     </td>
                     <td style={{ fontSize: "14px", color: "#555" }}>
                       {f.uploaded_by || "—"}
@@ -410,6 +448,135 @@ const JobCardsList = () => {
           )}
         </div>
       </div>
+
+      {/* Rename-before-upload modal */}
+      {showRenameModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={cancelUpload}
+        >
+          <div
+            style={{
+              background: "white",
+              borderRadius: "12px",
+              padding: "24px",
+              width: "100%",
+              maxWidth: "520px",
+              maxHeight: "80vh",
+              overflowY: "auto",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: "6px" }}>
+              Name your files
+            </h3>
+            <p style={{ color: "#777", fontSize: "0.9rem", marginTop: 0 }}>
+              Rename before uploading, or keep the original names.
+            </p>
+
+            {pendingFiles.map((p, i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "12px",
+                }}
+              >
+                <span style={{ fontSize: "1.2rem" }}>
+                  {fileIcon(p.file.type)}
+                </span>
+                <input
+                  type="text"
+                  value={p.base}
+                  onChange={(e) => updatePendingName(i, e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: "8px 10px",
+                    border: "2px solid #e0e0e0",
+                    borderRadius: "6px",
+                    fontSize: "0.9rem",
+                    outline: "none",
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = "#1e5faa")}
+                  onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+                />
+                <span style={{ color: "#888", fontSize: "0.85rem" }}>
+                  {p.ext}
+                </span>
+                <button
+                  onClick={() => removePendingFile(i)}
+                  title="Remove"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#c62828",
+                    cursor: "pointer",
+                    fontSize: "1rem",
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+
+            {pendingFiles.length === 0 && (
+              <p style={{ color: "#999", textAlign: "center" }}>
+                No files selected.
+              </p>
+            )}
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "10px",
+                marginTop: "20px",
+              }}
+            >
+              <button
+                onClick={cancelUpload}
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: "6px",
+                  border: "2px solid #e0e0e0",
+                  background: "white",
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmUpload}
+                disabled={pendingFiles.length === 0}
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: pendingFiles.length === 0 ? "#a9c3e0" : "#1e5faa",
+                  color: "white",
+                  cursor: pendingFiles.length === 0 ? "not-allowed" : "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                Upload{" "}
+                {pendingFiles.length > 0 ? `(${pendingFiles.length})` : ""}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

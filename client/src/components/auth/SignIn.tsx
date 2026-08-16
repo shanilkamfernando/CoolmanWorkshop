@@ -124,9 +124,9 @@ const SignIn = () => {
           <div className="form-group">
             <label htmlFor="username">Username</label>
             <div className="input-wrap">
-              <span className="field-icon">
+              {/* <span className="field-icon">
                 <UserIcon />
-              </span>
+              </span> */}
               <input
                 type="text"
                 id="username"
@@ -143,9 +143,9 @@ const SignIn = () => {
           <div className="form-group">
             <label htmlFor="password">Password</label>
             <div className="input-wrap has-toggle">
-              <span className="field-icon">
+              {/* <span className="field-icon">
                 <LockIcon />
-              </span>
+              </span> */}
               <input
                 type={showPassword ? "text" : "password"}
                 id="password"
@@ -172,9 +172,9 @@ const SignIn = () => {
             {loading ? "Signing In..." : "Login"}
           </button>
 
-          <button type="button" className="forgot-link">
+          {/* <button type="button" className="forgot-link">
             Forgot Password?
-          </button>
+          </button> */}
         </form>
 
         <div className="auth-footer">

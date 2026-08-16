@@ -5,11 +5,13 @@
   background: #f5f7fa;
 }
 
+/* Optional: give the header a subtle glow edge like the auth pages */
 .dashboard-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #0d1b30 0%, #1e5faa 100%);
   color: white;
   padding: 20px 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 20px rgba(30, 95, 170, 0.35);
+  border-bottom: 1px solid rgba(100, 181, 246, 0.25);
 }
 
 .header-content {
@@ -32,6 +34,7 @@
 
 .brand-man {
   font-weight: 400;
+  font-size: 1.8rem !important;
 }
 
 .user-info {

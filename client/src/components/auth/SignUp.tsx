@@ -171,9 +171,9 @@ const SignUp = () => {
                 First Name <span className="required">*</span>
               </label>
               <div className="input-wrap">
-                <span className="field-icon">
+                {/* <span className="field-icon">
                   <UserIcon />
-                </span>
+                </span> */}
                 <input
                   type="text"
                   id="firstName"
@@ -192,9 +192,9 @@ const SignUp = () => {
                 Last Name <span className="required">*</span>
               </label>
               <div className="input-wrap">
-                <span className="field-icon">
+                {/* <span className="field-icon">
                   <UserIcon />
-                </span>
+                </span> */}
                 <input
                   type="text"
                   id="lastName"
@@ -214,9 +214,9 @@ const SignUp = () => {
               Username <span className="required">*</span>
             </label>
             <div className="input-wrap">
-              <span className="field-icon">
+              {/* <span className="field-icon">
                 <UserIcon />
-              </span>
+              </span> */}
               <input
                 type="text"
                 id="username"
@@ -236,9 +236,9 @@ const SignUp = () => {
                 Password <span className="required">*</span>
               </label>
               <div className="input-wrap has-toggle">
-                <span className="field-icon">
+                {/* <span className="field-icon">
                   <LockIcon />
-                </span>
+                </span> */}
                 <input
                   type={showPassword ? "text" : "password"}
                   id="password"
@@ -266,9 +266,9 @@ const SignUp = () => {
                 Confirm Password <span className="required">*</span>
               </label>
               <div className="input-wrap has-toggle">
-                <span className="field-icon">
+                {/* <span className="field-icon">
                   <LockIcon />
-                </span>
+                </span> */}
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   id="confirmPassword"
