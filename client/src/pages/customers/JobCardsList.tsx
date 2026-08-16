@@ -423,13 +423,6 @@ const JobCardsList = () => {
                           justifyContent: "center",
                         }}
                       >
-                        <button
-                          className="btn-download-small"
-                          title="Download"
-                          onClick={() => handleDownload(f)}
-                        >
-                          ⬇️
-                        </button>
                         {isAdmin && (
                           <button
                             className="btn-delete-small"
