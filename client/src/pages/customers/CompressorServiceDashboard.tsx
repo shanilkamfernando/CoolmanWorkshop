@@ -1110,18 +1110,16 @@ const CompressorServiceDashboard = () => {
                       />
                     </td>
                     {/* <td>{fmtDate(c.created_at)}</td> */}
-                    {isAdmin && <th>Actions</th>}
-
-                    {isAdmin && (
-                      <td>
-                        <button
-                          className="btn-delete"
-                          onClick={() => handleDeleteCompressor(c.id)}
-                        >
-                          🗑️
-                        </button>
-                      </td>
-                    )}
+                    {isAdmin && <th>Actions</th>} (
+                    <td>
+                      <button
+                        className="btn-delete"
+                        onClick={() => handleDeleteCompressor(c.id)}
+                      >
+                        🗑️
+                      </button>
+                    </td>
+                    )
                   </tr>
                 ))
               )}
@@ -1293,18 +1291,16 @@ const CompressorServiceDashboard = () => {
                           onDeleteAttachment={handleDeleteAttachment}
                         />
                       </td>
-                      {isAdmin && <th>Actions</th>}
-
-                      {isAdmin && (
-                        <td>
-                          <button
-                            className="btn-delete"
-                            onClick={() => handleDeleteService(rec.id)}
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      )}
+                      {isAdmin && <th>Actions</th>} (
+                      <td>
+                        <button
+                          className="btn-delete"
+                          onClick={() => handleDeleteService(rec.id)}
+                        >
+                          🗑️
+                        </button>
+                      </td>
+                      )
                     </tr>
                   ))
                 )}
