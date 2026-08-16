@@ -113,7 +113,8 @@ const MasterPasswordModal = ({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="att-modal" onClick={(e) => e.stopPropagation()}>
+      {/* password model */}
+      {/* <div className="att-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>🔐 Set Master Download Password</h2>
           <button className="close-btn" onClick={onClose}>
@@ -163,7 +164,7 @@ const MasterPasswordModal = ({
             </button>
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };
@@ -1109,6 +1110,8 @@ const CompressorServiceDashboard = () => {
                       />
                     </td>
                     {/* <td>{fmtDate(c.created_at)}</td> */}
+                    {isAdmin && <th>Actions</th>}
+
                     {isAdmin && (
                       <td>
                         <button
@@ -1290,6 +1293,8 @@ const CompressorServiceDashboard = () => {
                           onDeleteAttachment={handleDeleteAttachment}
                         />
                       </td>
+                      {isAdmin && <th>Actions</th>}
+
                       {isAdmin && (
                         <td>
                           <button

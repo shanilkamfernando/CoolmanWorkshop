@@ -274,10 +274,10 @@ const AppHeader = ({ customerName: customerNameProp }: AppHeaderProps) => {
       style={{
         display: "flex",
         alignItems: "center",
+        justifyContent: "space-between",
         padding: "8px 20px",
         background: "#fff",
         borderBottom: "1px solid #e5e7eb",
-        gap: "16px",
         boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
       }}
     >
@@ -397,52 +397,71 @@ const AppHeader = ({ customerName: customerNameProp }: AppHeaderProps) => {
         ))}
       </div> */}
 
-      {/* User info */}
+      {/* Right side: user info + logout, spaced apart, pinned to the far right */}
       <div
         style={{
           display: "flex",
-          flexDirection: "column",
           alignItems: "center",
-          gap: "2px",
+          justifyContent: "space-between",
+          gap: "24px",
           flexShrink: 0,
         }}
       >
+        {/* User info */}
         <div
           style={{
-            width: "36px",
-            height: "36px",
-            borderRadius: "50%",
-            background: "#e5e7eb",
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            fontSize: "18px",
+            gap: "10px",
           }}
         >
-          👤
+          <div
+            style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "50%",
+              background: "#e5e7eb",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "18px",
+              flexShrink: 0,
+            }}
+          >
+            👤
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <span
+              style={{ fontSize: "13px", color: "#111827", fontWeight: 600 }}
+            >
+              {user?.username || "User"}
+            </span>
+            {user?.role && (
+              <span style={{ fontSize: "11px", color: "#6b7280" }}>
+                {user.role}
+              </span>
+            )}
+          </div>
         </div>
-        <span style={{ fontSize: "10px", color: "#374151" }}>
-          {user?.username || "User"}
-        </span>
-      </div>
 
-      {/* Logout */}
-      <button
-        onClick={handleLogout}
-        style={{
-          background: "#ef4444",
-          color: "#fff",
-          border: "none",
-          padding: "6px 14px",
-          borderRadius: "6px",
-          fontSize: "12px",
-          fontWeight: 600,
-          cursor: "pointer",
-          flexShrink: 0,
-        }}
-      >
-        Logout
-      </button>
+        {/* Logout */}
+        <button
+          onClick={handleLogout}
+          style={{
+            background: "#ef4444",
+            color: "#fff",
+            border: "none",
+            padding: "6px 14px",
+            borderRadius: "6px",
+            fontSize: "12px",
+            fontWeight: 600,
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          Logout
+        </button>
+      </div>
     </div>
   );
 };
