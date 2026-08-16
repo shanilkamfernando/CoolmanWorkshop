@@ -958,45 +958,6 @@ const CompressorServiceDashboard = () => {
 
   return (
     <div className="project-dashboard">
-      {/* Header */}
-      {/* <div className="portal-header">
-        <div className="header-left" onClick={() => navigate("/dashboard")}>
-          <img src={companyLogo} alt="Logo" className="company-logo" />
-          <h1 className="portal-title">
-            <span className="brand-cool">COOL</span>
-            <span className="brand-man">Man</span> Refrigeration
-          </h1>
-        </div>
-        <div className="header-right">
-          <div className="customer-logo-badge-with-icon">
-            <div
-              className="customer-badge-logo"
-              style={{ backgroundColor: getColor(customer.name) }}
-            >
-              {getInitials(customer.name)}
-            </div>
-            <span className="customer-logo-text">{customer.name}</span>
-          </div>
-          {isAdmin && (
-            <button
-              className={`btn-master-pwd ${hasMasterPwd ? "pwd-set" : "pwd-unset"}`}
-              onClick={() => setShowMasterPwd(true)}
-              title={
-                hasMasterPwd
-                  ? "Master download password is set — click to change"
-                  : "No master password set — click to set one"
-              }
-            >
-              {hasMasterPwd ? "🔐 Password Set" : "⚠️ Set Password"}
-            </button>
-          )}
-          <span className="user-icon">👤</span>
-          <span className="username">{user?.username || "User"}</span>
-          <button className="btn-logout" onClick={handleLogout}>
-            Logout
-          </button>
-        </div>
-      </div> */}
       <AppHeader />
 
       {/* Main */}
@@ -1033,12 +994,12 @@ const CompressorServiceDashboard = () => {
         <div className="project-section">
           <div className="section-header">
             <h3 className="section-title-text">Compressor Details</h3>
-            {/* <button
+            <button
               className="btn-add-small"
               onClick={() => setShowAddCompressor(!showAddCompressor)}
             >
               + Add Compressor
-            </button> */}
+            </button>
           </div>
 
           {showAddCompressor && (
