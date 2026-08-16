@@ -7,6 +7,19 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Auth.css";
+import {
+  CMBadge,
+  UserIcon,
+  LockIcon,
+  EyeIcon,
+  EyeOffIcon,
+  ShieldIcon,
+  GearIcon,
+  SnowflakeIcon,
+  UsersIcon,
+  HexPattern,
+  WaveAccent,
+} from "./AuthIcons";
 
 interface SignInForm {
   username: string;
@@ -21,6 +34,7 @@ const SignIn = () => {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -60,13 +74,6 @@ const SignIn = () => {
 
         console.log("Login successful:", response.data.user);
 
-        // // Redirect based on role
-        // if (response.data.user.role === "admin") {
-        //   navigate("/dashboard");
-        // } else {
-        //   navigate("/dashboard");
-        // }
-
         //everyone goes to dashboard - admin will see user management title there
         navigate("/dashboard");
       }
@@ -83,42 +90,28 @@ const SignIn = () => {
 
   return (
     <div className="auth-container">
-      {/* <div>
-        <div>Welcome to</div>
-        <br />
-        <span className="brand-cool">COOL</span>
-        <span className="brand-man">Man</span> <br />
-        <div>Refrigeration</div>
-      </div> */}
-      <div style={{ textAlign: "center", fontFamily: "Arial, sans-serif" }}>
-        <div
-          style={{
-            fontSize: "40px",
-            fontWeight: 400,
-            color: "#000",
-            marginBottom: "20px",
-          }}
-        >
-          Welcome to
+      <HexPattern className="hex-corner" />
+      <HexPattern className="hex-corner right" flip />
+
+      <div className="auth-brand">
+        <div className="badge-wrap">
+          <CMBadge size={92} />
         </div>
-        <div
-          style={{
-            fontSize: "72px",
-            fontWeight: 700,
-            lineHeight: 1,
-            marginBottom: "10px",
-          }}
-        >
-          <span style={{ color: "#4a90d9" }}>COOL</span>
-          <span style={{ color: "#1e5faa" }}>Man</span>
+        <div className="wordmark">
+          <span className="cool">COOL</span>
+          <span className="man">Man</span>
+          <span className="wordmark-sub">REFRIGERATION</span>
         </div>
-        <div style={{ fontSize: "48px", fontWeight: 600, color: "#000" }}>
-          Refrigeration
-        </div>
+        {/* <p className="tagline">
+          <strong>Powered by experience.</strong> Driven by innovation.
+        </p> */}
       </div>
+
       <div className="auth-box">
         <div className="auth-header">
-          <p className="auth-subtitle">Sign in to your account</p>
+          <span className="portal-label">Member Portal</span>
+          <div className="portal-divider" />
+          <p className="auth-subtitle">Sign in to continue</p>
         </div>
 
         {error && (
@@ -130,34 +123,57 @@ const SignIn = () => {
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
             <label htmlFor="username">Username</label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              value={formData.username}
-              onChange={handleChange}
-              placeholder="Enter your username"
-              autoComplete="username"
-              disabled={loading}
-            />
+            <div className="input-wrap">
+              <span className="field-icon">
+                <UserIcon />
+              </span>
+              <input
+                type="text"
+                id="username"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                placeholder="Enter your username"
+                autoComplete="username"
+                disabled={loading}
+              />
+            </div>
           </div>
 
-          <div className="form-group" style={{ paddingTop: "1rem" }}>
+          <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              disabled={loading}
-            />
+            <div className="input-wrap has-toggle">
+              <span className="field-icon">
+                <LockIcon />
+              </span>
+              <input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                disabled={loading}
+              />
+              <button
+                type="button"
+                className="toggle-visibility"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
           </div>
 
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? "Signing In..." : "Sign In"}
+            {loading ? "Signing In..." : "Login"}
+          </button>
+
+          <button type="button" className="forgot-link">
+            Forgot Password?
           </button>
         </form>
 
@@ -174,6 +190,8 @@ const SignIn = () => {
           </p>
         </div>
       </div>
+
+      <WaveAccent />
     </div>
   );
 };
