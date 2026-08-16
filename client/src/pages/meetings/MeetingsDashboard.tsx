@@ -300,18 +300,6 @@ const MeetingsDashboard = () => {
   // ── Calendar helpers ──────────────────────────────────────────────────────
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-  const calendarDays: (number | null)[] = [
-    ...Array(firstDay).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-
-  const getMeetingsForDay = (day: number) => {
-    const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    return meetings.filter((m) => m.date?.split("T")[0] === dateStr);
-  };
 
   const todayStr = new Date().toISOString().split("T")[0];
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
@@ -319,7 +307,7 @@ const MeetingsDashboard = () => {
   const prevYear = () => setCurrentDate(new Date(year - 1, month, 1));
   const nextYear = () => setCurrentDate(new Date(year + 1, month, 1));
 
-  // ── Filtered list ─────────────────────────────────────────────────────────
+  // ── Filtered list (Year view) ────────────────────────────────────────────
   const filteredMeetings = meetings
     .filter((m) => {
       const typeOk = filterType === "All" || m.type === filterType;
@@ -327,6 +315,37 @@ const MeetingsDashboard = () => {
       return typeOk && statusOk;
     })
     .sort((a, b) => a.date.localeCompare(b.date));
+
+  // ── Month-wise list (Calendar view, now a list grouped by day) ──────────
+  const monthPrefix = `${year}-${pad2(month + 1)}`;
+  const monthMeetings = meetings
+    .filter((m) => {
+      const d = m.date?.split("T")[0];
+      if (!d || !d.startsWith(monthPrefix)) return false;
+      const typeOk = filterType === "All" || m.type === filterType;
+      const statusOk = filterStatus === "All" || m.status === filterStatus;
+      return typeOk && statusOk;
+    })
+    .sort((a, b) => {
+      const dCmp = (a.date || "").localeCompare(b.date || "");
+      if (dCmp !== 0) return dCmp;
+      return (a.start_time || "").localeCompare(b.start_time || "");
+    });
+
+  const groupedByDate: Record<string, Meeting[]> = {};
+  monthMeetings.forEach((m) => {
+    const d = m.date.split("T")[0];
+    if (!groupedByDate[d]) groupedByDate[d] = [];
+    groupedByDate[d].push(m);
+  });
+  const sortedDates = Object.keys(groupedByDate).sort();
+
+  const formatGroupDate = (dateStr: string) => {
+    const [y, mo, da] = dateStr.split("-").map(Number);
+    const dObj = new Date(y, mo - 1, da);
+    const weekday = dObj.toLocaleDateString("en-GB", { weekday: "long" });
+    return `${weekday}, ${da} ${MONTHS[mo - 1]}`;
+  };
 
   const formatDateTime = (date: string, start_time: string) => {
     if (!date) return "—";
@@ -398,7 +417,7 @@ const MeetingsDashboard = () => {
           </span>
         </div>
 
-        {/* ══ CALENDAR VIEW ══════════════════════════════════════════════════ */}
+        {/* ══ CALENDAR VIEW — now a month-wise list grouped by day ═══════════ */}
         {viewMode === "calendar" && (
           <div className="calendar-container">
             <div className="calendar-nav">
@@ -413,85 +432,145 @@ const MeetingsDashboard = () => {
               </button>
             </div>
 
-            <div className="calendar-grid">
-              {DAYS.map((d) => (
-                <div key={d} className="cal-day-header">
-                  {d}
-                </div>
-              ))}
-
-              {calendarDays.map((day, idx) => {
-                if (!day)
-                  return (
-                    <div key={`empty-${idx}`} className="cal-cell empty" />
-                  );
-                const dayMeetings = getMeetingsForDay(day);
-                const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                const isToday = dateStr === todayStr;
-
-                return (
-                  <div
-                    key={day}
-                    className={`cal-cell ${isToday ? "today" : ""} ${dayMeetings.length > 0 ? "has-meetings" : ""}`}
-                    onClick={() => openAddModal(dateStr)}
-                  >
-                    <span
-                      className={`day-number ${isToday ? "today-dot" : ""}`}
-                    >
-                      {day}
-                    </span>
-                    <div className="day-meetings">
-                      {dayMeetings.slice(0, 2).map((m) => (
-                        <div
-                          key={m.id}
-                          className="cal-meeting-chip"
-                          style={{
-                            background: MEETING_COLORS[m.type]?.bg || "#1976D2",
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditModal(m);
-                          }}
-                          title={`${m.title}${m.customer ? ` — ${m.customer}` : ""}`}
-                        >
-                          {m.start_time && (
-                            <span className="chip-time">
-                              {formatTime(m.start_time)}
-                            </span>
-                          )}
-                          <span className="chip-title">{m.title}</span>
-                          {m.customer && (
-                            <span
-                              className="chip-customer"
-                              style={{
-                                fontSize: "10px",
-                                opacity: 0.85,
-                                display: "block",
-                                marginTop: "1px",
-                              }}
-                            >
-                              👤 {m.customer}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                      {dayMeetings.length > 2 && (
-                        <div className="more-meetings">
-                          +{dayMeetings.length - 2} more
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="month-list-filters">
+              <select
+                className="filter-select"
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+              >
+                <option value="All">All Types</option>
+                <option>Customer Visit</option>
+                <option>Internal</option>
+                <option>Supplier</option>
+                <option>Follow-up Call</option>
+              </select>
+              <select
+                className="filter-select"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="All">All Statuses</option>
+                <option>Scheduled</option>
+                <option>Completed</option>
+                <option>Cancelled</option>
+                <option>Postponed</option>
+              </select>
+              <span className="filter-count">
+                {monthMeetings.length} meeting
+                {monthMeetings.length !== 1 ? "s" : ""} in {MONTHS[month]}
+              </span>
             </div>
+
+            {sortedDates.length === 0 ? (
+              <div className="empty-state month-empty-state">
+                <div className="empty-icon">📅</div>
+                <p>
+                  No meetings scheduled in {MONTHS[month]} {year}
+                </p>
+                <button
+                  className="btn-add-meeting"
+                  style={{ marginTop: "14px" }}
+                  onClick={() => openAddModal()}
+                >
+                  + Add Meeting
+                </button>
+              </div>
+            ) : (
+              <div className="month-list">
+                {sortedDates.map((dateStr) => {
+                  const isToday = dateStr === todayStr;
+                  const dayMeetings = groupedByDate[dateStr];
+                  return (
+                    <div key={dateStr} className="date-group">
+                      <div className="date-group-header">
+                        <span
+                          className={`date-group-title ${isToday ? "is-today" : ""}`}
+                        >
+                          {formatGroupDate(dateStr)}
+                          {isToday && <span className="today-tag">Today</span>}
+                        </span>
+                        <button
+                          className="btn-add-day"
+                          onClick={() => openAddModal(dateStr)}
+                          title="Add meeting on this day"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                      <div className="meeting-list">
+                        {dayMeetings.map((m) => {
+                          const typeColor =
+                            MEETING_COLORS[m.type] ||
+                            MEETING_COLORS["Customer Visit"];
+                          const statusColor =
+                            STATUS_COLORS[m.status] || STATUS_COLORS.Scheduled;
+                          return (
+                            <div
+                              key={m.id}
+                              className="meeting-card"
+                              style={{ borderLeftColor: typeColor.bg }}
+                              onClick={() => openEditModal(m)}
+                            >
+                              <div className="meeting-card-top">
+                                <div className="meeting-card-left">
+                                  <span
+                                    className="meeting-type-tag"
+                                    style={{
+                                      background: typeColor.light,
+                                      color: typeColor.bg,
+                                    }}
+                                  >
+                                    {m.type}
+                                  </span>
+                                  <span className="meeting-title">
+                                    {m.title}
+                                  </span>
+                                </div>
+                                <span
+                                  className="meeting-status-tag"
+                                  style={{
+                                    background: statusColor.bg,
+                                    color: statusColor.text,
+                                  }}
+                                >
+                                  {m.status}
+                                </span>
+                              </div>
+                              <div className="meeting-card-meta">
+                                {m.start_time && (
+                                  <span>
+                                    🕒 {formatTime(m.start_time)}
+                                    {m.end_time
+                                      ? ` – ${formatTime(m.end_time)}`
+                                      : ""}
+                                  </span>
+                                )}
+                                {m.location && <span>📍 {m.location}</span>}
+                                {m.customer && <span>👤 {m.customer}</span>}
+                              </div>
+                              {m.notes && (
+                                <div className="meeting-notes-preview">
+                                  {m.notes}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             <p className="cal-hint">
-              💡 Click any date to add a meeting · Click a meeting to edit
+              💡 Click "+ Add" on a day to schedule a meeting · Click a meeting
+              to edit
             </p>
           </div>
         )}
 
-        {/* ══ YEAR VIEW (was "List") ═══════════════════════════════════════════ */}
+        {/* ══ YEAR VIEW ══════════════════════════════════════════════════════ */}
         {viewMode === "list" && (
           <div className="year-container">
             <div className="year-nav">

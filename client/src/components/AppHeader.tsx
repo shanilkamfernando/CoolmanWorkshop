@@ -305,7 +305,7 @@ const AppHeader = ({ customerName: customerNameProp }: AppHeaderProps) => {
       </div>
 
       {/* Breadcrumb trail */}
-      <div
+      {/* <div
         style={{
           display: "flex",
           alignItems: "center",
@@ -395,7 +395,7 @@ const AppHeader = ({ customerName: customerNameProp }: AppHeaderProps) => {
             </button>
           </div>
         ))}
-      </div>
+      </div> */}
 
       {/* User info */}
       <div
