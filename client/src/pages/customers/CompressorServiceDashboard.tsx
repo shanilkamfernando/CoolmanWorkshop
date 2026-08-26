@@ -978,7 +978,7 @@ const CompressorServiceDashboard = () => {
         </div>
 
         {/* No password warning */}
-        {isAdmin && !hasMasterPwd && (
+        {/* {isAdmin && !hasMasterPwd && (
           <div className="no-pwd-warning">
             ⚠️ No master download password has been set. Users won't be able to
             upload attachments until you set one.
@@ -989,7 +989,7 @@ const CompressorServiceDashboard = () => {
               Set Password Now
             </button>
           </div>
-        )}
+        )} */}
 
         {/* ── Compressors ── */}
         <div className="project-section">
