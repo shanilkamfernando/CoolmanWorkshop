@@ -7,19 +7,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Auth.css";
-import {
-  CMBadge,
-  UserIcon,
-  LockIcon,
-  EyeIcon,
-  EyeOffIcon,
-  ShieldIcon,
-  GearIcon,
-  SnowflakeIcon,
-  UsersIcon,
-  HexPattern,
-  WaveAccent,
-} from "./AuthIcons";
+import { EyeIcon, EyeOffIcon, HexPattern, WaveAccent } from "./AuthIcons";
+import mainlogo from "../../assets/images/mainlogo.png";
 
 interface SignUpForm {
   username: string;
@@ -112,7 +101,8 @@ const SignUp = () => {
   const Brand = () => (
     <div className="auth-brand">
       <div className="badge-wrap">
-        <CMBadge size={92} />
+        {/* <CMBadge size={92} /> */}
+        <img src={mainlogo} alt="COOLMan Logo" width={92} height={92} />
       </div>
       <div className="wordmark">
         <span className="cool">COOL</span>
