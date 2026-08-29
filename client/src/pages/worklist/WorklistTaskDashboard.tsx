@@ -234,12 +234,17 @@ const TaskUpdateLog = ({
     }
   };
 
-  // created_at comes back from Postgres as a UTC timestamp. Building a real
-  // Date object (rather than slicing the raw string) lets the browser
-  // convert it to local system time correctly — string-slicing was
-  // displaying the UTC clock, which is off by the local UTC offset.
-  const fmtLogDateTime = (isoString: string) => {
-    if (!isoString) return { date: "—", time: "—" };
+  // Postgres's CURRENT_TIMESTAMP on a "timestamp without time zone" column
+  // is stored as a true UTC instant, but comes back over the API as a bare
+  // string with no timezone marker (no "Z", no offset). JS's Date parser
+  // treats a marker-less string as *already local* and applies zero
+  // conversion — so without this normalization the UI would just echo the
+  // raw UTC digits, which is exactly the mismatch being seen. We explicitly
+  // mark it UTC before parsing so the browser converts it to real local time.
+  const fmtLogDateTime = (raw: string) => {
+    if (!raw) return { date: "—", time: "—" };
+    const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
+    const isoString = hasTimezone ? raw : `${raw.replace(" ", "T")}Z`;
     const d = new Date(isoString);
     if (isNaN(d.getTime())) return { date: "—", time: "—" };
     return {
