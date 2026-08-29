@@ -84,7 +84,7 @@ const SignIn = () => {
 
       <div className="auth-brand">
         <div className="badge-wrap">
-          <img src={mainlogo} alt="COOLMan Logo" width={92} height={92} />
+          <img src={mainlogo} alt="COOLMan Logo" width={110} height={92} />
         </div>
         <div className="wordmark">
           <span className="cool">COOL</span>

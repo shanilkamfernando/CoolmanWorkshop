@@ -2,6 +2,17 @@
 // Worklist Tasks Routes
 // Save as: server/src/routes/worklist-tasks.ts
 // ============================================
+//
+// ⚠️ REQUIRED DATABASE MIGRATION — run this once before deploying:
+//
+//   ALTER TABLE worklist_task_updates
+//     ADD COLUMN IF NOT EXISTS status VARCHAR(50),
+//     ADD COLUMN IF NOT EXISTS third_party VARCHAR(100);
+//
+// `status` stores what stage the task was at when that log line was added.
+// `third_party` stores the username of a company member the log entry
+// (and by extension the task) has been handed off to for review/action.
+// ============================================
 
 import { Router, Request, Response } from "express";
 import { Pool } from "pg";
@@ -19,6 +30,9 @@ interface AuthRequest extends Request {
 }
 
 const getPool = (req: Request): Pool => req.app.locals.pool;
+
+// Valid status values — keep in sync with frontend STATUS_OPTIONS
+const VALID_STATUSES = ["todo", "in_progress", "on_hold", "permission", "done"];
 
 // ─── DROPDOWN DATA ────────────────────────────────────────────────
 
@@ -151,6 +165,9 @@ router.get(
 // ─── TASKS CRUD ───────────────────────────────────────────────────
 
 // GET tasks for specific year
+// Also computes has_third_party (for the red-arrow indicator) and
+// third_party_names (so search can match a third-party assignee's name)
+// by aggregating across that task's update log rows.
 router.get(
   "/jobAssigned/tasks/:year",
   authenticateToken,
@@ -159,7 +176,23 @@ router.get(
     const pool = getPool(req);
     try {
       const result = await pool.query(
-        `SELECT * FROM worklist_tasks_v2 WHERE year = $1 ORDER BY task_no ASC`,
+        `SELECT t.*,
+          EXISTS (
+            SELECT 1 FROM worklist_task_updates u
+            WHERE u.task_id = t.id
+              AND u.third_party IS NOT NULL
+              AND u.third_party <> ''
+          ) AS has_third_party,
+          (
+            SELECT STRING_AGG(DISTINCT u.third_party, ', ')
+            FROM worklist_task_updates u
+            WHERE u.task_id = t.id
+              AND u.third_party IS NOT NULL
+              AND u.third_party <> ''
+          ) AS third_party_names
+        FROM worklist_tasks_v2 t
+        WHERE t.year = $1
+        ORDER BY t.task_no ASC`,
         [year],
       );
       res.json({ success: true, tasks: result.rows });
@@ -296,8 +329,36 @@ router.put(
         return;
       }
 
-      const USER_ALLOWED = ["update_note", "status", "finish_date"];
-      const updates = req.body;
+      // ── Once a task is done, it's locked — no further edits by anyone ──
+      if (record.status === "done") {
+        res.status(403).json({
+          success: false,
+          error: "This task is marked done and can no longer be edited",
+        });
+        return;
+      }
+
+      const updates: Record<string, any> = { ...req.body };
+
+      // ── finish_date is never client-settable — only the server sets it,
+      //    automatically, the moment status transitions to "done" ──
+      delete updates.finish_date;
+
+      // ── Block reverting back to "todo" once a task has moved past it ──
+      if (updates.status === "todo" && record.status !== "todo") {
+        res.status(400).json({
+          success: false,
+          error: "A task cannot be moved back to To Do once it has started",
+        });
+        return;
+      }
+
+      if (updates.status && !VALID_STATUSES.includes(updates.status)) {
+        res.status(400).json({ success: false, error: "Invalid status value" });
+        return;
+      }
+
+      const USER_ALLOWED = ["update_note", "status"];
       const fields = Object.keys(updates);
 
       if (!isAdmin) {
@@ -309,14 +370,14 @@ router.put(
           });
           return;
         }
-
-        // Lock finish_date for non-admin if already set
-        if (!isAdmin && record.finish_date && updates.finish_date) {
-          delete updates.finish_date;
-        }
       }
 
-      if (fields.length === 0) {
+      // ── Auto-stamp finish_date the moment status is set to done ──
+      if (updates.status === "done") {
+        updates.finish_date = new Date().toISOString().split("T")[0];
+      }
+
+      if (Object.keys(updates).length === 0) {
         res.status(400).json({ success: false, error: "No fields to update" });
         return;
       }
@@ -352,7 +413,6 @@ router.put(
           );
       }
 
-      // Send response ONCE — after all sync is fired (non-blocking)
       res.json({ success: true, task: updatedTask });
     } catch (error: any) {
       console.error("Update task error:", error?.message || error);
@@ -384,6 +444,9 @@ router.get(
 );
 
 // POST add update log row
+// Any authenticated user may add a note, as long as the task has moved
+// past "todo" and isn't yet "done". The row's `status` column is
+// auto-stamped with whatever stage the task is at right now.
 router.post(
   "/jobAssigned/tasks/:taskId/updates",
   authenticateToken,
@@ -400,19 +463,42 @@ router.post(
     }
 
     try {
+      const taskResult = await pool.query(
+        `SELECT * FROM worklist_tasks_v2 WHERE id = $1`,
+        [taskId],
+      );
+
+      if (taskResult.rows.length === 0) {
+        res.status(404).json({ success: false, error: "Task not found" });
+        return;
+      }
+
+      const task = taskResult.rows[0];
+
+      if (task.status === "done") {
+        res.status(403).json({
+          success: false,
+          error: "This task is marked done and can no longer be edited",
+        });
+        return;
+      }
+
+      if (task.status === "todo") {
+        res.status(403).json({
+          success: false,
+          error: "Move the task to In Progress before adding an update",
+        });
+        return;
+      }
+
       const result = await pool.query(
-        `INSERT INTO worklist_task_updates (task_id, update_note, created_by)
-   VALUES ($1, $2, $3) RETURNING *`,
-        [taskId, update_note.trim(), req.user?.username],
+        `INSERT INTO worklist_task_updates (task_id, update_note, status, created_by)
+   VALUES ($1, $2, $3, $4) RETURNING *`,
+        [taskId, update_note.trim(), task.status, req.user?.username],
       );
 
       // Sync to project_member_updates if task is linked to a project
       try {
-        const taskResult = await pool.query(
-          `SELECT * FROM worklist_tasks_v2 WHERE id = $1`,
-          [taskId],
-        );
-        const task = taskResult.rows[0];
         if (
           task?.job_type === "project" &&
           task?.job_reference_id &&
@@ -439,6 +525,50 @@ router.post(
       }
 
       res.status(201).json({ success: true, update: result.rows[0] });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message });
+    }
+  },
+);
+
+// PUT assign (or clear) a third-party member on a single update-log row
+// Any authenticated user may do this, as long as the task isn't done.
+router.put(
+  "/jobAssigned/tasks/:taskId/updates/:updateId/third-party",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { taskId, updateId } = req.params;
+    const { third_party } = req.body; // username string, or null to clear
+    const pool = getPool(req);
+
+    try {
+      const taskResult = await pool.query(
+        "SELECT status FROM worklist_tasks_v2 WHERE id = $1",
+        [taskId],
+      );
+      if (taskResult.rows.length === 0) {
+        res.status(404).json({ success: false, error: "Task not found" });
+        return;
+      }
+      if (taskResult.rows[0].status === "done") {
+        res.status(403).json({
+          success: false,
+          error: "This task is marked done and can no longer be edited",
+        });
+        return;
+      }
+
+      const result = await pool.query(
+        `UPDATE worklist_task_updates SET third_party = $1 WHERE id = $2 AND task_id = $3 RETURNING *`,
+        [third_party || null, updateId, taskId],
+      );
+
+      if (result.rows.length === 0) {
+        res.status(404).json({ success: false, error: "Update row not found" });
+        return;
+      }
+
+      res.json({ success: true, update: result.rows[0] });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error?.message });
     }

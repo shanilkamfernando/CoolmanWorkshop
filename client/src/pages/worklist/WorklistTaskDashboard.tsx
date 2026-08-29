@@ -36,6 +36,8 @@ interface WorklistTask {
   finish_date: string;
   created_by: string;
   created_at: string;
+  has_third_party?: boolean;
+  third_party_names?: string | null;
 }
 
 interface Customer {
@@ -82,6 +84,7 @@ const JOB_TYPES = [
   },
 ];
 
+// Added "permission" as a status stage between on_hold and done.
 const STATUS_OPTIONS = [
   { value: "todo", label: "To Do", bg: "#e3f2fd", color: "#2e7d32" },
   {
@@ -91,18 +94,31 @@ const STATUS_OPTIONS = [
     color: "#e6db00",
   },
   { value: "on_hold", label: "On Hold", bg: "#fce4ec", color: "#880e4f" },
+  {
+    value: "permission",
+    label: "Permission",
+    bg: "#ede7f6",
+    color: "#5e35b1",
+  },
   { value: "done", label: "Done", bg: "#c0c0c0", color: "#727272" },
 ];
 
 const getStatus = (val: string) =>
   STATUS_OPTIONS.find((s) => s.value === val) || STATUS_OPTIONS[0];
-const toDateInput = (d: string) => {
-  if (!d) return "";
-  return d.split("T")[0];
-};
+
 const fmtDate = (d: string) => {
   if (!d) return "—";
-  const date = new Date(d);
+
+  // Extract just the date part in case it's a full ISO timestamp, then
+  // parse the components manually so we never let Date reinterpret a
+  // plain "YYYY-MM-DD" as UTC midnight and shift it a day in local time.
+  const datePart = d.split("T")[0];
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "—";
+
+  const [, year, month, day] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+
   if (isNaN(date.getTime())) return "—";
   return date.toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -110,9 +126,27 @@ const fmtDate = (d: string) => {
     year: "numeric",
   });
 };
+
 const fmtTime = (t: string) => {
   if (!t) return "—";
-  return t.substring(0, 5);
+
+  const match = t.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return "—";
+
+  let [, hoursStr, minutes] = match;
+  let hours = parseInt(hoursStr, 10);
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours === 0 ? 12 : hours;
+
+  return `${hours}:${minutes} ${ampm}`;
+};
+
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
 };
 
 const API = "https://coolmanworkshop-production.up.railway.app/api";
@@ -122,16 +156,22 @@ const TaskUpdateLog = ({
   taskId,
   canEdit,
   isAdmin,
+  readOnly,
+  systemUsers,
   authHeaders,
 }: {
   taskId: number;
-  canEdit: boolean;
+  canEdit: boolean; // can this user add a new log line right now
   isAdmin: boolean;
+  readOnly: boolean; // task is done — fully locked
+  systemUsers: SystemUser[];
   authHeaders: () => { Authorization: string };
 }) => {
   const [updates, setUpdates] = useState<any[]>([]);
   const [newNote, setNewNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [assignOpenFor, setAssignOpenFor] = useState<number | null>(null);
+  const [assigning, setAssigning] = useState(false);
 
   const API = "https://coolmanworkshop-production.up.railway.app/api";
 
@@ -177,6 +217,23 @@ const TaskUpdateLog = ({
     } catch {}
   };
 
+  const handleAssignThirdParty = async (updateId: number, username: string) => {
+    setAssigning(true);
+    try {
+      await axios.put(
+        `${API}/jobAssigned/tasks/${taskId}/updates/${updateId}/third-party`,
+        { third_party: username },
+        { headers: authHeaders() },
+      );
+      setAssignOpenFor(null);
+      fetchUpdates();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to assign");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   const fmtUpdateDate = (d: string) => {
     if (!d) return "—";
     const [y, m, day] = d.split("T")[0].split("-");
@@ -185,7 +242,8 @@ const TaskUpdateLog = ({
 
   const fmtUpdateTime = (t: string) => {
     if (!t) return "—";
-    return t.substring(0, 5);
+    const isoTime = t.includes("T") ? t.split("T")[1] : t;
+    return fmtTime(isoTime);
   };
 
   return (
@@ -215,65 +273,14 @@ const TaskUpdateLog = ({
       >
         <thead>
           <tr style={{ background: "#f8f9ff" }}>
-            <th
-              style={{
-                padding: "6px 10px",
-                textAlign: "left" as const,
-                fontSize: "11px",
-                fontWeight: 600,
-                color: "#888",
-                borderBottom: "1px solid #e8e8e8",
-                width: "100px",
-              }}
-            >
-              Date
-            </th>
-            <th
-              style={{
-                padding: "6px 10px",
-                textAlign: "left" as const,
-                fontSize: "11px",
-                fontWeight: 600,
-                color: "#888",
-                borderBottom: "1px solid #e8e8e8",
-                width: "70px",
-              }}
-            >
-              Time
-            </th>
-            <th
-              style={{
-                padding: "6px 10px",
-                textAlign: "left" as const,
-                fontSize: "11px",
-                fontWeight: 600,
-                color: "#888",
-                borderBottom: "1px solid #e8e8e8",
-              }}
-            >
-              Update
-            </th>
-            <th
-              style={{
-                padding: "6px 10px",
-                textAlign: "left" as const,
-                fontSize: "11px",
-                fontWeight: 600,
-                color: "#888",
-                borderBottom: "1px solid #e8e8e8",
-                width: "80px",
-              }}
-            >
-              By
-            </th>
+            <th style={thStyle("90px")}>Date</th>
+            <th style={thStyle("70px")}>Time</th>
+            <th style={thStyle("80px")}>By</th>
+            <th style={thStyle()}>Update</th>
+            <th style={thStyle("100px")}>Status</th>
+            <th style={thStyle("120px")}>Third Party</th>
             {isAdmin && (
-              <th
-                style={{
-                  padding: "6px 10px",
-                  width: "40px",
-                  borderBottom: "1px solid #e8e8e8",
-                }}
-              ></th>
+              <th style={{ ...thStyle("40px"), padding: "6px 10px" }}></th>
             )}
           </tr>
         </thead>
@@ -281,7 +288,7 @@ const TaskUpdateLog = ({
           {updates.length === 0 ? (
             <tr>
               <td
-                colSpan={isAdmin ? 5 : 4}
+                colSpan={isAdmin ? 7 : 6}
                 style={{
                   padding: "16px 10px",
                   textAlign: "center" as const,
@@ -293,89 +300,165 @@ const TaskUpdateLog = ({
               </td>
             </tr>
           ) : (
-            updates.map((u, idx) => (
-              <tr
-                key={u.id}
-                style={{ background: idx % 2 === 0 ? "#fff" : "#fafbff" }}
-              >
-                <td
-                  style={{
-                    padding: "6px 10px",
-                    fontSize: "13px",
-                    color: "#555",
-                    borderBottom: "1px solid #f0f0f0",
-                  }}
+            updates.map((u, idx) => {
+              const rowStatus = getStatus(u.status || "todo");
+              return (
+                <tr
+                  key={u.id}
+                  style={{ background: idx % 2 === 0 ? "#fff" : "#fafbff" }}
                 >
-                  {fmtUpdateDate(u.update_date || u.created_at)}
-                </td>
-                <td
-                  style={{
-                    padding: "6px 10px",
-                    fontSize: "13px",
-                    color: "#555",
-                    borderBottom: "1px solid #f0f0f0",
-                  }}
-                >
-                  {fmtUpdateTime(
-                    u.update_time || u.created_at?.split("T")[1] || "",
-                  )}
-                </td>
-                <td
-                  style={{
-                    padding: "6px 10px",
-                    fontSize: "13px",
-                    color: "#333",
-                    borderBottom: "1px solid #f0f0f0",
-                  }}
-                >
-                  {u.update_note}
-                </td>
-                <td
-                  style={{
-                    padding: "6px 10px",
-                    fontSize: "12px",
-                    color: "#888",
-                    borderBottom: "1px solid #f0f0f0",
-                  }}
-                >
-                  {u.created_by || "—"}
-                </td>
-                {isAdmin && (
-                  <td
-                    style={{
-                      padding: "6px 10px",
-                      borderBottom: "1px solid #f0f0f0",
-                      textAlign: "center" as const,
-                    }}
-                  >
-                    <button
-                      onClick={() => handleDelete(u.id)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "#ddd",
-                        fontSize: "14px",
-                      }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.color = "#ef4444")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.color = "#ddd")
-                      }
-                    >
-                      🗑️
-                    </button>
+                  <td style={tdStyle}>
+                    {fmtUpdateDate(u.update_date || u.created_at)}
                   </td>
-                )}
-              </tr>
-            ))
+                  <td style={tdStyle}>
+                    {fmtUpdateTime(u.update_time || u.created_at || "")}
+                  </td>
+                  <td style={{ ...tdStyle, color: "#888", fontSize: "12px" }}>
+                    {u.created_by || "—"}
+                  </td>
+                  <td style={{ ...tdStyle, color: "#333" }}>{u.update_note}</td>
+                  <td style={tdStyle}>
+                    <span
+                      style={{
+                        padding: "2px 8px",
+                        borderRadius: "9px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        background: rowStatus.bg,
+                        color: rowStatus.color,
+                        whiteSpace: "nowrap" as const,
+                      }}
+                    >
+                      {rowStatus.label}
+                    </span>
+                  </td>
+                  <td style={{ ...tdStyle, position: "relative" as const }}>
+                    {u.third_party ? (
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          color: "#c62828",
+                        }}
+                      >
+                        @{u.third_party}
+                      </span>
+                    ) : !readOnly ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAssignOpenFor(
+                            assignOpenFor === u.id ? null : u.id,
+                          );
+                        }}
+                        style={{
+                          background: "none",
+                          border: "1px dashed #bbb",
+                          borderRadius: "5px",
+                          color: "#888",
+                          fontSize: "12px",
+                          padding: "2px 8px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        @ Assign
+                      </button>
+                    ) : (
+                      <span style={{ color: "#ccc", fontSize: "12px" }}>—</span>
+                    )}
+
+                    {assignOpenFor === u.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          zIndex: 20,
+                          background: "#fff",
+                          border: "1px solid #ddd",
+                          borderRadius: "8px",
+                          boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+                          minWidth: "180px",
+                          maxHeight: "220px",
+                          overflowY: "auto" as const,
+                          marginTop: "4px",
+                        }}
+                      >
+                        {systemUsers.length === 0 ? (
+                          <div
+                            style={{
+                              padding: "10px",
+                              fontSize: "12px",
+                              color: "#999",
+                            }}
+                          >
+                            No members found
+                          </div>
+                        ) : (
+                          systemUsers.map((su) => (
+                            <div
+                              key={su.username}
+                              onClick={() =>
+                                !assigning &&
+                                handleAssignThirdParty(u.id, su.username)
+                              }
+                              style={{
+                                padding: "8px 12px",
+                                fontSize: "13px",
+                                cursor: "pointer",
+                                borderBottom: "1px solid #f2f2f2",
+                              }}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.background = "#f8f9ff")
+                              }
+                              onMouseLeave={(e) =>
+                                (e.currentTarget.style.background = "")
+                              }
+                            >
+                              {su.first_name} {su.last_name}{" "}
+                              <span style={{ color: "#aaa" }}>
+                                ({su.username})
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </td>
+                  {isAdmin && (
+                    <td style={{ ...tdStyle, textAlign: "center" as const }}>
+                      {!readOnly && (
+                        <button
+                          onClick={() => handleDelete(u.id)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "#ddd",
+                            fontSize: "14px",
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.color = "#ef4444")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.color = "#ddd")
+                          }
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
 
       {/* Add new update row */}
-      {canEdit && (
+      {canEdit && !readOnly && (
         <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
           <textarea
             value={newNote}
@@ -414,8 +497,30 @@ const TaskUpdateLog = ({
           </button>
         </div>
       )}
+      {!canEdit && !readOnly && (
+        <div style={{ fontSize: "12px", color: "#aaa", fontStyle: "italic" }}>
+          Move this task to In Progress to start adding updates.
+        </div>
+      )}
     </div>
   );
+};
+
+const thStyle = (width?: string) => ({
+  padding: "6px 10px",
+  textAlign: "left" as const,
+  fontSize: "11px",
+  fontWeight: 600,
+  color: "#888",
+  borderBottom: "1px solid #e8e8e8",
+  ...(width ? { width } : {}),
+});
+
+const tdStyle = {
+  padding: "6px 10px",
+  fontSize: "13px",
+  color: "#555",
+  borderBottom: "1px solid #f0f0f0",
 };
 
 const WorklistTasksDashboard = () => {
@@ -563,6 +668,34 @@ const WorklistTasksDashboard = () => {
     }
   };
 
+  // Status changes go through here so "done" can auto-stamp finish_date
+  // in one request, and so a revert-to-todo never reaches the server.
+  const handleStatusChange = async (task: WorklistTask, newStatus: string) => {
+    if (newStatus === "todo" && task.status !== "todo") {
+      alert("A task can't be moved back to To Do once it has started.");
+      return;
+    }
+
+    const updates: Record<string, string> = { status: newStatus };
+    if (newStatus === "done" && !task.finish_date) {
+      updates.finish_date = todayISO();
+    }
+
+    setTasks((prev) =>
+      prev.map((t) => (t.id === task.id ? { ...t, ...updates } : t)),
+    );
+
+    try {
+      await axios.put(`${API}/jobAssigned/tasks/${task.id}`, updates, {
+        headers: authHeaders(),
+      });
+      fetchTasks();
+    } catch (e: any) {
+      alert(e.response?.data?.error || "Failed to update status");
+      fetchTasks();
+    }
+  };
+
   const handleDelete = async (task: WorklistTask) => {
     try {
       await axios.delete(`${API}/jobAssigned/tasks/${task.id}`, {
@@ -575,7 +708,6 @@ const WorklistTasksDashboard = () => {
     }
   };
 
-  // ── FIX: Build the navigation path correctly ──
   const getJobLink = (task: WorklistTask): string | null => {
     if (!task.customer_id || !task.job_type) return null;
     const jt = JOB_TYPES.find((j) => j.value === task.job_type);
@@ -592,7 +724,6 @@ const WorklistTasksDashboard = () => {
     if (!link) return;
 
     try {
-      // Always fetch customer
       const custRes = await axios.get(`${API}/customers/${task.customer_id}`, {
         headers: authHeaders(),
       });
@@ -603,7 +734,6 @@ const WorklistTasksDashboard = () => {
 
       let state: Record<string, any> = { customer };
 
-      // For compressor repair — also fetch the company
       if (task.job_reference_id && task.job_type === "compressor_repair") {
         try {
           const compRes = await axios.get(
@@ -619,7 +749,6 @@ const WorklistTasksDashboard = () => {
         } catch {}
       }
 
-      // For compressor service — also fetch the company
       if (task.job_reference_id && task.job_type === "compressor_service") {
         try {
           const compRes = await axios.get(
@@ -635,7 +764,6 @@ const WorklistTasksDashboard = () => {
         } catch {}
       }
 
-      // For project — also fetch the project
       if (task.job_reference_id && task.job_type === "project") {
         try {
           const projRes = await axios.get(
@@ -654,14 +782,31 @@ const WorklistTasksDashboard = () => {
     }
   };
 
-  const filtered = tasks.filter(
-    (t) =>
-      !search ||
-      String(t.task_no).includes(search) ||
-      (t.customer_name || "").toLowerCase().includes(search.toLowerCase()) ||
-      (t.assigned_member || "").toLowerCase().includes(search.toLowerCase()) ||
-      (t.job_description || "").toLowerCase().includes(search.toLowerCase()),
-  );
+  // Search also matches a third-party assignee's name (e.g. "maduranga"
+  // surfaces a task even if he's only handed off on one of its log lines).
+  const filtered = tasks
+    .filter(
+      (t) =>
+        !search ||
+        String(t.task_no).includes(search) ||
+        (t.customer_name || "").toLowerCase().includes(search.toLowerCase()) ||
+        (t.assigned_member || "")
+          .toLowerCase()
+          .includes(search.toLowerCase()) ||
+        (t.job_description || "")
+          .toLowerCase()
+          .includes(search.toLowerCase()) ||
+        (t.third_party_names || "")
+          .toLowerCase()
+          .includes(search.toLowerCase()),
+    )
+    // Completed tasks sink to the bottom; task_no is never touched.
+    .sort((a, b) => {
+      const aDone = a.status === "done" ? 1 : 0;
+      const bDone = b.status === "done" ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return a.task_no - b.task_no;
+    });
 
   const getInitials = (name: string) => {
     const w = name.trim().split(" ");
@@ -690,7 +835,7 @@ const WorklistTasksDashboard = () => {
 
   return (
     <div className="project-dashboard">
-      {/* Header — matches your system style */}
+      {/* Header */}
       <div className="portal-header">
         <div className="header-left">
           <div
@@ -751,7 +896,7 @@ const WorklistTasksDashboard = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="🔍 Search by task no, customer, member, description..."
+              placeholder="🔍 Search by task no, customer, member, third party, description..."
               style={{
                 flex: 1,
                 minWidth: "240px",
@@ -823,7 +968,7 @@ const WorklistTasksDashboard = () => {
             <table className="meetings-table" style={{ tableLayout: "fixed" }}>
               <thead>
                 <tr>
-                  {/* <th style={{ width: "55px" }}>No</th> */}
+                  <th style={{ width: "55px" }}>No</th>
                   <th style={{ width: "110px" }}>Date</th>
                   <th style={{ width: "75px" }}>Time</th>
                   <th style={{ width: "160px" }}>Customer</th>
@@ -840,9 +985,10 @@ const WorklistTasksDashboard = () => {
                 {filtered.map((task) => {
                   const isExpanded = expandedId === task.id;
                   const st = getStatus(task.status);
+                  const isDone = task.status === "done";
                   const isAssignedToMe =
                     task.assigned_member === user?.username;
-                  const canEditUpdate = isAdmin || isAssignedToMe;
+                  const canEditUpdate = !isDone && task.status !== "todo";
                   const jobLink = getJobLink(task);
                   const jobTypeLabel = JOB_TYPES.find(
                     (j) => j.value === task.job_type,
@@ -856,9 +1002,10 @@ const WorklistTasksDashboard = () => {
                           cursor: "pointer",
                           transition: "background 0.15s",
                           background: isExpanded ? "#f8f9ff" : "",
+                          opacity: isDone ? 0.55 : 1,
                         }}
                         onMouseEnter={(e) => {
-                          if (!isExpanded)
+                          if (!isExpanded && !isDone)
                             e.currentTarget.style.background = "#f8f9ff";
                         }}
                         onMouseLeave={(e) => {
@@ -870,7 +1017,7 @@ const WorklistTasksDashboard = () => {
                         }
                       >
                         {/* No */}
-                        {/* <td
+                        <td
                           style={{
                             textAlign: "center",
                             fontWeight: 700,
@@ -879,7 +1026,7 @@ const WorklistTasksDashboard = () => {
                           }}
                         >
                           #{task.task_no}
-                        </td> */}
+                        </td>
 
                         {/* Date */}
                         <td
@@ -1034,7 +1181,7 @@ const WorklistTasksDashboard = () => {
                           {fmtDate(task.due_date)}
                         </td>
 
-                        {/* Finish Date */}
+                        {/* Finish Date — always read-only, server-computed */}
                         <td
                           style={{
                             fontSize: "14px",
@@ -1063,18 +1210,24 @@ const WorklistTasksDashboard = () => {
                           </span>
                         </td>
 
-                        {/* Expand toggle */}
+                        {/* Expand toggle — red when a third party is assigned */}
                         <td style={{ textAlign: "center" }}>
                           <span
                             style={{
                               display: "inline-block",
-                              color: "#999",
+                              color: task.has_third_party ? "#f44336" : "#999",
                               fontSize: "12px",
+                              fontWeight: task.has_third_party ? 700 : 400,
                               transition: "transform 0.2s",
                               transform: isExpanded
                                 ? "rotate(90deg)"
                                 : "rotate(0deg)",
                             }}
+                            title={
+                              task.has_third_party
+                                ? `Assigned to third party: ${task.third_party_names}`
+                                : undefined
+                            }
                           >
                             ▶
                           </span>
@@ -1085,7 +1238,7 @@ const WorklistTasksDashboard = () => {
                       {isExpanded && (
                         <tr key={`${task.id}-detail`}>
                           <td
-                            colSpan={10}
+                            colSpan={11}
                             style={{ padding: 0, background: "#fafbff" }}
                           >
                             <div
@@ -1095,7 +1248,6 @@ const WorklistTasksDashboard = () => {
                                 borderBottom: "1px solid #e8e8e8",
                               }}
                             >
-                              {/* -------------------------------------------------------------------------- */}
                               <div
                                 style={{
                                   display: "grid",
@@ -1126,40 +1278,9 @@ const WorklistTasksDashboard = () => {
                                     >
                                       Finish Date
                                     </div>
-                                    {isAdmin ||
-                                    (!task.finish_date && canEditUpdate) ? (
-                                      <input
-                                        type="date"
-                                        defaultValue={toDateInput(
-                                          task.finish_date,
-                                        )}
-                                        onChange={(e) => {
-                                          handleUpdateLocal(
-                                            task.id,
-                                            "finish_date",
-                                            e.target.value,
-                                          );
-                                          handleSave(
-                                            task.id,
-                                            "finish_date",
-                                            e.target.value,
-                                          );
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        style={{
-                                          padding: "7px 10px",
-                                          border: "1.5px solid #ddd",
-                                          borderRadius: "6px",
-                                          fontSize: "14px",
-                                          width: "100%",
-                                          boxSizing: "border-box" as const,
-                                        }}
-                                      />
-                                    ) : (
-                                      <span style={{ fontSize: "14px" }}>
-                                        {fmtDate(task.finish_date)}
-                                      </span>
-                                    )}
+                                    <span style={{ fontSize: "14px" }}>
+                                      {fmtDate(task.finish_date)}
+                                    </span>
                                   </div>
 
                                   <div>
@@ -1177,19 +1298,26 @@ const WorklistTasksDashboard = () => {
                                     >
                                       Status
                                     </div>
-                                    {canEditUpdate ? (
+                                    {isDone ? (
+                                      <span
+                                        style={{
+                                          padding: "3px 10px",
+                                          borderRadius: "10px",
+                                          fontSize: "12px",
+                                          fontWeight: 700,
+                                          background: st.bg,
+                                          color: st.color,
+                                        }}
+                                      >
+                                        {st.label}
+                                      </span>
+                                    ) : (
                                       <select
                                         value={task.status}
                                         onChange={(e) => {
                                           e.stopPropagation();
-                                          handleUpdateLocal(
-                                            task.id,
-                                            "status",
-                                            e.target.value,
-                                          );
-                                          handleSave(
-                                            task.id,
-                                            "status",
+                                          handleStatusChange(
+                                            task,
                                             e.target.value,
                                           );
                                         }}
@@ -1207,25 +1335,27 @@ const WorklistTasksDashboard = () => {
                                           boxSizing: "border-box" as const,
                                         }}
                                       >
-                                        {STATUS_OPTIONS.map((s) => (
+                                        {STATUS_OPTIONS.filter(
+                                          (s) =>
+                                            task.status === "todo" ||
+                                            s.value !== "todo",
+                                        ).map((s) => (
                                           <option key={s.value} value={s.value}>
                                             {s.label}
                                           </option>
                                         ))}
                                       </select>
-                                    ) : (
-                                      <span
+                                    )}
+                                    {!isDone && task.status !== "todo" && (
+                                      <div
                                         style={{
-                                          padding: "3px 10px",
-                                          borderRadius: "10px",
-                                          fontSize: "12px",
-                                          fontWeight: 700,
-                                          background: st.bg,
-                                          color: st.color,
+                                          fontSize: "11px",
+                                          color: "#aaa",
+                                          marginTop: "4px",
                                         }}
                                       >
-                                        {st.label}
-                                      </span>
+                                        Can't be moved back to To Do
+                                      </div>
                                     )}
                                   </div>
                                 </div>
@@ -1236,12 +1366,14 @@ const WorklistTasksDashboard = () => {
                                     taskId={task.id}
                                     canEdit={canEditUpdate}
                                     isAdmin={isAdmin}
+                                    readOnly={isDone}
+                                    systemUsers={systemUsers}
                                     authHeaders={authHeaders}
                                   />
                                 </div>
                               </div>
 
-                              {/* Bottom bar — Job link + created by + delete */}
+                              {/* Bottom bar */}
                               <div
                                 style={{
                                   display: "flex",
@@ -1267,7 +1399,6 @@ const WorklistTasksDashboard = () => {
                                     Created by:{" "}
                                     <strong>{task.created_by || "—"}</strong>
                                   </span>
-                                  {/* ── FIX: Navigate to job page ── */}
                                   {jobLink && (
                                     <button
                                       onClick={(e) =>
