@@ -2,17 +2,6 @@
 // Worklist Tasks Routes
 // Save as: server/src/routes/worklist-tasks.ts
 // ============================================
-//
-// ⚠️ REQUIRED DATABASE MIGRATION — run this once before deploying:
-//
-//   ALTER TABLE worklist_task_updates
-//     ADD COLUMN IF NOT EXISTS status VARCHAR(50),
-//     ADD COLUMN IF NOT EXISTS third_party VARCHAR(100);
-//
-// `status` stores what stage the task was at when that log line was added.
-// `third_party` stores the username of a company member the log entry
-// (and by extension the task) has been handed off to for review/action.
-// ============================================
 
 import { Router, Request, Response } from "express";
 import { Pool } from "pg";
@@ -305,7 +294,6 @@ router.put(
     const { taskId } = req.params;
     const pool = getPool(req);
     const isAdmin = req.user?.role === "admin";
-    const currentUser = req.user?.username;
 
     try {
       const existing = await pool.query(
@@ -319,15 +307,10 @@ router.put(
       }
 
       const record = existing.rows[0];
-      const isAssignedUser = record.assigned_member === currentUser;
 
-      if (!isAdmin && !isAssignedUser) {
-        res.status(403).json({
-          success: false,
-          error: "You can only update your own assigned tasks",
-        });
-        return;
-      }
+      // Any authenticated user may update a task's status/notes — not just
+      // the assigned member or an admin. Only the field allow-list below
+      // and the done/todo guards constrain what a non-admin can change.
 
       // ── Once a task is done, it's locked — no further edits by anyone ──
       if (record.status === "done") {

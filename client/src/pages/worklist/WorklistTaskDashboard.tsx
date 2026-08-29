@@ -234,16 +234,26 @@ const TaskUpdateLog = ({
     }
   };
 
-  const fmtUpdateDate = (d: string) => {
-    if (!d) return "—";
-    const [y, m, day] = d.split("T")[0].split("-");
-    return `${day} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
-  };
-
-  const fmtUpdateTime = (t: string) => {
-    if (!t) return "—";
-    const isoTime = t.includes("T") ? t.split("T")[1] : t;
-    return fmtTime(isoTime);
+  // created_at comes back from Postgres as a UTC timestamp. Building a real
+  // Date object (rather than slicing the raw string) lets the browser
+  // convert it to local system time correctly — string-slicing was
+  // displaying the UTC clock, which is off by the local UTC offset.
+  const fmtLogDateTime = (isoString: string) => {
+    if (!isoString) return { date: "—", time: "—" };
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return { date: "—", time: "—" };
+    return {
+      date: d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      time: d.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }),
+    };
   };
 
   return (
@@ -302,17 +312,16 @@ const TaskUpdateLog = ({
           ) : (
             updates.map((u, idx) => {
               const rowStatus = getStatus(u.status || "todo");
+              const { date: logDate, time: logTime } = fmtLogDateTime(
+                u.created_at,
+              );
               return (
                 <tr
                   key={u.id}
                   style={{ background: idx % 2 === 0 ? "#fff" : "#fafbff" }}
                 >
-                  <td style={tdStyle}>
-                    {fmtUpdateDate(u.update_date || u.created_at)}
-                  </td>
-                  <td style={tdStyle}>
-                    {fmtUpdateTime(u.update_time || u.created_at || "")}
-                  </td>
+                  <td style={tdStyle}>{logDate}</td>
+                  <td style={tdStyle}>{logTime}</td>
                   <td style={{ ...tdStyle, color: "#888", fontSize: "12px" }}>
                     {u.created_by || "—"}
                   </td>
