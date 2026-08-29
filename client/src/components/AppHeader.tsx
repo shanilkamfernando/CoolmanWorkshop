@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import axios from "axios";
-import companyLogo from "../assets/mainlogo.jpeg";
+import companyLogo from "../assets/mainlogo.png";
 
 import iconCustomers from "../assets/customers.jpeg";
 import iconPurchasing from "../assets/purchasing.jpeg";

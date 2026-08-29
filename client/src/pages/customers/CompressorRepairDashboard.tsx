@@ -8,7 +8,7 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./ProjectDashboard.css";
 import AppHeader from "../../components/AppHeader";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
 
 interface User {
   username: string;

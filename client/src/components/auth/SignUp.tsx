@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Auth.css";
 import { EyeIcon, EyeOffIcon, HexPattern, WaveAccent } from "./AuthIcons";
-import mainlogo from "../../assets/images/mainlogo.png";
+import mainlogo from "../../assets/mainlogo.png";
 
 interface SignUpForm {
   username: string;

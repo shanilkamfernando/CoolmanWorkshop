@@ -7,7 +7,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Auth.css";
-import mainlogo from "../../assets/images/mainlogo.png";
+import mainlogo from "../../assets/mainlogo.png";
 import { EyeIcon, EyeOffIcon, HexPattern, WaveAccent } from "./AuthIcons";
 
 interface SignInForm {

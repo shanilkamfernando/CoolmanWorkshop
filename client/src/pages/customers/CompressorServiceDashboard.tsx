@@ -9,7 +9,7 @@ import axios from "axios";
 import "./CompressorServiceDashboard.css";
 import "./ProjectDashboard.css";
 import AppHeader from "../../components/AppHeader";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
 
 interface User {
   username: string;

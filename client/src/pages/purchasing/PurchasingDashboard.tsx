@@ -6,7 +6,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
 import "../customers/ProjectDashboard.css";
 import AppHeader from "../../components/AppHeader";
 

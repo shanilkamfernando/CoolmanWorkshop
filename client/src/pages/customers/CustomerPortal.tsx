@@ -9,7 +9,7 @@ import axios from "axios";
 import "./Customers.css";
 
 // Import logo
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
 import { API_BASE } from "../../config";
 import AppHeader from "../../components/AppHeader";
 
