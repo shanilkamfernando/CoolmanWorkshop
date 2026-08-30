@@ -1216,6 +1216,11 @@ const WorklistTasksDashboard = () => {
                                 borderBottom: "1px solid #e8e8e8",
                               }}
                             >
+                              <div style={{ fontSize: "13px", color: "#888" }}>
+                                Assigned by:{" "}
+                                <strong>{task.created_by || "—"}</strong>
+                              </div>
+
                               <div
                                 style={{
                                   display: "grid",
@@ -1358,12 +1363,12 @@ const WorklistTasksDashboard = () => {
                                     gap: "12px",
                                   }}
                                 >
-                                  <span
+                                  {/* <span
                                     style={{ fontSize: "13px", color: "#888" }}
                                   >
                                     Created by:{" "}
                                     <strong>{task.created_by || "—"}</strong>
-                                  </span>
+                                  </span> */}
                                   {jobLink && (
                                     <button
                                       onClick={(e) =>
