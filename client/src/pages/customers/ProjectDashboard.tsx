@@ -125,6 +125,36 @@ const todayISO = () => {
   ).padStart(2, "0")}`;
 };
 
+// assigned_date/assigned_time and activity_date/activity_time are
+// auto-stamped at creation via CURRENT_DATE / CURRENT_TIME, stored in
+// UTC exactly like created_at — but as two separate columns with no
+// timezone marker. Combine them into one instant, force UTC
+// interpretation, then convert to real local time — same fix as the
+// Update Log and as Job Assigned's main table.
+const fmtCreatedDateTime = (dateStr: string, timeStr: string) => {
+  if (!dateStr) return { date: "—", time: "—" };
+  const datePart = dateStr.split("T")[0];
+  const timePart = (timeStr || "00:00:00").split(".")[0];
+  const d = new Date(`${datePart}T${timePart}Z`);
+  if (isNaN(d.getTime()))
+    return {
+      date: fmtDateDDMMYYYY(dateStr),
+      time: timeStr ? timeStr.substring(0, 5) : "—",
+    };
+  return {
+    date: fmtDateDDMMYYYY(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate(),
+      ).padStart(2, "0")}`,
+    ),
+    time: d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }),
+  };
+};
+
 const MeetingDetailPanel = ({
   meeting,
   customerId,
@@ -519,6 +549,19 @@ const MeetingDetailPanel = ({
 };
 
 // ── Member Update Log (only mounted once its row is expanded) ──────
+const MEMBER_STATUS_LOOKUP: Record<
+  string,
+  { label: string; bg: string; color: string }
+> = {
+  todo: { label: "To Do", bg: "#e3f2fd", color: "#2e7d32" },
+  in_progress: { label: "In Progress", bg: "#fff8e1", color: "#e6db00" },
+  on_hold: { label: "On Hold", bg: "#fce4ec", color: "#880e4f" },
+  permission: { label: "Permission", bg: "#ede7f6", color: "#5e35b1" },
+  done: { label: "Done", bg: "#c0c0c0", color: "#727272" },
+};
+const getMemberLogStatus = (val: string) =>
+  MEMBER_STATUS_LOOKUP[val] || MEMBER_STATUS_LOOKUP.todo;
+
 const MemberUpdateLog = ({
   customerId,
   projectId,
@@ -526,6 +569,7 @@ const MemberUpdateLog = ({
   canEdit,
   isAdmin,
   readOnly,
+  systemUsers,
 }: {
   customerId: string | undefined;
   projectId: string | undefined;
@@ -533,10 +577,13 @@ const MemberUpdateLog = ({
   canEdit: boolean;
   isAdmin: boolean;
   readOnly: boolean;
+  systemUsers: SystemUser[];
 }) => {
   const [updates, setUpdates] = useState<any[]>([]);
   const [newNote, setNewNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [assignOpenFor, setAssignOpenFor] = useState<number | null>(null);
+  const [assigning, setAssigning] = useState(false);
 
   const token = () => localStorage.getItem("token");
   const hdr = () => ({ Authorization: `Bearer ${token()}` });
@@ -575,6 +622,23 @@ const MemberUpdateLog = ({
     } catch {}
   };
 
+  const handleAssignThirdParty = async (updateId: number, username: string) => {
+    setAssigning(true);
+    try {
+      await axios.put(
+        `${BASE}/${updateId}/third-party`,
+        { third_party: username },
+        { headers: hdr() },
+      );
+      setAssignOpenFor(null);
+      fetchUpdates();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to assign");
+    } finally {
+      setAssigning(false);
+    }
+  };
+
   return (
     <div>
       <div
@@ -604,8 +668,10 @@ const MemberUpdateLog = ({
           <tr style={{ background: "#f8f9ff" }}>
             <th style={mThStyle("90px")}>Date</th>
             <th style={mThStyle("65px")}>Time</th>
-            <th style={mThStyle()}>Update</th>
             <th style={mThStyle("70px")}>By</th>
+            <th style={mThStyle()}>Update</th>
+            <th style={mThStyle("100px")}>Status</th>
+            <th style={mThStyle("120px")}>Third Party</th>
             {isAdmin && (
               <th style={{ ...mThStyle("30px"), padding: "5px 8px" }}></th>
             )}
@@ -615,7 +681,7 @@ const MemberUpdateLog = ({
           {updates.length === 0 ? (
             <tr>
               <td
-                colSpan={isAdmin ? 5 : 4}
+                colSpan={isAdmin ? 7 : 6}
                 style={{
                   padding: "10px 8px",
                   textAlign: "center" as const,
@@ -632,6 +698,7 @@ const MemberUpdateLog = ({
               const { date: logDate, time: logTime } = fmtLogDateTime(
                 u.created_at,
               );
+              const rowStatus = getMemberLogStatus(u.status || "todo");
               return (
                 <tr
                   key={u.id}
@@ -639,11 +706,120 @@ const MemberUpdateLog = ({
                 >
                   <td style={mTdStyle}>{logDate}</td>
                   <td style={mTdStyle}>{logTime}</td>
+                  <td style={{ ...mTdStyle, fontSize: "11px" }}>
+                    {u.created_by || "—"}
+                  </td>
                   <td style={{ ...mTdStyle, color: "#333" }}>
                     {u.update_note}
                   </td>
-                  <td style={{ ...mTdStyle, fontSize: "11px" }}>
-                    {u.created_by || "—"}
+                  <td style={mTdStyle}>
+                    <span
+                      style={{
+                        padding: "2px 8px",
+                        borderRadius: "9px",
+                        fontSize: "10px",
+                        fontWeight: 700,
+                        background: rowStatus.bg,
+                        color: rowStatus.color,
+                        whiteSpace: "nowrap" as const,
+                      }}
+                    >
+                      {rowStatus.label}
+                    </span>
+                  </td>
+                  <td style={{ ...mTdStyle, position: "relative" as const }}>
+                    {u.third_party ? (
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          color: "#c62828",
+                        }}
+                      >
+                        @{u.third_party}
+                      </span>
+                    ) : !readOnly ? (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAssignOpenFor(
+                            assignOpenFor === u.id ? null : u.id,
+                          );
+                        }}
+                        style={{
+                          background: "none",
+                          border: "1px dashed #bbb",
+                          borderRadius: "5px",
+                          color: "#888",
+                          fontSize: "12px",
+                          padding: "2px 8px",
+                          cursor: "pointer",
+                        }}
+                      >
+                        @ Assign
+                      </button>
+                    ) : (
+                      <span style={{ color: "#ccc", fontSize: "12px" }}>—</span>
+                    )}
+
+                    {assignOpenFor === u.id && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: "absolute" as const,
+                          top: "100%",
+                          left: 0,
+                          zIndex: 20,
+                          background: "#fff",
+                          border: "1px solid #ddd",
+                          borderRadius: "8px",
+                          boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+                          minWidth: "180px",
+                          maxHeight: "220px",
+                          overflowY: "auto" as const,
+                          marginTop: "4px",
+                        }}
+                      >
+                        {systemUsers.length === 0 ? (
+                          <div
+                            style={{
+                              padding: "10px",
+                              fontSize: "12px",
+                              color: "#999",
+                            }}
+                          >
+                            No members found
+                          </div>
+                        ) : (
+                          systemUsers.map((su) => (
+                            <div
+                              key={su.username}
+                              onClick={() =>
+                                !assigning &&
+                                handleAssignThirdParty(u.id, su.username)
+                              }
+                              style={{
+                                padding: "8px 12px",
+                                fontSize: "13px",
+                                cursor: "pointer",
+                                borderBottom: "1px solid #f2f2f2",
+                              }}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.background = "#f8f9ff")
+                              }
+                              onMouseLeave={(e) =>
+                                (e.currentTarget.style.background = "")
+                              }
+                            >
+                              {su.first_name} {su.last_name}{" "}
+                              <span style={{ color: "#aaa" }}>
+                                ({su.username})
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
                   </td>
                   {isAdmin && (
                     <td style={{ ...mTdStyle, textAlign: "center" as const }}>
@@ -1418,11 +1594,27 @@ const ProjectDashboard = () => {
   const initials = getInitials(customer.name);
   const color = getColorFromName(customer.name);
 
+  // Must match Worklist dashboard's STATUS_OPTIONS exactly — both sides
+  // share the same status column via sync, so a value either side doesn't
+  // recognize silently falls back to "To Do" on display. This previously
+  // used "pending" here instead of "in_progress", which was the direct
+  // cause of statuses appearing wrong across the two dashboards.
   const STATUS_OPTIONS = [
-    { value: "todo", label: "To Do", bg: "#e3f2fd", color: "#1565c0" },
-    { value: "pending", label: "Pending", bg: "#fff8e1", color: "#e65100" },
+    { value: "todo", label: "To Do", bg: "#e3f2fd", color: "#2e7d32" },
+    {
+      value: "in_progress",
+      label: "In Progress",
+      bg: "#fff8e1",
+      color: "#e6db00",
+    },
     { value: "on_hold", label: "On Hold", bg: "#fce4ec", color: "#880e4f" },
-    { value: "done", label: "Done", bg: "#e8f5e9", color: "#2e7d32" },
+    {
+      value: "permission",
+      label: "Permission",
+      bg: "#ede7f6",
+      color: "#5e35b1",
+    },
+    { value: "done", label: "Done", bg: "#c0c0c0", color: "#727272" },
   ];
 
   const getStatusStyle = (status: string) => {
@@ -1633,6 +1825,11 @@ const ProjectDashboard = () => {
                 const canEditUpdate = !isDone && (isAdmin || isAssignedToMe);
                 const st = getStatusStyle(member.status);
                 const isExpanded = expandedMemberId === member.id;
+                const { date: memberDate, time: memberTime } =
+                  fmtCreatedDateTime(
+                    member.assigned_date,
+                    member.assigned_time,
+                  );
 
                 return (
                   <>
@@ -1661,18 +1858,12 @@ const ProjectDashboard = () => {
 
                       {/* Date */}
                       <td>
-                        <span style={{ fontSize: "14px" }}>
-                          {fmtDateDDMMYYYY(member.assigned_date)}
-                        </span>
+                        <span style={{ fontSize: "14px" }}>{memberDate}</span>
                       </td>
 
                       {/* Time */}
                       <td>
-                        <span style={{ fontSize: "14px" }}>
-                          {member.assigned_time
-                            ? member.assigned_time.substring(0, 5)
-                            : "—"}
-                        </span>
+                        <span style={{ fontSize: "14px" }}>{memberTime}</span>
                       </td>
 
                       {/* Assigned Member */}
@@ -1942,6 +2133,7 @@ const ProjectDashboard = () => {
                                   canEdit={canEditUpdate}
                                   isAdmin={isAdmin}
                                   readOnly={isDone}
+                                  systemUsers={systemUsers}
                                 />
                               </div>
                             </div>

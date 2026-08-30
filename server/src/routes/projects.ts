@@ -2,31 +2,6 @@
 // Projects Routes
 // Save as: server/src/routes/projects.ts
 // ============================================
-//
-// ⚠️ REQUIRED DATABASE MIGRATION — run once, alongside the one in
-// worklist-tasks.ts (same columns, shared by both files):
-//
-//   ALTER TABLE worklist_tasks_v2
-//     ADD COLUMN IF NOT EXISTS linked_member_id INTEGER;
-//   ALTER TABLE project_assigned_members
-//     ADD COLUMN IF NOT EXISTS linked_task_id INTEGER;
-//
-//   UPDATE worklist_tasks_v2 wt
-//   SET linked_member_id = pam.id
-//   FROM project_assigned_members pam
-//   WHERE wt.job_type = 'project'
-//     AND wt.job_reference_id = pam.project_id
-//     AND wt.assigned_member = pam.assigned_member
-//     AND wt.linked_member_id IS NULL;
-//
-//   UPDATE project_assigned_members pam
-//   SET linked_task_id = wt.id
-//   FROM worklist_tasks_v2 wt
-//   WHERE wt.job_type = 'project'
-//     AND wt.job_reference_id = pam.project_id
-//     AND wt.assigned_member = pam.assigned_member
-//     AND pam.linked_task_id IS NULL;
-// ============================================
 
 import { Router, Request, Response } from "express";
 import { Pool } from "pg";
@@ -1038,9 +1013,9 @@ router.post(
       }
 
       const result = await pool.query(
-        `INSERT INTO project_member_updates (member_id, update_note, created_by)
-   VALUES ($1, $2, $3) RETURNING *`,
-        [memberId, update_note.trim(), req.user?.username],
+        `INSERT INTO project_member_updates (member_id, update_note, status, created_by)
+   VALUES ($1, $2, $3, $4) RETURNING *`,
+        [memberId, update_note.trim(), member.status, req.user?.username],
       );
 
       // ── Sync this note into worklist_task_updates as a real log row —
@@ -1088,6 +1063,50 @@ router.post(
       }
 
       res.status(201).json({ success: true, update: result.rows[0] });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error?.message });
+    }
+  },
+);
+
+// PUT assign (or clear) a third-party member on a single update-log row
+// Mirrors the equivalent endpoint in worklist-tasks.ts.
+router.put(
+  "/:customerId/projects/:projectId/members/:memberId/updates/:updateId/third-party",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { memberId, updateId } = req.params;
+    const { third_party } = req.body;
+    const pool = getPool(req);
+
+    try {
+      const memberResult = await pool.query(
+        "SELECT status FROM project_assigned_members WHERE id = $1",
+        [memberId],
+      );
+      if (memberResult.rows.length === 0) {
+        res.status(404).json({ success: false, error: "Assignment not found" });
+        return;
+      }
+      if (memberResult.rows[0].status === "done") {
+        res.status(403).json({
+          success: false,
+          error: "This assignment is marked done and can no longer be edited",
+        });
+        return;
+      }
+
+      const result = await pool.query(
+        `UPDATE project_member_updates SET third_party = $1 WHERE id = $2 AND member_id = $3 RETURNING *`,
+        [third_party || null, updateId, memberId],
+      );
+
+      if (result.rows.length === 0) {
+        res.status(404).json({ success: false, error: "Update row not found" });
+        return;
+      }
+
+      res.json({ success: true, update: result.rows[0] });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error?.message });
     }

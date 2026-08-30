@@ -101,6 +101,7 @@
   cursor: pointer;
   transition: all 0.3s;
   position: relative;
+  text-align: center;
 }
 
 .portal-tile:hover:not(.disabled) {

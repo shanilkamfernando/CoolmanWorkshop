@@ -2,46 +2,6 @@
 // Worklist Tasks Routes
 // Save as: server/src/routes/worklist-tasks.ts
 // ============================================
-//
-// ⚠️ REQUIRED DATABASE MIGRATION — run this once before deploying:
-//
-//   ALTER TABLE worklist_task_updates
-//     ADD COLUMN IF NOT EXISTS status VARCHAR(50),
-//     ADD COLUMN IF NOT EXISTS third_party VARCHAR(100);
-//
-//   ALTER TABLE worklist_tasks_v2
-//     ADD COLUMN IF NOT EXISTS linked_member_id INTEGER;
-//   ALTER TABLE project_assigned_members
-//     ADD COLUMN IF NOT EXISTS linked_task_id INTEGER;
-//
-//   -- One-time backfill so existing task/member pairs (created before
-//   -- this migration) get linked directly instead of relying on the
-//   -- old project_id + assigned_member text match, which could silently
-//   -- match zero rows with no error surfaced anywhere.
-//   UPDATE worklist_tasks_v2 wt
-//   SET linked_member_id = pam.id
-//   FROM project_assigned_members pam
-//   WHERE wt.job_type = 'project'
-//     AND wt.job_reference_id = pam.project_id
-//     AND wt.assigned_member = pam.assigned_member
-//     AND wt.linked_member_id IS NULL;
-//
-//   UPDATE project_assigned_members pam
-//   SET linked_task_id = wt.id
-//   FROM worklist_tasks_v2 wt
-//   WHERE wt.job_type = 'project'
-//     AND wt.job_reference_id = pam.project_id
-//     AND wt.assigned_member = pam.assigned_member
-//     AND pam.linked_task_id IS NULL;
-//
-// `status` and `third_party` on worklist_task_updates store what stage the
-// task was at when that log line was added, and any third-party assignee
-// on that entry. `linked_member_id` / `linked_task_id` are the direct,
-// guaranteed cross-reference between a worklist task and its matching
-// project_assigned_members row — every sync below now follows this link
-// instead of re-matching by project_id + assigned_member every time,
-// which was fragile and failed silently on any mismatch.
-// ============================================
 
 import { Router, Request, Response } from "express";
 import { Pool } from "pg";
@@ -578,9 +538,9 @@ router.post(
 
           if (memberId) {
             await pool.query(
-              `INSERT INTO project_member_updates (member_id, update_note, created_by)
-         VALUES ($1, $2, $3)`,
-              [memberId, update_note.trim(), req.user?.username],
+              `INSERT INTO project_member_updates (member_id, update_note, status, created_by)
+         VALUES ($1, $2, $3, $4)`,
+              [memberId, update_note.trim(), task.status, req.user?.username],
             );
           }
         }
