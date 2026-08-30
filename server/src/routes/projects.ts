@@ -2,6 +2,31 @@
 // Projects Routes
 // Save as: server/src/routes/projects.ts
 // ============================================
+//
+// ⚠️ REQUIRED DATABASE MIGRATION — run once, alongside the one in
+// worklist-tasks.ts (same columns, shared by both files):
+//
+//   ALTER TABLE worklist_tasks_v2
+//     ADD COLUMN IF NOT EXISTS linked_member_id INTEGER;
+//   ALTER TABLE project_assigned_members
+//     ADD COLUMN IF NOT EXISTS linked_task_id INTEGER;
+//
+//   UPDATE worklist_tasks_v2 wt
+//   SET linked_member_id = pam.id
+//   FROM project_assigned_members pam
+//   WHERE wt.job_type = 'project'
+//     AND wt.job_reference_id = pam.project_id
+//     AND wt.assigned_member = pam.assigned_member
+//     AND wt.linked_member_id IS NULL;
+//
+//   UPDATE project_assigned_members pam
+//   SET linked_task_id = wt.id
+//   FROM worklist_tasks_v2 wt
+//   WHERE wt.job_type = 'project'
+//     AND wt.job_reference_id = pam.project_id
+//     AND wt.assigned_member = pam.assigned_member
+//     AND pam.linked_task_id IS NULL;
+// ============================================
 
 import { Router, Request, Response } from "express";
 import { Pool } from "pg";
@@ -786,27 +811,38 @@ router.post(
         );
         const projectName = projResult.rows[0]?.name || "";
 
-        await pool.query(
-          `INSERT INTO worklist_tasks_v2
+        await pool
+          .query(
+            `INSERT INTO worklist_tasks_v2
           (task_no, year, customer_id, customer_name, job_type,
            job_reference_id, job_reference_name, assigned_member,
-           job_description, due_date, status, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
-          [
-            nextTaskNo,
-            year,
-            customerId,
-            customerName,
-            "project",
-            projectId,
-            projectName,
-            assigned_member || null,
-            job_description || null,
-            due_date || null,
-            "todo",
-            req.user?.username,
-          ],
-        );
+           job_description, due_date, status, created_by, linked_member_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         RETURNING id`,
+            [
+              nextTaskNo,
+              year,
+              customerId,
+              customerName,
+              "project",
+              projectId,
+              projectName,
+              assigned_member || null,
+              job_description || null,
+              due_date || null,
+              "todo",
+              req.user?.username,
+              newMember.id,
+            ],
+          )
+          .then(async (taskInsertResult) => {
+            // Link the member row back to the task just created — this
+            // direct link is what every future sync follows.
+            await pool.query(
+              `UPDATE project_assigned_members SET linked_task_id = $1 WHERE id = $2`,
+              [taskInsertResult.rows[0].id, newMember.id],
+            );
+          });
       } catch (syncErr) {
         console.error("Sync to worklist_tasks_v2 failed:", syncErr);
         // Non-blocking
@@ -903,17 +939,35 @@ router.put(
 
       // ── Sync status/finish_date back to worklist_tasks_v2 ──
       try {
-        await pool.query(
-          `UPDATE worklist_tasks_v2
-         SET status = $1, finish_date = $2
-         WHERE job_type = 'project' AND job_reference_id = $3 AND assigned_member = $4`,
-          [
-            updatedMember.status,
-            updatedMember.finish_date || null,
-            projectId,
-            record.assigned_member,
-          ],
-        );
+        if (record.linked_task_id) {
+          await pool.query(
+            `UPDATE worklist_tasks_v2 SET status = $1, finish_date = $2 WHERE id = $3`,
+            [
+              updatedMember.status,
+              updatedMember.finish_date || null,
+              record.linked_task_id,
+            ],
+          );
+        } else {
+          const matched = await pool.query(
+            `UPDATE worklist_tasks_v2
+             SET status = $1, finish_date = $2
+             WHERE job_type = 'project' AND job_reference_id = $3 AND assigned_member = $4
+             RETURNING id`,
+            [
+              updatedMember.status,
+              updatedMember.finish_date || null,
+              projectId,
+              record.assigned_member,
+            ],
+          );
+          if (matched.rows.length > 0) {
+            await pool.query(
+              `UPDATE project_assigned_members SET linked_task_id = $1 WHERE id = $2`,
+              [matched.rows[0].id, memberId],
+            );
+          }
+        }
       } catch (syncErr) {
         console.error("Sync to worklist_tasks_v2 failed:", syncErr);
       }
@@ -990,25 +1044,43 @@ router.post(
       );
 
       // ── Sync this note into worklist_task_updates as a real log row —
-      //    the previous version wrote into worklist_tasks_v2.update_note,
-      //    a single scalar column the Job Assigned dashboard never reads.
-      //    It reads from this separate per-row table instead, same as the
-      //    forward direction (Job Assigned → here) already correctly did. ──
+      //    now follows the direct link set at creation time, falling back
+      //    to the old text-match only for legacy rows, and self-healing
+      //    the link so that fallback only runs once. ──
       try {
-        const taskResult = await pool.query(
-          `SELECT id, status FROM worklist_tasks_v2
-           WHERE job_type = 'project'
-             AND job_reference_id = $1
-             AND assigned_member = $2
-           LIMIT 1`,
-          [projectId, member.assigned_member],
-        );
-        if (taskResult.rows.length > 0) {
-          const task = taskResult.rows[0];
+        let taskId: number | null = member.linked_task_id || null;
+        let taskStatus: string | null = null;
+
+        if (taskId) {
+          const t = await pool.query(
+            `SELECT status FROM worklist_tasks_v2 WHERE id = $1`,
+            [taskId],
+          );
+          taskStatus = t.rows[0]?.status || null;
+        } else {
+          const taskResult = await pool.query(
+            `SELECT id, status FROM worklist_tasks_v2
+             WHERE job_type = 'project'
+               AND job_reference_id = $1
+               AND assigned_member = $2
+             LIMIT 1`,
+            [projectId, member.assigned_member],
+          );
+          if (taskResult.rows.length > 0) {
+            taskId = taskResult.rows[0].id;
+            taskStatus = taskResult.rows[0].status;
+            await pool.query(
+              `UPDATE project_assigned_members SET linked_task_id = $1 WHERE id = $2`,
+              [taskId, memberId],
+            );
+          }
+        }
+
+        if (taskId) {
           await pool.query(
             `INSERT INTO worklist_task_updates (task_id, update_note, status, created_by)
              VALUES ($1, $2, $3, $4)`,
-            [task.id, update_note.trim(), task.status, req.user?.username],
+            [taskId, update_note.trim(), taskStatus, req.user?.username],
           );
         }
       } catch (syncErr) {
