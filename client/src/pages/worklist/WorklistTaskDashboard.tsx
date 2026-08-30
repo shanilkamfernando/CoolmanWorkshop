@@ -234,13 +234,36 @@ const TaskUpdateLog = ({
     }
   };
 
-  // Postgres's CURRENT_TIMESTAMP on a "timestamp without time zone" column
-  // is stored as a true UTC instant, but comes back over the API as a bare
-  // string with no timezone marker (no "Z", no offset). JS's Date parser
-  // treats a marker-less string as *already local* and applies zero
-  // conversion — so without this normalization the UI would just echo the
-  // raw UTC digits, which is exactly the mismatch being seen. We explicitly
-  // mark it UTC before parsing so the browser converts it to real local time.
+  const normalizeDbTimestamp = (raw: string) => {
+    if (!raw) return null;
+    const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
+    const isoString = hasTimezone ? raw : `${raw.replace(" ", "T")}Z`;
+    const d = new Date(isoString);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
+  const fmtMainDateTime = (rawDate?: string, rawTime?: string) => {
+    // If backend sends separate date+time, combine; else fallback to whichever exists
+    const combined =
+      rawDate && rawTime ? `${rawDate} ${rawTime}` : rawDate || rawTime || "";
+
+    const d = normalizeDbTimestamp(combined);
+    if (!d) return { date: "—", time: "—" };
+
+    return {
+      date: d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      time: d.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }),
+    };
+  };
+
   const fmtLogDateTime = (raw: string) => {
     if (!raw) return { date: "—", time: "—" };
     const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
@@ -847,6 +870,35 @@ const WorklistTasksDashboard = () => {
     return colors[Math.abs(h) % colors.length];
   };
 
+  function fmtMainDateTime(
+    rawDate?: string,
+    rawTime?: string,
+  ): { date: string; time: string } {
+    const combined =
+      rawDate && rawTime ? `${rawDate} ${rawTime}` : rawDate || rawTime || "";
+
+    if (!combined) return { date: "—", time: "—" };
+
+    const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(combined);
+    const isoString = hasTimezone ? combined : `${combined.replace(" ", "T")}Z`;
+    const d = new Date(isoString);
+
+    if (isNaN(d.getTime())) return { date: "—", time: "—" };
+
+    return {
+      date: d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      time: d.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }),
+    };
+  }
+
   return (
     <div className="project-dashboard">
       {/* Header */}
@@ -997,6 +1049,10 @@ const WorklistTasksDashboard = () => {
               </thead>
               <tbody>
                 {filtered.map((task) => {
+                  const { date: mainDate, time: mainTime } = fmtMainDateTime(
+                    task.date,
+                    task.time,
+                  );
                   const isExpanded = expandedId === task.id;
                   const st = getStatus(task.status);
                   const isDone = task.status === "done";
@@ -1050,12 +1106,12 @@ const WorklistTasksDashboard = () => {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {fmtDate(task.date)}
+                          {mainDate}
                         </td>
 
                         {/* Time */}
                         <td style={{ fontSize: "14px", color: "#555" }}>
-                          {fmtTime(task.time)}
+                          {mainTime}
                         </td>
 
                         {/* Customer */}
