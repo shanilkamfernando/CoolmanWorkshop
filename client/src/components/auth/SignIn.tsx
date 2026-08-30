@@ -7,6 +7,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Auth.css";
+import mainlogo from "../../assets/mainlogo.png";
+import { EyeIcon, EyeOffIcon, HexPattern, WaveAccent } from "./AuthIcons";
 
 interface SignInForm {
   username: string;
@@ -21,6 +23,7 @@ const SignIn = () => {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -46,7 +49,7 @@ const SignIn = () => {
 
       // Call backend API
       const response = await axios.post(
-        "http://localhost:5000/api/auth/signin",
+        "https://coolmanworkshop-production.up.railway.app/api/auth/signin",
         {
           username: formData.username,
           password: formData.password,
@@ -59,13 +62,6 @@ const SignIn = () => {
         localStorage.setItem("user", JSON.stringify(response.data.user));
 
         console.log("Login successful:", response.data.user);
-
-        // // Redirect based on role
-        // if (response.data.user.role === "admin") {
-        //   navigate("/dashboard");
-        // } else {
-        //   navigate("/dashboard");
-        // }
 
         //everyone goes to dashboard - admin will see user management title there
         navigate("/dashboard");
@@ -83,13 +79,28 @@ const SignIn = () => {
 
   return (
     <div className="auth-container">
+      <HexPattern className="hex-corner" />
+      <HexPattern className="hex-corner right" flip />
+
+      <div className="auth-brand">
+        <div className="badge-wrap">
+          <img src={mainlogo} alt="COOLMan Logo" width={110} height={92} />
+        </div>
+        <div className="wordmark">
+          <span className="cool">COOL</span>
+          <span className="man">Man</span>
+          <span className="wordmark-sub">REFRIGERATION</span>
+        </div>
+        {/* <p className="tagline">
+          <strong>Powered by experience.</strong> Driven by innovation.
+        </p> */}
+      </div>
+
       <div className="auth-box">
         <div className="auth-header">
-          <h1>
-            <span className="brand-cool">COOL</span>
-            <span className="brand-man">Man</span> Refrigeration
-          </h1>
-          <p className="auth-subtitle">Sign in to your account</p>
+          <span className="portal-label">Member Portal</span>
+          <div className="portal-divider" />
+          <p className="auth-subtitle">Sign in to continue</p>
         </div>
 
         {error && (
@@ -101,35 +112,58 @@ const SignIn = () => {
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
             <label htmlFor="username">Username</label>
-            <input
-              type="text"
-              id="username"
-              name="username"
-              value={formData.username}
-              onChange={handleChange}
-              placeholder="Enter your username"
-              autoComplete="username"
-              disabled={loading}
-            />
+            <div className="input-wrap">
+              {/* <span className="field-icon">
+                <UserIcon />
+              </span> */}
+              <input
+                type="text"
+                id="username"
+                name="username"
+                value={formData.username}
+                onChange={handleChange}
+                placeholder="Enter your username"
+                autoComplete="username"
+                disabled={loading}
+              />
+            </div>
           </div>
 
           <div className="form-group">
             <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              disabled={loading}
-            />
+            <div className="input-wrap has-toggle">
+              {/* <span className="field-icon">
+                <LockIcon />
+              </span> */}
+              <input
+                type={showPassword ? "text" : "password"}
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                disabled={loading}
+              />
+              <button
+                type="button"
+                className="toggle-visibility"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
           </div>
 
           <button type="submit" className="btn-primary" disabled={loading}>
-            {loading ? "Signing In..." : "Sign In"}
+            {loading ? "Signing In..." : "Login"}
           </button>
+
+          {/* <button type="button" className="forgot-link">
+            Forgot Password?
+          </button> */}
         </form>
 
         <div className="auth-footer">
@@ -145,6 +179,8 @@ const SignIn = () => {
           </p>
         </div>
       </div>
+
+      <WaveAccent />
     </div>
   );
 };

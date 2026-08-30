@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./FollowUpDashboard.css";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
 
 interface User {
   username: string;
@@ -79,9 +79,12 @@ const FollowUpDashboard = () => {
   const fetchFollowUps = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5000/api/followups", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await axios.get(
+        "https://coolmanworkshop-production.up.railway.app/api/followups",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setFollowUps(res.data.followUps || []);
     } catch (err) {
       console.error("Error fetching follow-ups:", err);
@@ -96,9 +99,13 @@ const FollowUpDashboard = () => {
     }
     try {
       const token = localStorage.getItem("token");
-      await axios.post("http://localhost:5000/api/followups", addForm, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.post(
+        "https://coolmanworkshop-production.up.railway.app/api/followups",
+        addForm,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setShowAddModal(false);
       setAddForm(emptyForm);
       fetchFollowUps();
@@ -119,7 +126,7 @@ const FollowUpDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.patch(
-        `http://localhost:5000/api/followups/${id}/field`,
+        `https://coolmanworkshop-production.up.railway.app/api/followups/${id}/field`,
         {
           field,
           value: editValue,
@@ -144,7 +151,7 @@ const FollowUpDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.patch(
-        `http://localhost:5000/api/followups/${id}/contact`,
+        `https://coolmanworkshop-production.up.railway.app/api/followups/${id}/contact`,
         {
           contact_index: contactIndex,
           field,
@@ -182,7 +189,7 @@ const FollowUpDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/followups/${contactTarget?.id}/contact`,
+        `https://coolmanworkshop-production.up.railway.app/api/followups/${contactTarget?.id}/contact`,
         { date: contactForm.date, update: contactForm.update },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -202,7 +209,7 @@ const FollowUpDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/followups/${itemToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/followups/${itemToDelete.id}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },

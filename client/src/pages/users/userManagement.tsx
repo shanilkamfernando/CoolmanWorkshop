@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import "./UserManagement.css";
+import "./userManagement.css";
 
 type PortalId =
   | "customers"
@@ -18,7 +18,7 @@ interface User {
   username: string;
   firstName: string;
   lastName: string;
-  role: "admin" | "user";
+  role: "admin" | "user" | "office" | "office_admin" | "stores" | "data_entry";
   permissions: {
     portals: PortalId[];
     canManageUsers?: boolean;
@@ -42,6 +42,7 @@ const UserManagement = () => {
   const [showModal, setShowModal] = useState(false);
   const [selectedPortals, setSelectedPortals] = useState<PortalId[]>([]);
   const [isUserActive, setIsUserActive] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<string>("user");
 
   const portals: Portal[] = [
     { id: "customers", label: "Customers", icon: "👥" },
@@ -64,9 +65,12 @@ const UserManagement = () => {
       setLoading(true);
       const token = localStorage.getItem("token");
 
-      const response = await axios.get("http://localhost:5000/api/auth/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.get(
+        "https://coolmanworkshop-production.up.railway.app/api/auth/users",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       if (response.data.users) {
         setUsers(response.data.users);
@@ -83,6 +87,7 @@ const UserManagement = () => {
     setSelectedUser(user);
     setSelectedPortals(user.permissions.portals || []);
     setIsUserActive(user.isActive);
+    setSelectedRole(user.role);
     setShowModal(true);
   };
 
@@ -114,10 +119,11 @@ const UserManagement = () => {
       const token = localStorage.getItem("token");
 
       await axios.put(
-        `http://localhost:5000/api/auth/users/${selectedUser.id}/permissions`,
+        `https://coolmanworkshop-production.up.railway.app/api/auth/users/${selectedUser.id}/permissions`,
         {
           permissions: { portals: selectedPortals },
           isActive: isUserActive,
+          role: selectedRole,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -135,9 +141,12 @@ const UserManagement = () => {
 
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`http://localhost:5000/api/auth/users/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.delete(
+        `https://coolmanworkshop-production.up.railway.app/api/auth/users/${userId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       alert("User deleted successfully!");
       fetchUsers();
@@ -150,7 +159,7 @@ const UserManagement = () => {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
-        <p>Loading users...</p>
+        <p>Loading users....</p>
       </div>
     );
   }
@@ -267,6 +276,98 @@ const UserManagement = () => {
                   />
                   <span>Account Active</span>
                 </label>
+              </div>
+
+              {/* Role Section */}
+              <div className="status-section" style={{ marginTop: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    color: "#555",
+                    marginBottom: "8px",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  User Role
+                </label>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {[
+                    {
+                      value: "user",
+                      label: "User",
+                      desc: "Creates requests",
+                      color: "#1976D2",
+                    },
+                    {
+                      value: "office",
+                      label: "Office",
+                      desc: "Order Form, PO, Invoice, Delivery",
+                      color: "#C2185B",
+                    },
+                    {
+                      value: "office_admin",
+                      label: "Office Admin",
+                      desc: "Office + Can Approve",
+                      color: "#E65100",
+                    },
+                    {
+                      value: "stores",
+                      label: "Stores",
+                      desc: "Delivery section only",
+                      color: "#7B1FA2",
+                    },
+                    {
+                      value: "admin",
+                      label: "Admin",
+                      desc: "Full access",
+                      color: "#2E7D32",
+                    },
+                    {
+                      value: "data_entry",
+                      label: "Data Entry",
+                      desc: "BOQ data entry only",
+                      color: "#0891b2",
+                    },
+                  ].map((r) => (
+                    <div
+                      key={r.value}
+                      onClick={() => setSelectedRole(r.value as any)}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        border: "2px solid",
+                        borderColor:
+                          selectedRole === r.value ? r.color : "#e0e0e0",
+                        background:
+                          selectedRole === r.value ? r.color + "15" : "#fff",
+                        transition: "all 0.2s",
+                        minWidth: "120px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "13px",
+                          color: selectedRole === r.value ? r.color : "#333",
+                        }}
+                      >
+                        {r.label}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "#888",
+                          marginTop: "2px",
+                        }}
+                      >
+                        {r.desc}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="portal-access-header">

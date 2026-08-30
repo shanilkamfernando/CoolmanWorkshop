@@ -7,7 +7,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./Customers.css";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -77,9 +78,12 @@ const CustomerList = () => {
     try {
       setLoading(true);
       const token = localStorage.getItem("token");
-      const response = await axios.get("http://localhost:5000/api/customers", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.get(
+        "https://coolmanworkshop-production.up.railway.app/api/customers",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       setCustomers(response.data.customers || []);
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -111,7 +115,7 @@ const CustomerList = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        "http://localhost:5000/api/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/customers",
         { name: newCustomerName },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -153,7 +157,7 @@ const CustomerList = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerToDelete.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("Customer deleted successfully!");
@@ -174,7 +178,7 @@ const CustomerList = () => {
   return (
     <div className="customer-portal">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div className="logo-container" onClick={handleBackToDashboard}>
             <img
@@ -192,7 +196,8 @@ const CustomerList = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       {/* Main Content */}
       <div className="main-content-full">

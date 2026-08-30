@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
 import "./StoresDashboard.css";
 
 interface User {
@@ -63,7 +63,7 @@ const StoresLanding = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        "http://localhost:5000/api/stores/categories",
+        "https://coolmanworkshop-production.up.railway.app/api/stores/categories",
         {
           headers: { Authorization: `Bearer ${token}` },
         },
