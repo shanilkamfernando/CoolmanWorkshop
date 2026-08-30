@@ -84,7 +84,6 @@ const JOB_TYPES = [
   },
 ];
 
-// Added "permission" as a status stage between on_hold and done.
 const STATUS_OPTIONS = [
   { value: "todo", label: "To Do", bg: "#e3f2fd", color: "#2e7d32" },
   {
@@ -108,10 +107,6 @@ const getStatus = (val: string) =>
 
 const fmtDate = (d: string) => {
   if (!d) return "—";
-
-  // Extract just the date part in case it's a full ISO timestamp, then
-  // parse the components manually so we never let Date reinterpret a
-  // plain "YYYY-MM-DD" as UTC midnight and shift it a day in local time.
   const datePart = d.split("T")[0];
   const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!match) return "—";
@@ -129,7 +124,6 @@ const fmtDate = (d: string) => {
 
 const fmtTime = (t: string) => {
   if (!t) return "—";
-
   const match = t.match(/^(\d{1,2}):(\d{2})/);
   if (!match) return "—";
 
@@ -161,9 +155,9 @@ const TaskUpdateLog = ({
   authHeaders,
 }: {
   taskId: number;
-  canEdit: boolean; // can this user add a new log line right now
+  canEdit: boolean;
   isAdmin: boolean;
-  readOnly: boolean; // task is done — fully locked
+  readOnly: boolean;
   systemUsers: SystemUser[];
   authHeaders: () => { Authorization: string };
 }) => {
@@ -172,8 +166,6 @@ const TaskUpdateLog = ({
   const [saving, setSaving] = useState(false);
   const [assignOpenFor, setAssignOpenFor] = useState<number | null>(null);
   const [assigning, setAssigning] = useState(false);
-
-  const API = "https://coolmanworkshop-production.up.railway.app/api";
 
   useEffect(() => {
     fetchUpdates();
@@ -234,36 +226,6 @@ const TaskUpdateLog = ({
     }
   };
 
-  const normalizeDbTimestamp = (raw: string) => {
-    if (!raw) return null;
-    const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
-    const isoString = hasTimezone ? raw : `${raw.replace(" ", "T")}Z`;
-    const d = new Date(isoString);
-    return isNaN(d.getTime()) ? null : d;
-  };
-
-  const fmtMainDateTime = (rawDate?: string, rawTime?: string) => {
-    // If backend sends separate date+time, combine; else fallback to whichever exists
-    const combined =
-      rawDate && rawTime ? `${rawDate} ${rawTime}` : rawDate || rawTime || "";
-
-    const d = normalizeDbTimestamp(combined);
-    if (!d) return { date: "—", time: "—" };
-
-    return {
-      date: d.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      time: d.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      }),
-    };
-  };
-
   const fmtLogDateTime = (raw: string) => {
     if (!raw) return { date: "—", time: "—" };
     const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
@@ -290,7 +252,7 @@ const TaskUpdateLog = ({
         style={{
           fontSize: "11px",
           fontWeight: 700,
-          textTransform: "uppercase" as const,
+          textTransform: "uppercase",
           letterSpacing: "0.6px",
           color: "#667eea",
           marginBottom: "8px",
@@ -329,7 +291,7 @@ const TaskUpdateLog = ({
                 colSpan={isAdmin ? 7 : 6}
                 style={{
                   padding: "16px 10px",
-                  textAlign: "center" as const,
+                  textAlign: "center",
                   color: "#bbb",
                   fontStyle: "italic",
                 }}
@@ -363,13 +325,13 @@ const TaskUpdateLog = ({
                         fontWeight: 700,
                         background: rowStatus.bg,
                         color: rowStatus.color,
-                        whiteSpace: "nowrap" as const,
+                        whiteSpace: "nowrap",
                       }}
                     >
                       {rowStatus.label}
                     </span>
                   </td>
-                  <td style={{ ...tdStyle, position: "relative" as const }}>
+                  <td style={{ ...tdStyle, position: "relative" }}>
                     {u.third_party ? (
                       <span
                         style={{
@@ -418,7 +380,7 @@ const TaskUpdateLog = ({
                           boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
                           minWidth: "180px",
                           maxHeight: "220px",
-                          overflowY: "auto" as const,
+                          overflowY: "auto",
                           marginTop: "4px",
                         }}
                       >
@@ -464,7 +426,7 @@ const TaskUpdateLog = ({
                     )}
                   </td>
                   {isAdmin && (
-                    <td style={{ ...tdStyle, textAlign: "center" as const }}>
+                    <td style={{ ...tdStyle, textAlign: "center" }}>
                       {!readOnly && (
                         <button
                           onClick={() => handleDelete(u.id)}
@@ -494,7 +456,6 @@ const TaskUpdateLog = ({
         </tbody>
       </table>
 
-      {/* Add new update row */}
       {canEdit && !readOnly && (
         <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
           <textarea
@@ -509,9 +470,9 @@ const TaskUpdateLog = ({
               fontSize: "13px",
               border: "1.5px solid #ddd",
               borderRadius: "6px",
-              resize: "vertical" as const,
+              resize: "vertical",
               fontFamily: "inherit",
-              boxSizing: "border-box" as const,
+              boxSizing: "border-box",
             }}
           />
           <button
@@ -526,7 +487,7 @@ const TaskUpdateLog = ({
               cursor: "pointer",
               fontSize: "13px",
               fontWeight: 600,
-              whiteSpace: "nowrap" as const,
+              whiteSpace: "nowrap",
               opacity: !newNote.trim() ? 0.5 : 1,
             }}
           >
@@ -686,27 +647,6 @@ const WorklistTasksDashboard = () => {
     }
   };
 
-  const handleUpdateLocal = (taskId: number, field: string, value: string) => {
-    setTasks(
-      tasks.map((t) => (t.id === taskId ? { ...t, [field]: value } : t)),
-    );
-  };
-
-  const handleSave = async (taskId: number, field: string, value: string) => {
-    try {
-      await axios.put(
-        `${API}/jobAssigned/tasks/${taskId}`,
-        { [field]: value },
-        { headers: authHeaders() },
-      );
-    } catch (e: any) {
-      alert(e.response?.data?.error || "Failed to save");
-      fetchTasks();
-    }
-  };
-
-  // Status changes go through here so "done" can auto-stamp finish_date
-  // in one request, and so a revert-to-todo never reaches the server.
   const handleStatusChange = async (task: WorklistTask, newStatus: string) => {
     if (newStatus === "todo" && task.status !== "todo") {
       alert("A task can't be moved back to To Do once it has started.");
@@ -819,8 +759,6 @@ const WorklistTasksDashboard = () => {
     }
   };
 
-  // Search also matches a third-party assignee's name (e.g. "maduranga"
-  // surfaces a task even if he's only handed off on one of its log lines).
   const filtered = tasks
     .filter(
       (t) =>
@@ -837,7 +775,6 @@ const WorklistTasksDashboard = () => {
           .toLowerCase()
           .includes(search.toLowerCase()),
     )
-    // Completed tasks sink to the bottom; task_no is never touched.
     .sort((a, b) => {
       const aDone = a.status === "done" ? 1 : 0;
       const bDone = b.status === "done" ? 1 : 0;
@@ -851,6 +788,7 @@ const WorklistTasksDashboard = () => {
       ? w[0].substring(0, 2).toUpperCase()
       : (w[0][0] + w[w.length - 1][0]).toUpperCase();
   };
+
   const getColor = (name: string) => {
     const colors = [
       "#667eea",
@@ -870,38 +808,18 @@ const WorklistTasksDashboard = () => {
     return colors[Math.abs(h) % colors.length];
   };
 
+  // Main table date/time formatter (NO timezone conversion)
   function fmtMainDateTime(
-    rawDate?: string,
-    rawTime?: string,
+    rawDate?: string | null,
+    rawTime?: string | null,
   ): { date: string; time: string } {
-    const combined =
-      rawDate && rawTime ? `${rawDate} ${rawTime}` : rawDate || rawTime || "";
-
-    if (!combined) return { date: "—", time: "—" };
-
-    const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(combined);
-    const isoString = hasTimezone ? combined : `${combined.replace(" ", "T")}Z`;
-    const d = new Date(isoString);
-
-    if (isNaN(d.getTime())) return { date: "—", time: "—" };
-
-    return {
-      date: d.toLocaleDateString("en-GB", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      }),
-      time: d.toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      }),
-    };
+    const date = rawDate ? fmtDate(rawDate) : "—";
+    const time = rawTime ? fmtTime(rawTime) : "—";
+    return { date, time };
   }
 
   return (
     <div className="project-dashboard">
-      {/* Header */}
       <div className="portal-header">
         <div className="header-left">
           <div
@@ -933,7 +851,6 @@ const WorklistTasksDashboard = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="project-main-content">
         <div className="project-header-row">
           <h2>Job Assigned — {year}</h2>
@@ -948,7 +865,6 @@ const WorklistTasksDashboard = () => {
         </div>
 
         <div className="project-section">
-          {/* Toolbar */}
           <div
             style={{
               display: "flex",
@@ -981,7 +897,6 @@ const WorklistTasksDashboard = () => {
             </span>
           </div>
 
-          {/* Status legend */}
           <div
             style={{
               display: "flex",
@@ -1007,7 +922,6 @@ const WorklistTasksDashboard = () => {
             ))}
           </div>
 
-          {/* Table */}
           {filtered.length === 0 ? (
             <div
               style={{
@@ -1067,7 +981,6 @@ const WorklistTasksDashboard = () => {
                   return (
                     <React.Fragment key={task.id}>
                       <tr
-                        key={task.id}
                         style={{
                           cursor: "pointer",
                           transition: "background 0.15s",
@@ -1086,7 +999,6 @@ const WorklistTasksDashboard = () => {
                           setExpandedId(isExpanded ? null : task.id)
                         }
                       >
-                        {/* No */}
                         <td
                           style={{
                             textAlign: "center",
@@ -1097,8 +1009,6 @@ const WorklistTasksDashboard = () => {
                         >
                           #{task.task_no}
                         </td>
-
-                        {/* Date */}
                         <td
                           style={{
                             fontSize: "14px",
@@ -1108,13 +1018,9 @@ const WorklistTasksDashboard = () => {
                         >
                           {mainDate}
                         </td>
-
-                        {/* Time */}
                         <td style={{ fontSize: "14px", color: "#555" }}>
                           {mainTime}
                         </td>
-
-                        {/* Customer */}
                         <td>
                           {task.customer_name ? (
                             <div
@@ -1160,7 +1066,6 @@ const WorklistTasksDashboard = () => {
                           )}
                         </td>
 
-                        {/* Job */}
                         <td>
                           {jobTypeLabel ? (
                             <div>
@@ -1197,7 +1102,6 @@ const WorklistTasksDashboard = () => {
                           )}
                         </td>
 
-                        {/* Assigned To */}
                         <td>
                           <span
                             style={{
@@ -1221,7 +1125,6 @@ const WorklistTasksDashboard = () => {
                           </span>
                         </td>
 
-                        {/* Description */}
                         <td
                           style={{
                             fontSize: "14px",
@@ -1235,7 +1138,6 @@ const WorklistTasksDashboard = () => {
                           {task.job_description || "—"}
                         </td>
 
-                        {/* Due Date */}
                         <td
                           style={{
                             fontSize: "14px",
@@ -1251,7 +1153,6 @@ const WorklistTasksDashboard = () => {
                           {fmtDate(task.due_date)}
                         </td>
 
-                        {/* Finish Date — always read-only, server-computed */}
                         <td
                           style={{
                             fontSize: "14px",
@@ -1262,7 +1163,6 @@ const WorklistTasksDashboard = () => {
                           {task.finish_date ? fmtDate(task.finish_date) : "—"}
                         </td>
 
-                        {/* Status */}
                         <td>
                           <span
                             style={{
@@ -1280,7 +1180,6 @@ const WorklistTasksDashboard = () => {
                           </span>
                         </td>
 
-                        {/* Expand toggle — red when a third party is assigned */}
                         <td style={{ textAlign: "center" }}>
                           <span
                             style={{
@@ -1304,9 +1203,8 @@ const WorklistTasksDashboard = () => {
                         </td>
                       </tr>
 
-                      {/* Expanded detail row */}
                       {isExpanded && (
-                        <tr key={`${task.id}-detail`}>
+                        <tr>
                           <td
                             colSpan={11}
                             style={{ padding: 0, background: "#fafbff" }}
@@ -1325,7 +1223,6 @@ const WorklistTasksDashboard = () => {
                                   gap: "24px",
                                 }}
                               >
-                                {/* Finish Date + Status */}
                                 <div
                                   style={{
                                     display: "flex",
@@ -1338,7 +1235,7 @@ const WorklistTasksDashboard = () => {
                                       style={{
                                         fontSize: "11px",
                                         fontWeight: 700,
-                                        textTransform: "uppercase" as const,
+                                        textTransform: "uppercase",
                                         letterSpacing: "0.6px",
                                         color: "#667eea",
                                         marginBottom: "8px",
@@ -1358,7 +1255,7 @@ const WorklistTasksDashboard = () => {
                                       style={{
                                         fontSize: "11px",
                                         fontWeight: 700,
-                                        textTransform: "uppercase" as const,
+                                        textTransform: "uppercase",
                                         letterSpacing: "0.6px",
                                         color: "#667eea",
                                         marginBottom: "8px",
@@ -1402,7 +1299,7 @@ const WorklistTasksDashboard = () => {
                                           color: st.color,
                                           fontWeight: 700,
                                           cursor: "pointer",
-                                          boxSizing: "border-box" as const,
+                                          boxSizing: "border-box",
                                         }}
                                       >
                                         {STATUS_OPTIONS.filter(
@@ -1430,7 +1327,6 @@ const WorklistTasksDashboard = () => {
                                   </div>
                                 </div>
 
-                                {/* Update Log */}
                                 <div>
                                   <TaskUpdateLog
                                     taskId={task.id}
@@ -1443,7 +1339,6 @@ const WorklistTasksDashboard = () => {
                                 </div>
                               </div>
 
-                              {/* Bottom bar */}
                               <div
                                 style={{
                                   display: "flex",
@@ -1526,7 +1421,6 @@ const WorklistTasksDashboard = () => {
         </div>
       </div>
 
-      {/* ── Add Task Modal ── */}
       {showAdd && (
         <div className="modal-overlay" onClick={() => setShowAdd(false)}>
           <div
@@ -1731,7 +1625,6 @@ const WorklistTasksDashboard = () => {
         </div>
       )}
 
-      {/* Delete Confirm */}
       {deleteTarget && (
         <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
           <div
