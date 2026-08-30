@@ -83,6 +83,48 @@ interface SystemUser {
   role: string;
 }
 
+// Shared date formatter — dd/mm/yyyy, parsed manually from the date
+// components so a plain "YYYY-MM-DD" never gets reinterpreted as UTC
+// midnight and shifted a day by the browser's local timezone.
+const fmtDateDDMMYYYY = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return "—";
+  const datePart = dateStr.split("T")[0];
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "—";
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+};
+
+// created_at from Postgres may come back with no timezone marker even
+// though it's a UTC instant. Force UTC interpretation before converting
+// to the browser's local time, otherwise JS treats a marker-less string
+// as already-local and applies no conversion at all.
+const fmtLogDateTime = (raw: string) => {
+  if (!raw) return { date: "—", time: "—" };
+  const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
+  const isoString = hasTimezone ? raw : `${raw.replace(" ", "T")}Z`;
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return { date: "—", time: "—" };
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return {
+    date: `${day}/${month}/${year}`,
+    time: d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }),
+  };
+};
+
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+};
+
 const MeetingDetailPanel = ({
   meeting,
   customerId,
@@ -137,13 +179,6 @@ const MeetingDetailPanel = ({
       fetchUpdates();
     } catch {}
   };
-
-  const fmtD = (d: string) => {
-    if (!d) return "—";
-    const [y, m, day] = d.split("T")[0].split("-");
-    return `${day} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
-  };
-  const fmtT = (t: string) => (!t ? "—" : t.substring(0, 5));
 
   const hasContent =
     meeting.customer_side || meeting.cm_side || updates.length > 0;
@@ -381,62 +416,63 @@ const MeetingDetailPanel = ({
                   No updates yet
                 </div>
               ) : (
-                updates.map((u, idx) => (
-                  <div
-                    key={u.id}
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: "6px",
-                      marginBottom: "4px",
-                      background: idx % 2 === 0 ? "#f8f9ff" : "#fff",
-                      border: "1px solid #eef0ff",
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontSize: "13px",
-                          color: "#333",
-                          marginBottom: "3px",
-                        }}
-                      >
-                        {u.update_note}
+                updates.map((u, idx) => {
+                  const { date: logDate, time: logTime } = fmtLogDateTime(
+                    u.created_at,
+                  );
+                  return (
+                    <div
+                      key={u.id}
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: "6px",
+                        marginBottom: "4px",
+                        background: idx % 2 === 0 ? "#f8f9ff" : "#fff",
+                        border: "1px solid #eef0ff",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            color: "#333",
+                            marginBottom: "3px",
+                          }}
+                        >
+                          {u.update_note}
+                        </div>
+                        <div style={{ fontSize: "10px", color: "#aaa" }}>
+                          {logDate} · {logTime} · {u.created_by || "—"}
+                        </div>
                       </div>
-                      <div style={{ fontSize: "10px", color: "#aaa" }}>
-                        {fmtD(u.update_date || u.created_at)} ·{" "}
-                        {fmtT(
-                          u.update_time || u.created_at?.split("T")[1] || "",
-                        )}{" "}
-                        · {u.created_by || "—"}
-                      </div>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDeleteUpdate(u.id)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "#ddd",
+                            fontSize: "13px",
+                            marginLeft: "6px",
+                            flexShrink: 0,
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.color = "#ef4444")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.color = "#ddd")
+                          }
+                        >
+                          🗑️
+                        </button>
+                      )}
                     </div>
-                    {isAdmin && (
-                      <button
-                        onClick={() => handleDeleteUpdate(u.id)}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          color: "#ddd",
-                          fontSize: "13px",
-                          marginLeft: "6px",
-                          flexShrink: 0,
-                        }}
-                        onMouseEnter={(e) =>
-                          (e.currentTarget.style.color = "#ef4444")
-                        }
-                        onMouseLeave={(e) =>
-                          (e.currentTarget.style.color = "#ddd")
-                        }
-                      >
-                        🗑️
-                      </button>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
@@ -482,323 +518,21 @@ const MeetingDetailPanel = ({
   );
 };
 
-// ── Meeting Update Log Component ──────────────────────────────
-const MeetingUpdateLog = ({
-  customerId,
-  projectId,
-  meetingId,
-  isAdmin,
-}: {
-  customerId: string | undefined;
-  projectId: string | undefined;
-  meetingId: number;
-  isAdmin: boolean;
-}) => {
-  const [open, setOpen] = useState(false);
-  const [updates, setUpdates] = useState<any[]>([]);
-  const [newNote, setNewNote] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const token = () => localStorage.getItem("token");
-  const hdr = () => ({ Authorization: `Bearer ${token()}` });
-  const BASE = `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/meetings/${meetingId}/updates`;
-
-  useEffect(() => {
-    if (open) fetchUpdates();
-  }, [open]);
-
-  const fetchUpdates = async () => {
-    try {
-      const r = await axios.get(BASE, { headers: hdr() });
-      setUpdates(r.data.updates || []);
-    } catch {}
-  };
-
-  const handleAdd = async () => {
-    if (!newNote.trim()) return;
-    setSaving(true);
-    try {
-      await axios.post(BASE, { update_note: newNote }, { headers: hdr() });
-      setNewNote("");
-      fetchUpdates();
-    } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to add update");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async (updateId: number) => {
-    if (!confirm("Delete this update?")) return;
-    try {
-      await axios.delete(`${BASE}/${updateId}`, { headers: hdr() });
-      fetchUpdates();
-    } catch {}
-  };
-
-  const fmtD = (d: string) => {
-    if (!d) return "—";
-    const [y, m, day] = d.split("T")[0].split("-");
-    return `${day} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
-  };
-  const fmtT = (t: string) => {
-    if (!t) return "—";
-    return t.substring(0, 5);
-  };
-
-  return (
-    <div>
-      {/* Toggle button showing update count */}
-      <button
-        onClick={() => setOpen(!open)}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "6px",
-          padding: "5px 12px",
-          background: open ? "#667eea" : "#f0f0f0",
-          color: open ? "#fff" : "#555",
-          border: "none",
-          borderRadius: "20px",
-          cursor: "pointer",
-          fontSize: "12px",
-          fontWeight: 600,
-          transition: "all 0.2s",
-        }}
-      >
-        📝 Updates {updates.length > 0 && `(${updates.length})`}
-        <span style={{ fontSize: "10px" }}>{open ? "▲" : "▼"}</span>
-      </button>
-
-      {open && (
-        <div
-          style={{
-            marginTop: "8px",
-            background: "#f8f9ff",
-            borderRadius: "8px",
-            border: "1px solid #e8e8e8",
-            padding: "10px",
-            minWidth: "280px",
-          }}
-        >
-          {/* Updates table */}
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              fontSize: "12px",
-              marginBottom: "8px",
-            }}
-          >
-            <thead>
-              <tr style={{ background: "#eef0ff" }}>
-                <th
-                  style={{
-                    padding: "5px 8px",
-                    textAlign: "left" as const,
-                    color: "#667eea",
-                    fontWeight: 600,
-                    borderBottom: "1px solid #e0e0ff",
-                    width: "85px",
-                  }}
-                >
-                  Date
-                </th>
-                <th
-                  style={{
-                    padding: "5px 8px",
-                    textAlign: "left" as const,
-                    color: "#667eea",
-                    fontWeight: 600,
-                    borderBottom: "1px solid #e0e0ff",
-                    width: "50px",
-                  }}
-                >
-                  Time
-                </th>
-                <th
-                  style={{
-                    padding: "5px 8px",
-                    textAlign: "left" as const,
-                    color: "#667eea",
-                    fontWeight: 600,
-                    borderBottom: "1px solid #e0e0ff",
-                  }}
-                >
-                  Update
-                </th>
-                <th
-                  style={{
-                    padding: "5px 8px",
-                    textAlign: "left" as const,
-                    color: "#667eea",
-                    fontWeight: 600,
-                    borderBottom: "1px solid #e0e0ff",
-                    width: "65px",
-                  }}
-                >
-                  By
-                </th>
-                {isAdmin && (
-                  <th
-                    style={{
-                      padding: "5px 8px",
-                      width: "28px",
-                      borderBottom: "1px solid #e0e0ff",
-                    }}
-                  ></th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {updates.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={isAdmin ? 5 : 4}
-                    style={{
-                      padding: "10px 8px",
-                      textAlign: "center" as const,
-                      color: "#bbb",
-                      fontStyle: "italic",
-                      fontSize: "12px",
-                    }}
-                  >
-                    No updates yet
-                  </td>
-                </tr>
-              ) : (
-                updates.map((u, idx) => (
-                  <tr
-                    key={u.id}
-                    style={{ background: idx % 2 === 0 ? "#fff" : "#f5f6ff" }}
-                  >
-                    <td
-                      style={{
-                        padding: "5px 8px",
-                        color: "#555",
-                        borderBottom: "1px solid #f0f0f0",
-                        fontSize: "11px",
-                      }}
-                    >
-                      {fmtD(u.update_date || u.created_at)}
-                    </td>
-                    <td
-                      style={{
-                        padding: "5px 8px",
-                        color: "#555",
-                        borderBottom: "1px solid #f0f0f0",
-                        fontSize: "11px",
-                      }}
-                    >
-                      {fmtT(u.update_time || u.created_at?.split("T")[1] || "")}
-                    </td>
-                    <td
-                      style={{
-                        padding: "5px 8px",
-                        color: "#333",
-                        borderBottom: "1px solid #f0f0f0",
-                      }}
-                    >
-                      {u.update_note}
-                    </td>
-                    <td
-                      style={{
-                        padding: "5px 8px",
-                        color: "#888",
-                        borderBottom: "1px solid #f0f0f0",
-                        fontSize: "11px",
-                      }}
-                    >
-                      {u.created_by || "—"}
-                    </td>
-                    {isAdmin && (
-                      <td
-                        style={{
-                          padding: "5px 8px",
-                          borderBottom: "1px solid #f0f0f0",
-                          textAlign: "center" as const,
-                        }}
-                      >
-                        <button
-                          onClick={() => handleDelete(u.id)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: "#ddd",
-                            fontSize: "13px",
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.color = "#ef4444")
-                          }
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.color = "#ddd")
-                          }
-                        >
-                          🗑️
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-
-          {/* Add new update */}
-          <div style={{ display: "flex", gap: "6px" }}>
-            <input
-              type="text"
-              value={newNote}
-              onChange={(e) => setNewNote(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-              placeholder="Add update note..."
-              style={{
-                flex: 1,
-                padding: "5px 8px",
-                fontSize: "12px",
-                border: "1.5px solid #c7d0ff",
-                borderRadius: "5px",
-                outline: "none",
-              }}
-            />
-            <button
-              onClick={handleAdd}
-              disabled={saving || !newNote.trim()}
-              style={{
-                padding: "5px 12px",
-                background: "#667eea",
-                color: "#fff",
-                border: "none",
-                borderRadius: "5px",
-                cursor: "pointer",
-                fontSize: "12px",
-                fontWeight: 600,
-                opacity: !newNote.trim() ? 0.5 : 1,
-              }}
-            >
-              {saving ? "..." : "+ Add"}
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// ── Member Update Log Component ───────────────────────────────
+// ── Member Update Log (only mounted once its row is expanded) ──────
 const MemberUpdateLog = ({
   customerId,
   projectId,
   memberId,
   canEdit,
   isAdmin,
+  readOnly,
 }: {
   customerId: string | undefined;
   projectId: string | undefined;
   memberId: number;
   canEdit: boolean;
   isAdmin: boolean;
+  readOnly: boolean;
 }) => {
   const [updates, setUpdates] = useState<any[]>([]);
   const [newNote, setNewNote] = useState("");
@@ -841,18 +575,23 @@ const MemberUpdateLog = ({
     } catch {}
   };
 
-  const fmtD = (d: string) => {
-    if (!d) return "—";
-    const [y, m, day] = d.split("T")[0].split("-");
-    return `${day} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
-  };
-  const fmtT = (t: string) => {
-    if (!t) return "—";
-    return t.substring(0, 5);
-  };
-
   return (
     <div>
+      <div
+        style={{
+          fontSize: "11px",
+          fontWeight: 700,
+          textTransform: "uppercase" as const,
+          letterSpacing: "0.6px",
+          color: "#667eea",
+          marginBottom: "8px",
+          paddingBottom: "6px",
+          borderBottom: "2px solid #e8f0fe",
+        }}
+      >
+        Update Log
+      </div>
+
       <table
         style={{
           width: "100%",
@@ -863,61 +602,12 @@ const MemberUpdateLog = ({
       >
         <thead>
           <tr style={{ background: "#f8f9ff" }}>
-            <th
-              style={{
-                padding: "5px 8px",
-                textAlign: "left" as const,
-                color: "#888",
-                fontWeight: 600,
-                borderBottom: "1px solid #e8e8e8",
-                width: "90px",
-              }}
-            >
-              Date
-            </th>
-            <th
-              style={{
-                padding: "5px 8px",
-                textAlign: "left" as const,
-                color: "#888",
-                fontWeight: 600,
-                borderBottom: "1px solid #e8e8e8",
-                width: "60px",
-              }}
-            >
-              Time
-            </th>
-            <th
-              style={{
-                padding: "5px 8px",
-                textAlign: "left" as const,
-                color: "#888",
-                fontWeight: 600,
-                borderBottom: "1px solid #e8e8e8",
-              }}
-            >
-              Update
-            </th>
-            <th
-              style={{
-                padding: "5px 8px",
-                textAlign: "left" as const,
-                color: "#888",
-                fontWeight: 600,
-                borderBottom: "1px solid #e8e8e8",
-                width: "70px",
-              }}
-            >
-              By
-            </th>
+            <th style={mThStyle("90px")}>Date</th>
+            <th style={mThStyle("65px")}>Time</th>
+            <th style={mThStyle()}>Update</th>
+            <th style={mThStyle("70px")}>By</th>
             {isAdmin && (
-              <th
-                style={{
-                  padding: "5px 8px",
-                  width: "30px",
-                  borderBottom: "1px solid #e8e8e8",
-                }}
-              ></th>
+              <th style={{ ...mThStyle("30px"), padding: "5px 8px" }}></th>
             )}
           </tr>
         </thead>
@@ -938,83 +628,55 @@ const MemberUpdateLog = ({
               </td>
             </tr>
           ) : (
-            updates.map((u, idx) => (
-              <tr
-                key={u.id}
-                style={{ background: idx % 2 === 0 ? "#fff" : "#fafbff" }}
-              >
-                <td
-                  style={{
-                    padding: "5px 8px",
-                    color: "#555",
-                    borderBottom: "1px solid #f0f0f0",
-                  }}
+            updates.map((u, idx) => {
+              const { date: logDate, time: logTime } = fmtLogDateTime(
+                u.created_at,
+              );
+              return (
+                <tr
+                  key={u.id}
+                  style={{ background: idx % 2 === 0 ? "#fff" : "#fafbff" }}
                 >
-                  {fmtD(u.update_date || u.created_at)}
-                </td>
-                <td
-                  style={{
-                    padding: "5px 8px",
-                    color: "#555",
-                    borderBottom: "1px solid #f0f0f0",
-                  }}
-                >
-                  {fmtT(u.update_time || u.created_at?.split("T")[1] || "")}
-                </td>
-                <td
-                  style={{
-                    padding: "5px 8px",
-                    color: "#333",
-                    borderBottom: "1px solid #f0f0f0",
-                  }}
-                >
-                  {u.update_note}
-                </td>
-                <td
-                  style={{
-                    padding: "5px 8px",
-                    color: "#888",
-                    borderBottom: "1px solid #f0f0f0",
-                    fontSize: "11px",
-                  }}
-                >
-                  {u.created_by || "—"}
-                </td>
-                {isAdmin && (
-                  <td
-                    style={{
-                      padding: "5px 8px",
-                      borderBottom: "1px solid #f0f0f0",
-                      textAlign: "center" as const,
-                    }}
-                  >
-                    <button
-                      onClick={() => handleDelete(u.id)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        color: "#ddd",
-                        fontSize: "13px",
-                      }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.color = "#ef4444")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.color = "#ddd")
-                      }
-                    >
-                      🗑️
-                    </button>
+                  <td style={mTdStyle}>{logDate}</td>
+                  <td style={mTdStyle}>{logTime}</td>
+                  <td style={{ ...mTdStyle, color: "#333" }}>
+                    {u.update_note}
                   </td>
-                )}
-              </tr>
-            ))
+                  <td style={{ ...mTdStyle, fontSize: "11px" }}>
+                    {u.created_by || "—"}
+                  </td>
+                  {isAdmin && (
+                    <td style={{ ...mTdStyle, textAlign: "center" as const }}>
+                      {!readOnly && (
+                        <button
+                          onClick={() => handleDelete(u.id)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "#ddd",
+                            fontSize: "13px",
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.color = "#ef4444")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.color = "#ddd")
+                          }
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </td>
+                  )}
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
 
-      {canEdit && (
+      {canEdit && !readOnly && (
         <div style={{ display: "flex", gap: "6px" }}>
           <input
             type="text"
@@ -1053,6 +715,21 @@ const MemberUpdateLog = ({
   );
 };
 
+const mThStyle = (width?: string) => ({
+  padding: "5px 8px",
+  textAlign: "left" as const,
+  color: "#888",
+  fontWeight: 600,
+  borderBottom: "1px solid #e8e8e8",
+  ...(width ? { width } : {}),
+});
+
+const mTdStyle = {
+  padding: "5px 8px",
+  color: "#555",
+  borderBottom: "1px solid #f0f0f0",
+};
+
 const ProjectDashboard = () => {
   const navigate = useNavigate();
   const { customerId, projectId } = useParams();
@@ -1068,6 +745,7 @@ const ProjectDashboard = () => {
   const [uploadingFile, setUploadingFile] = useState(false);
 
   const [assignedMembers, setAssignedMembers] = useState<AssignedMember[]>([]);
+  const [expandedMemberId, setExpandedMemberId] = useState<number | null>(null);
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberUsername, setNewMemberUsername] = useState("");
@@ -1257,6 +935,20 @@ const ProjectDashboard = () => {
       console.error("Error updating member:", error);
       alert(error.response?.data?.error || "Failed to update");
     }
+  };
+
+  // Status changes go through here so "done" can be followed by an
+  // auto-stamped finish_date in a second call, matching what the
+  // server now does server-side too.
+  const handleMemberStatusChange = async (
+    member: AssignedMember,
+    newStatus: string,
+  ) => {
+    await handleUpdateMember(member.id, "status", newStatus);
+    if (newStatus === "done" && !member.finish_date) {
+      await handleUpdateMember(member.id, "finish_date", todayISO());
+    }
+    fetchAssignedMembers();
   };
 
   const handleDeleteMember = async (memberId: number) => {
@@ -1742,37 +1434,16 @@ const ProjectDashboard = () => {
     return dateStr.split("T")[0];
   };
 
+  // Done assignments sink to the bottom; assignment_no is never touched.
+  const sortedMembers = [...assignedMembers].sort((a, b) => {
+    const aDone = a.status === "done" ? 1 : 0;
+    const bDone = b.status === "done" ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+    return a.assignment_no - b.assignment_no;
+  });
+
   return (
     <div className="project-dashboard">
-      {/* Header */}
-      {/* <div className="portal-header">
-        <div className="header-left">
-          <div className="logo-container" onClick={handleBackToDashboard}>
-            <img
-              src={companyLogo}
-              alt="Company Logo"
-              className="company-logo"
-            />
-          </div>
-          <h1 className="portal-title" onClick={handleBackToDashboard}>
-            <span className="brand-cool">COOL</span>
-            <span className="brand-man">Man</span> Refrigeration
-          </h1>
-        </div>
-        <div className="header-right">
-          <div className="customer-logo-badge-with-icon">
-            <div
-              className="customer-badge-logo"
-              style={{ backgroundColor: color }}
-            >
-              {initials}
-            </div>
-            <span className="customer-logo-text">{customer.name}</span>
-          </div>
-          <span className="user-icon">👤</span>
-          <span className="username">{user?.username || "User"}</span>
-        </div>
-      </div> */}
       <AppHeader />
 
       {/* Main Content */}
@@ -1819,7 +1490,7 @@ const ProjectDashboard = () => {
           </>
         )}
 
-        {/* Assigned Members */}
+        {/* Assigned Members — restructured to expand-on-arrow, like Job Assigned */}
         <div className="project-section">
           <div className="section-header">
             <h3 className="section-title-text">Assigned Members</h3>
@@ -1941,154 +1612,135 @@ const ProjectDashboard = () => {
             </div>
           )}
 
-          <table className="meetings-table">
+          <table className="meetings-table" style={{ tableLayout: "fixed" }}>
             <thead>
               <tr>
                 <th style={{ width: "50px" }}>No</th>
-                <th style={{ width: "110px" }}>Date</th>
-                <th style={{ width: "90px" }}>Time</th>
+                <th style={{ width: "100px" }}>Date</th>
+                <th style={{ width: "80px" }}>Time</th>
                 <th style={{ width: "140px" }}>Assigned To</th>
                 <th>Job Description</th>
-                <th style={{ width: "110px" }}>Due Date</th>
-                <th style={{ width: "110px" }}>Status</th>
-                <th style={{ width: "110px" }}>Finish Date</th>
-                <th style={{ minWidth: "280px" }}>Update Log</th>
-                {isAdmin && <th style={{ width: "70px" }}>Actions</th>}
+                <th style={{ width: "100px" }}>Due Date</th>
+                <th style={{ width: "100px" }}>Status</th>
+                <th style={{ width: "36px" }}></th>
               </tr>
             </thead>
             <tbody>
-              {assignedMembers.map((member) => {
+              {sortedMembers.map((member) => {
                 const isAssignedToMe =
                   member.assigned_member === user?.username;
-                const canEditUpdate = isAdmin || isAssignedToMe;
+                const isDone = member.status === "done";
+                const canEditUpdate = !isDone && (isAdmin || isAssignedToMe);
                 const st = getStatusStyle(member.status);
+                const isExpanded = expandedMemberId === member.id;
 
                 return (
-                  <tr key={member.id}>
-                    {/* No */}
-                    <td
+                  <>
+                    <tr
+                      key={member.id}
                       style={{
-                        textAlign: "center",
-                        fontWeight: 600,
-                        color: "#666",
-                        fontSize: "15px",
+                        cursor: "pointer",
+                        background: isExpanded ? "#f8f9ff" : "",
+                        opacity: isDone ? 0.55 : 1,
                       }}
+                      onClick={() =>
+                        setExpandedMemberId(isExpanded ? null : member.id)
+                      }
                     >
-                      {member.assignment_no}
-                    </td>
+                      {/* No */}
+                      <td
+                        style={{
+                          textAlign: "center",
+                          fontWeight: 600,
+                          color: "#666",
+                          fontSize: "15px",
+                        }}
+                      >
+                        {member.assignment_no}
+                      </td>
 
-                    {/* Date - auto generated, read only */}
-                    <td>
-                      <span style={{ fontSize: "15px" }}>
-                        {member.assigned_date
-                          ? new Date(member.assigned_date).toLocaleDateString(
-                              "en-GB",
-                              {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              },
-                            )
-                          : "—"}
-                      </span>
-                    </td>
+                      {/* Date */}
+                      <td>
+                        <span style={{ fontSize: "14px" }}>
+                          {fmtDateDDMMYYYY(member.assigned_date)}
+                        </span>
+                      </td>
 
-                    {/* Time - auto generated, read only */}
-                    <td>
-                      <span style={{ fontSize: "15px" }}>
-                        {member.assigned_time
-                          ? member.assigned_time.substring(0, 5)
-                          : "—"}
-                      </span>
-                    </td>
+                      {/* Time */}
+                      <td>
+                        <span style={{ fontSize: "14px" }}>
+                          {member.assigned_time
+                            ? member.assigned_time.substring(0, 5)
+                            : "—"}
+                        </span>
+                      </td>
 
-                    {/* Assigned Member - admin editable */}
-                    <td>
-                      {isAdmin ? (
-                        <select
-                          value={member.assigned_member}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "assigned_member",
-                              e.target.value,
-                            )
-                          }
-                          className="table-input"
-                          style={{ fontSize: "14px" }}
-                        >
-                          {systemUsers.map((u) => (
-                            <option key={u.username} value={u.username}>
-                              {u.username}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
+                      {/* Assigned Member */}
+                      <td>
+                        {isAdmin && !isDone ? (
+                          <select
+                            value={member.assigned_member}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleUpdateMember(
+                                member.id,
+                                "assigned_member",
+                                e.target.value,
+                              );
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="table-input"
+                            style={{ fontSize: "14px" }}
+                          >
+                            {systemUsers.map((u) => (
+                              <option key={u.username} value={u.username}>
+                                {u.username}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: "14px",
+                              fontWeight: isAssignedToMe ? 700 : 400,
+                              color: isAssignedToMe ? "#667eea" : "#333",
+                            }}
+                          >
+                            {member.assigned_member}
+                            {isAssignedToMe && (
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  marginLeft: "4px",
+                                  color: "#888",
+                                }}
+                              >
+                                (you)
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Job Description — truncated preview, edited in expanded panel */}
+                      <td
+                        style={{
+                          fontSize: "14px",
+                          color: "#555",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          maxWidth: "0",
+                        }}
+                      >
+                        {member.job_description || "—"}
+                      </td>
+
+                      {/* Due Date */}
+                      <td>
                         <span
                           style={{
-                            fontSize: "15px",
-                            fontWeight: isAssignedToMe ? 700 : 400,
-                            color: isAssignedToMe ? "#667eea" : "#333",
-                          }}
-                        >
-                          {member.assigned_member}
-                          {isAssignedToMe && (
-                            <span
-                              style={{
-                                fontSize: "11px",
-                                marginLeft: "4px",
-                                color: "#888",
-                              }}
-                            >
-                              (you)
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Job Description - admin editable */}
-                    <td>
-                      {isAdmin ? (
-                        <textarea
-                          value={member.job_description || ""}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "job_description",
-                              e.target.value,
-                            )
-                          }
-                          className="table-textarea"
-                          rows={2}
-                          placeholder="Job description..."
-                        />
-                      ) : (
-                        <span style={{ fontSize: "15px" }}>
-                          {member.job_description || "—"}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Due Date - admin editable */}
-                    <td>
-                      {isAdmin ? (
-                        <input
-                          type="date"
-                          value={toDateInput(member.due_date)}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "due_date",
-                              e.target.value,
-                            )
-                          }
-                          className="table-input"
-                        />
-                      ) : (
-                        <span
-                          style={{
-                            fontSize: "15px",
+                            fontSize: "14px",
                             color:
                               member.due_date &&
                               new Date(member.due_date) < new Date() &&
@@ -2097,56 +1749,17 @@ const ProjectDashboard = () => {
                                 : "#333",
                           }}
                         >
-                          {member.due_date
-                            ? new Date(member.due_date).toLocaleDateString(
-                                "en-GB",
-                                {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                },
-                              )
-                            : "—"}
+                          {fmtDateDDMMYYYY(member.due_date)}
                         </span>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Status */}
-                    <td>
-                      {canEditUpdate ? (
-                        <select
-                          value={member.status}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "status",
-                              e.target.value,
-                            )
-                          }
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            fontSize: "13px",
-                            border: "1px solid #ddd",
-                            borderRadius: "6px",
-                            background: st.bg,
-                            color: st.color,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {STATUS_OPTIONS.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
+                      {/* Status */}
+                      <td>
                         <span
                           style={{
                             padding: "3px 10px",
                             borderRadius: "12px",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             fontWeight: 600,
                             background: st.bg,
                             color: st.color,
@@ -2155,76 +1768,226 @@ const ProjectDashboard = () => {
                         >
                           {st.label}
                         </span>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Finish Date — only editable if not yet set (non-admin) or always (admin) */}
-                    <td>
-                      {isAdmin || (!member.finish_date && canEditUpdate) ? (
-                        <input
-                          type="date"
-                          value={toDateInput(member.finish_date)}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "finish_date",
-                              e.target.value,
-                            )
-                          }
-                          className="table-input"
-                        />
-                      ) : (
+                      {/* Expand toggle */}
+                      <td style={{ textAlign: "center" }}>
                         <span
                           style={{
-                            fontSize: "14px",
-                            color: member.finish_date ? "#2e7d32" : "#bbb",
-                            fontWeight: member.finish_date ? 600 : 400,
+                            display: "inline-block",
+                            color: "#999",
+                            fontSize: "12px",
+                            transition: "transform 0.2s",
+                            transform: isExpanded
+                              ? "rotate(90deg)"
+                              : "rotate(0deg)",
                           }}
                         >
-                          {member.finish_date
-                            ? new Date(member.finish_date).toLocaleDateString(
-                                "en-GB",
-                                {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                },
-                              )
-                            : "—"}
+                          ▶
                         </span>
-                      )}
-                    </td>
-                    {/* Update Log */}
-                    <td style={{ padding: "8px" }}>
-                      <MemberUpdateLog
-                        customerId={customerId}
-                        projectId={projectId}
-                        memberId={member.id}
-                        canEdit={canEditUpdate}
-                        isAdmin={isAdmin}
-                      />
-                    </td>
-
-                    {/* Actions - admin only */}
-                    {isAdmin && (
-                      <td>
-                        <button
-                          className="btn-delete"
-                          onClick={() => handleDeleteMember(member.id)}
-                          title="Remove assignment"
-                        >
-                          🗑️
-                        </button>
                       </td>
+                    </tr>
+
+                    {isExpanded && (
+                      <tr key={`${member.id}-detail`}>
+                        <td
+                          colSpan={8}
+                          style={{ padding: 0, background: "#fafbff" }}
+                        >
+                          <div
+                            style={{
+                              padding: "20px 24px",
+                              borderTop: "2px solid #667eea20",
+                              borderBottom: "1px solid #e8e8e8",
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: "280px 1fr",
+                                gap: "24px",
+                              }}
+                            >
+                              {/* Left: Job Description edit, Due Date edit, Finish Date, Status */}
+                              <div
+                                style={{
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "16px",
+                                }}
+                              >
+                                {isAdmin && (
+                                  <div>
+                                    <div style={detailLabelStyle}>
+                                      Job Description
+                                    </div>
+                                    {isDone ? (
+                                      <span style={{ fontSize: "14px" }}>
+                                        {member.job_description || "—"}
+                                      </span>
+                                    ) : (
+                                      <textarea
+                                        defaultValue={
+                                          member.job_description || ""
+                                        }
+                                        onBlur={(e) => {
+                                          if (
+                                            e.target.value !==
+                                            (member.job_description || "")
+                                          )
+                                            handleUpdateMember(
+                                              member.id,
+                                              "job_description",
+                                              e.target.value,
+                                            );
+                                        }}
+                                        onClick={(e) => e.stopPropagation()}
+                                        rows={2}
+                                        placeholder="Job description..."
+                                        style={detailTextareaStyle}
+                                      />
+                                    )}
+                                  </div>
+                                )}
+
+                                {isAdmin && (
+                                  <div>
+                                    <div style={detailLabelStyle}>Due Date</div>
+                                    {isDone ? (
+                                      <span style={{ fontSize: "14px" }}>
+                                        {fmtDateDDMMYYYY(member.due_date)}
+                                      </span>
+                                    ) : (
+                                      <input
+                                        type="date"
+                                        value={toDateInput(member.due_date)}
+                                        onChange={(e) =>
+                                          handleUpdateMember(
+                                            member.id,
+                                            "due_date",
+                                            e.target.value,
+                                          )
+                                        }
+                                        onClick={(e) => e.stopPropagation()}
+                                        style={detailInputStyle}
+                                      />
+                                    )}
+                                  </div>
+                                )}
+
+                                <div>
+                                  <div style={detailLabelStyle}>
+                                    Finish Date
+                                  </div>
+                                  <span style={{ fontSize: "14px" }}>
+                                    {fmtDateDDMMYYYY(member.finish_date)}
+                                  </span>
+                                </div>
+
+                                <div>
+                                  <div style={detailLabelStyle}>Status</div>
+                                  {isDone ? (
+                                    <span
+                                      style={{
+                                        padding: "3px 10px",
+                                        borderRadius: "10px",
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        background: st.bg,
+                                        color: st.color,
+                                      }}
+                                    >
+                                      {st.label}
+                                    </span>
+                                  ) : (
+                                    <select
+                                      value={member.status}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        handleMemberStatusChange(
+                                          member,
+                                          e.target.value,
+                                        );
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      style={{
+                                        width: "100%",
+                                        padding: "7px 10px",
+                                        fontSize: "13px",
+                                        border: "1.5px solid #ddd",
+                                        borderRadius: "6px",
+                                        background: st.bg,
+                                        color: st.color,
+                                        fontWeight: 700,
+                                        cursor: "pointer",
+                                        boxSizing: "border-box" as const,
+                                      }}
+                                    >
+                                      {STATUS_OPTIONS.map((s) => (
+                                        <option key={s.value} value={s.value}>
+                                          {s.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Right: Update Log */}
+                              <div>
+                                <MemberUpdateLog
+                                  customerId={customerId}
+                                  projectId={projectId}
+                                  memberId={member.id}
+                                  canEdit={canEditUpdate}
+                                  isAdmin={isAdmin}
+                                  readOnly={isDone}
+                                />
+                              </div>
+                            </div>
+
+                            {isAdmin && (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "flex-end",
+                                  marginTop: "16px",
+                                  paddingTop: "14px",
+                                  borderTop: "1px solid #f0f0f0",
+                                }}
+                              >
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteMember(member.id);
+                                  }}
+                                  style={{
+                                    padding: "6px 14px",
+                                    background: "#fff",
+                                    color: "#c62828",
+                                    border: "1px solid #ef9a9a",
+                                    borderRadius: "7px",
+                                    cursor: "pointer",
+                                    fontSize: "13px",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  🗑️ Remove Assignment
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </tr>
+                  </>
                 );
               })}
 
               {assignedMembers.length === 0 && (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 8 : 7}
+                    colSpan={8}
                     style={{
                       textAlign: "center",
                       color: "#999",
@@ -2308,7 +2071,7 @@ const ProjectDashboard = () => {
                       />
                     ) : (
                       <p style={{ fontSize: "16px" }}>
-                        {new Date(entry.activity_date).toLocaleDateString()}
+                        {fmtDateDDMMYYYY(entry.activity_date)}
                       </p>
                     )}
                   </td>
@@ -2521,7 +2284,7 @@ const ProjectDashboard = () => {
                           {formatFileSize(doc.file_size)}
                         </td>
                         <td style={{ fontSize: "16px" }}>
-                          {new Date(doc.created_at).toLocaleDateString()}
+                          {fmtDateDDMMYYYY(doc.created_at)}
                         </td>
                         <td>
                           <div
@@ -2598,7 +2361,6 @@ const ProjectDashboard = () => {
             <table className="meetings-table attachments-table">
               <thead>
                 <tr>
-                  {/* <th style={{ width: "50px" }}>Type</th> */}
                   <th>File Name</th>
                   <th style={{ width: "120px" }}>Size</th>
                   <th style={{ width: "140px" }}>Date</th>
@@ -2608,9 +2370,6 @@ const ProjectDashboard = () => {
               <tbody>
                 {attachments.map((attachment) => (
                   <tr key={attachment.id}>
-                    {/* <td style={{ fontSize: "1rem", textAlign: "center" }}>
-                      {getFileIcon(attachment.file_type)}
-                    </td> */}
                     <td>
                       <div style={{ fontWeight: 500, fontSize: "16px" }}>
                         {attachment.original_filename}
@@ -2620,7 +2379,7 @@ const ProjectDashboard = () => {
                       {formatFileSize(attachment.file_size)}
                     </td>
                     <td style={{ fontSize: "16px" }}>
-                      {new Date(attachment.created_at).toLocaleDateString()}
+                      {fmtDateDDMMYYYY(attachment.created_at)}
                     </td>
                     <td style={{ fontSize: "16px" }}>
                       <div
@@ -2841,7 +2600,6 @@ const ProjectDashboard = () => {
           <table className="meetings-table">
             <thead>
               <tr>
-                {/* <th style={{ width: "55px" }}>No</th> */}
                 <th style={{ width: "120px" }}>Date</th>
                 <th style={{ width: "100px" }}>Time</th>
                 <th style={{ width: "140px" }}>Location</th>
@@ -2849,24 +2607,11 @@ const ProjectDashboard = () => {
                 <th>Description</th>
                 <th style={{ width: "120px" }}>Details</th>
                 {isAdmin && <th style={{ width: "60px" }}>Actions</th>}
-                {isAdmin && <th style={{ width: "60px" }}>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {meetings.map((meeting) => (
                 <tr key={meeting.id}>
-                  {/* No */}
-                  {/* <td
-                    style={{
-                      textAlign: "center",
-                      fontWeight: 600,
-                      color: "#666",
-                      fontSize: "15px",
-                    }}
-                  >
-                    {meeting.meeting_no}
-                  </td> */}
-
                   {/* Date */}
                   <td>
                     {isAdmin ? (
@@ -2884,11 +2629,7 @@ const ProjectDashboard = () => {
                       />
                     ) : (
                       <span style={{ fontSize: "16px" }}>
-                        {new Date(meeting.date).toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {fmtDateDDMMYYYY(meeting.date)}
                       </span>
                     )}
                   </td>
@@ -2967,54 +2708,6 @@ const ProjectDashboard = () => {
                     )}
                   </td>
 
-                  {/* Customer Side - admin only editable */}
-                  {/* 
-                  <td>
-                    <textarea
-                      defaultValue={meeting.customer_side || ""}
-                      onBlur={(e) => {
-                        if (e.target.value !== (meeting.customer_side || "")) {
-                          handleUpdateMeeting(
-                            meeting.id,
-                            "customer_side",
-                            e.target.value,
-                          );
-                        }
-                      }}
-                      className="table-textarea"
-                      rows={2}
-                      placeholder="Customer side notes..."
-                    />
-                  </td> */}
-
-                  {/* CM Side - all users can edit */}
-                  {/* <td>
-                    <textarea
-                      defaultValue={meeting.cm_side || ""}
-                      onBlur={(e) => {
-                        if (e.target.value !== (meeting.cm_side || "")) {
-                          handleUpdateMeeting(
-                            meeting.id,
-                            "cm_side",
-                            e.target.value,
-                          );
-                        }
-                      }}
-                      className="table-textarea"
-                      rows={2}
-                      placeholder="CM side notes..."
-                    />
-                  </td> */}
-
-                  {/* Updates */}
-                  {/* <td style={{ padding: "8px" }}>
-                    <MeetingUpdateLog
-                      customerId={customerId}
-                      projectId={projectId}
-                      meetingId={meeting.id}
-                      isAdmin={isAdmin}
-                    />
-                  </td> */}
                   <td style={{ padding: "8px", position: "relative" as const }}>
                     <MeetingDetailPanel
                       meeting={meeting}
@@ -3035,23 +2728,12 @@ const ProjectDashboard = () => {
                       </button>
                     </td>
                   )}
-
-                  {isAdmin && (
-                    <td>
-                      <button
-                        className="btn-delete"
-                        onClick={() => handleDeleteMeeting(meeting.id)}
-                      >
-                        🗑️
-                      </button>
-                    </td>
-                  )}
                 </tr>
               ))}
               {meetings.length === 0 && (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 9 : 8}
+                    colSpan={isAdmin ? 7 : 6}
                     style={{ textAlign: "center", color: "#999" }}
                   >
                     No meetings yet. Click "+ Add" to create one.
@@ -3064,6 +2746,37 @@ const ProjectDashboard = () => {
       </div>
     </div>
   );
+};
+
+const detailLabelStyle = {
+  fontSize: "11px",
+  fontWeight: 700,
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.6px",
+  color: "#667eea",
+  marginBottom: "8px",
+  paddingBottom: "6px",
+  borderBottom: "2px solid #e8f0fe",
+};
+
+const detailTextareaStyle = {
+  width: "100%",
+  padding: "7px 10px",
+  fontSize: "13px",
+  border: "1.5px solid #ddd",
+  borderRadius: "6px",
+  resize: "vertical" as const,
+  fontFamily: "inherit",
+  boxSizing: "border-box" as const,
+};
+
+const detailInputStyle = {
+  width: "100%",
+  padding: "7px 10px",
+  fontSize: "13px",
+  border: "1.5px solid #ddd",
+  borderRadius: "6px",
+  boxSizing: "border-box" as const,
 };
 
 export default ProjectDashboard;

@@ -854,63 +854,61 @@ router.put(
         return;
       }
 
+      // ── Once done, locked for everyone — read only ──
+      if (record.status === "done") {
+        res.status(403).json({
+          success: false,
+          error: "This assignment is marked done and can no longer be edited",
+        });
+        return;
+      }
+
+      // finish_date is never client-settable — auto-stamped only when
+      // status transitions to "done"
+      const incomingStatus: string | undefined = req.body.status;
+      const autoFinishDate =
+        incomingStatus === "done"
+          ? new Date().toISOString().split("T")[0]
+          : record.finish_date;
+
       let result;
 
       if (isAdmin) {
-        const {
-          assigned_member,
-          job_description,
-          due_date,
-          update_note,
-          status,
-          finish_date,
-        } = req.body;
+        const { assigned_member, job_description, due_date, status } = req.body;
         result = await pool.query(
           `UPDATE project_assigned_members
          SET assigned_member=$1, job_description=$2, due_date=$3,
-             update_note=$4, status=$5, finish_date=$6, updated_at=CURRENT_TIMESTAMP
-         WHERE id=$7 RETURNING *`,
+             status=$4, finish_date=$5, updated_at=CURRENT_TIMESTAMP
+         WHERE id=$6 RETURNING *`,
           [
             assigned_member || record.assigned_member,
             job_description ?? record.job_description,
             due_date || record.due_date,
-            update_note ?? record.update_note,
             status || record.status,
-            finish_date || record.finish_date,
+            autoFinishDate,
             memberId,
           ],
         );
       } else {
-        const { update_note, status, finish_date } = req.body;
-        // Non-admin cannot change finish_date once it has been set
-        const finalFinishDate = record.finish_date
-          ? record.finish_date // already set — lock it, ignore incoming value
-          : finish_date || null;
-
+        const { status } = req.body;
         result = await pool.query(
           `UPDATE project_assigned_members
-     SET update_note=$1, status=$2, finish_date=$3, updated_at=CURRENT_TIMESTAMP
-     WHERE id=$4 RETURNING *`,
-          [
-            update_note ?? record.update_note,
-            status || record.status,
-            finalFinishDate,
-            memberId,
-          ],
+     SET status=$1, finish_date=$2, updated_at=CURRENT_TIMESTAMP
+     WHERE id=$3 RETURNING *`,
+          [status || record.status, autoFinishDate, memberId],
         );
       }
 
       const updatedMember = result.rows[0];
 
-      // ── Sync status/note back to worklist_tasks_v2 ──
+      // ── Sync status/finish_date back to worklist_tasks_v2 ──
       try {
         await pool.query(
           `UPDATE worklist_tasks_v2
-         SET status = $1, update_note = $2, finish_date = $3
-         WHERE job_type = 'project' AND job_reference_id = $4 AND assigned_member = $5`,
+         SET status = $1, finish_date = $2
+         WHERE job_type = 'project' AND job_reference_id = $3 AND assigned_member = $4`,
           [
             updatedMember.status,
-            updatedMember.update_note || null,
             updatedMember.finish_date || null,
             projectId,
             record.assigned_member,
@@ -955,7 +953,7 @@ router.post(
   "/:customerId/projects/:projectId/members/:memberId/updates",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
-    const { memberId } = req.params;
+    const { projectId, memberId } = req.params;
     const { update_note } = req.body;
     const pool = getPool(req);
 
@@ -967,31 +965,54 @@ router.post(
     }
 
     try {
+      const memberResult = await pool.query(
+        `SELECT * FROM project_assigned_members WHERE id = $1`,
+        [memberId],
+      );
+      if (memberResult.rows.length === 0) {
+        res.status(404).json({ success: false, error: "Assignment not found" });
+        return;
+      }
+      const member = memberResult.rows[0];
+
+      if (member.status === "done") {
+        res.status(403).json({
+          success: false,
+          error: "This assignment is marked done and can no longer be edited",
+        });
+        return;
+      }
+
       const result = await pool.query(
         `INSERT INTO project_member_updates (member_id, update_note, created_by)
    VALUES ($1, $2, $3) RETURNING *`,
         [memberId, update_note.trim(), req.user?.username],
       );
 
-      // Sync update note to worklist_tasks_v2
+      // ── Sync this note into worklist_task_updates as a real log row —
+      //    the previous version wrote into worklist_tasks_v2.update_note,
+      //    a single scalar column the Job Assigned dashboard never reads.
+      //    It reads from this separate per-row table instead, same as the
+      //    forward direction (Job Assigned → here) already correctly did. ──
       try {
-        const memberResult = await pool.query(
-          `SELECT * FROM project_assigned_members WHERE id = $1`,
-          [memberId],
+        const taskResult = await pool.query(
+          `SELECT id, status FROM worklist_tasks_v2
+           WHERE job_type = 'project'
+             AND job_reference_id = $1
+             AND assigned_member = $2
+           LIMIT 1`,
+          [projectId, member.assigned_member],
         );
-        const member = memberResult.rows[0];
-        if (member) {
+        if (taskResult.rows.length > 0) {
+          const task = taskResult.rows[0];
           await pool.query(
-            `UPDATE worklist_tasks_v2
-       SET update_note = $1
-       WHERE job_type = 'project'
-         AND job_reference_id = $2
-         AND assigned_member = $3`,
-            [update_note.trim(), member.project_id, member.assigned_member],
+            `INSERT INTO worklist_task_updates (task_id, update_note, status, created_by)
+             VALUES ($1, $2, $3, $4)`,
+            [task.id, update_note.trim(), task.status, req.user?.username],
           );
         }
       } catch (syncErr) {
-        console.error("Sync update to worklist failed:", syncErr);
+        console.error("Sync update to worklist_task_updates failed:", syncErr);
       }
 
       res.status(201).json({ success: true, update: result.rows[0] });
