@@ -532,10 +532,26 @@ const WorklistTasksDashboard = () => {
   const [tasks, setTasks] = useState<WorklistTask[]>([]);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
-
+  const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [jobItems, setJobItems] = useState<JobItem[]>([]);
+
+  useEffect(() => {
+    setLoading(true);
+    const u = localStorage.getItem("user");
+
+    if (u) {
+      try {
+        setUser(JSON.parse(u));
+      } catch (error) {
+        console.error("Failed to parse user:", error);
+      }
+    }
+
+    fetchTasks();
+    fetchDropdownData();
+  }, [year]);
 
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
@@ -559,7 +575,15 @@ const WorklistTasksDashboard = () => {
 
   useEffect(() => {
     const u = localStorage.getItem("user");
-    if (u) setUser(JSON.parse(u));
+
+    if (u) {
+      try {
+        setUser(JSON.parse(u));
+      } catch (error) {
+        console.error("Failed to parse user:", error);
+      }
+    }
+
     fetchTasks();
     fetchDropdownData();
   }, [year]);
@@ -573,14 +597,43 @@ const WorklistTasksDashboard = () => {
     setForm((f) => ({ ...f, job_reference_id: "", job_reference_name: "" }));
   }, [form.customer_id, form.job_type]);
 
-  const fetchTasks = async () => {
+  const fetchTasks = async (retryCount = 0) => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      console.log("No authentication token yet.");
+
+      if (retryCount < 3) {
+        setTimeout(() => fetchTasks(retryCount + 1), 500);
+      }
+
+      return;
+    }
+
     try {
       const res = await axios.get(`${API}/jobAssigned/tasks/${year}`, {
-        headers: authHeaders(),
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
+
       setTasks(res.data.tasks || []);
-    } catch {
-      setTasks([]);
+    } catch (error: any) {
+      console.error(
+        `Failed to fetch tasks (attempt ${retryCount + 1}):`,
+        error.response?.status,
+        error.response?.data || error.message,
+      );
+
+      // Retry automatically
+      if (retryCount < 3) {
+        setTimeout(() => {
+          fetchTasks(retryCount + 1);
+        }, 1000);
+      }
+
+      // IMPORTANT:
+      // Don't do setTasks([]) here.
     }
   };
 
@@ -650,13 +703,51 @@ const WorklistTasksDashboard = () => {
     }
   };
 
+  // const handleStatusChange = async (task: WorklistTask, newStatus: string) => {
+  //   if (newStatus === "todo" && task.status !== "todo") {
+  //     alert("A task can't be moved back to To Do once it has started.");
+  //     return;
+  //   }
+
+  //   const updates: Record<string, string> = { status: newStatus };
+  //   if (newStatus === "done" && !task.finish_date) {
+  //     updates.finish_date = todayISO();
+  //   }
+
+  //   setTasks((prev) =>
+  //     prev.map((t) => (t.id === task.id ? { ...t, ...updates } : t)),
+  //   );
+
+  //   try {
+  //     await axios.put(`${API}/jobAssigned/tasks/${task.id}`, updates, {
+  //       headers: authHeaders(),
+  //     });
+  //     fetchTasks();
+  //   } catch (e: any) {
+  //     alert(e.response?.data?.error || "Failed to update status");
+  //     fetchTasks();
+  //   }
+  // };
+
   const handleStatusChange = async (task: WorklistTask, newStatus: string) => {
+    // Cannot move a completed task back to another status
+    if (task.status === "done") {
+      alert("Completed tasks cannot be changed.");
+      return;
+    }
+
+    // Cannot move back to To Do
     if (newStatus === "todo" && task.status !== "todo") {
       alert("A task can't be moved back to To Do once it has started.");
       return;
     }
 
-    const updates: Record<string, string> = { status: newStatus };
+    // Only send finish_date when changing to Done
+    // and only if it has never been set before.
+    const updates: Record<string, string> = {
+      status: newStatus,
+    };
+
     if (newStatus === "done" && !task.finish_date) {
       updates.finish_date = todayISO();
     }
@@ -669,6 +760,7 @@ const WorklistTasksDashboard = () => {
       await axios.put(`${API}/jobAssigned/tasks/${task.id}`, updates, {
         headers: authHeaders(),
       });
+
       fetchTasks();
     } catch (e: any) {
       alert(e.response?.data?.error || "Failed to update status");
