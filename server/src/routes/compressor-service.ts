@@ -30,7 +30,7 @@ router.get(
 
     try {
       const result = await pool.query(
-        `SELECT id, customer_id, name, created_at, updated_at 
+        `SELECT id, customer_id, name, model, serial_number, unit, created_at, updated_at 
          FROM compressor_service_companies 
          WHERE customer_id = $1 
          ORDER BY created_at DESC`,
@@ -61,7 +61,7 @@ router.get(
 
     try {
       const result = await pool.query(
-        `SELECT id, customer_id, name, created_at, updated_at 
+        `SELECT id, customer_id, name, model, serial_number, unit, created_at, updated_at 
          FROM compressor_service_companies 
          WHERE id = $1 AND customer_id = $2`,
         [companyId, customerId],
@@ -95,7 +95,7 @@ router.post(
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
-    const { name } = req.body;
+    const { name, model, serial_number, unit } = req.body;
     const pool = getPool(req);
 
     if (req.user?.role !== "admin") {
@@ -116,10 +116,17 @@ router.post(
 
     try {
       const result = await pool.query(
-        `INSERT INTO compressor_service_companies (customer_id, name, created_at, updated_at) 
-         VALUES ($1, $2, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
-         RETURNING id, customer_id, name, created_at, updated_at`,
-        [customerId, name.trim()],
+        `INSERT INTO compressor_service_companies 
+           (customer_id, name, model, serial_number, unit, created_at, updated_at) 
+         VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP) 
+         RETURNING id, customer_id, name, model, serial_number, unit, created_at, updated_at`,
+        [
+          customerId,
+          name.trim(),
+          model?.trim() || null,
+          serial_number?.trim() || null,
+          unit?.trim() || null,
+        ],
       );
 
       res.status(201).json({
@@ -143,7 +150,7 @@ router.put(
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId, companyId } = req.params;
-    const { name } = req.body;
+    const { name, model, serial_number, unit } = req.body;
     const pool = getPool(req);
 
     if (req.user?.role !== "admin") {
@@ -165,10 +172,17 @@ router.put(
     try {
       const result = await pool.query(
         `UPDATE compressor_service_companies 
-         SET name = $1, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $2 AND customer_id = $3 
-         RETURNING id, customer_id, name, created_at, updated_at`,
-        [name.trim(), companyId, customerId],
+         SET name = $1, model = $2, serial_number = $3, unit = $4, updated_at = CURRENT_TIMESTAMP 
+         WHERE id = $5 AND customer_id = $6 
+         RETURNING id, customer_id, name, model, serial_number, unit, created_at, updated_at`,
+        [
+          name.trim(),
+          model?.trim() || null,
+          serial_number?.trim() || null,
+          unit?.trim() || null,
+          companyId,
+          customerId,
+        ],
       );
 
       if (result.rows.length === 0) {

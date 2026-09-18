@@ -6,8 +6,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
 import "../customers/ProjectDashboard.css";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -81,8 +82,8 @@ const PurchasingCustomerPortal = () => {
     setLoading(true);
     try {
       const res = await axios.get(
-        "http://localhost:5000/api/workshop/customers",
-        // "http://localhost:5000/api/purchasing/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
+        // "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers",
         { headers: headers() },
       );
       setCustomers(res.data.customers || []);
@@ -101,8 +102,8 @@ const PurchasingCustomerPortal = () => {
     setSaving(true);
     try {
       await axios.post(
-        "http://localhost:5000/api/workshop/customers",
-        // "http://localhost:5000/api/purchasing/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
+        // "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers",
         {
           name: newName.trim(),
           contact_number: newContact,
@@ -127,8 +128,8 @@ const PurchasingCustomerPortal = () => {
   const handleDelete = async (customer: PurchasingCustomer) => {
     try {
       await axios.delete(
-        `http://localhost:5000/api/workshop/customers/${customer.id}`,
-        // `http://localhost:5000/api/purchasing/customers/${customer.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/workshop/customers/${customer.id}`,
+        // `https://coolmanworkshop-production.up.railway.app/api/purchasing/customers/${customer.id}`,
         { headers: headers() },
       );
       setDeleteTarget(null);
@@ -147,7 +148,7 @@ const PurchasingCustomerPortal = () => {
   return (
     <div className="project-dashboard">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div
             className="logo-container"
@@ -176,7 +177,8 @@ const PurchasingCustomerPortal = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       <div className="project-main-content">
         {/* Page header */}
@@ -394,9 +396,12 @@ const PurchasingCustomerPortal = () => {
                       "0 2px 6px rgba(0,0,0,0.05)";
                   }}
                   onClick={() =>
-                    navigate(`/purchasing/workshop/customers/${customer.id}`, {
-                      state: { customer },
-                    })
+                    navigate(
+                      `/purchasing/workshop/customers/${customer.id}/dashboard`,
+                      {
+                        state: { customer },
+                      },
+                    )
                   }
                 >
                   {isAdmin && (

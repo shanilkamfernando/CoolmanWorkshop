@@ -109,13 +109,13 @@ const Dashboard = () => {
     //   path: "/followup",
     //   description: "Customer follow-ups",
     // },
-    {
-      id: "staff",
-      label: "Staff",
-      icon: "👤",
-      path: "/staff",
-      description: "Employee management",
-    },
+    // {
+    //   id: "staff",
+    //   label: "Staff",
+    //   icon: "👤",
+    //   path: "/staff",
+    //   description: "Employee management",
+    // },
   ];
 
   const hasPortalAccess = (portalId: PortalId): boolean => {

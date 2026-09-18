@@ -40,10 +40,14 @@ import JobCardDetail from "./pages/customers/JobCardDetail";
 
 //purchasing portal
 import PurchasingPortal from "./pages/purchasing/PurchasingPortal";
+import PurchasingCustomerList from "./pages/purchasing/PurchasingCustomerList";
+import BOQPage from "./pages/purchasing/BOQPage";
+import CustomerPurchasingDashboard from "./pages/purchasing/CustomerPurchasingDashboard";
 
 //purchasing - Workshop portal
 import WorkshopPortal from "./pages/purchasing/WorkshopPortal";
 import PurchasingCustomerPortal from "./pages/purchasing/PurchasingCustomerPortal";
+import PurchasingDashboard from "./pages/purchasing/PurchasingDashboard";
 
 //stores - dashboard
 import StoresDashboard from "./pages/stores/StoresDashboard";
@@ -250,10 +254,10 @@ function App() {
           path="/customers/:customerId/jobcards"
           element={<JobCardsList />}
         />
-        <Route
+        {/* <Route
           path="/customers/:customerId/jobcards/:jobCardId"
           element={<JobCardDetail />}
-        />
+        /> */}
 
         <Route path="/purchasing" element={<PurchasingPortal />} />
 
@@ -263,6 +267,47 @@ function App() {
           element={
             <ProtectedRoute>
               <PurchasingCustomerPortal />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/purchasing/workshop/customers/:customerId/dashboard"
+          element={
+            <ProtectedRoute>
+              <PurchasingDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/purchasing/customer-list"
+          element={
+            <ProtectedRoute>
+              <PurchasingCustomerList />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/purchasing/customers/:customerId/dashboard"
+          element={
+            <ProtectedRoute>
+              <CustomerPurchasingDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/purchasing/customers/:customerId/entries"
+          element={<PurchasingDashboard />}
+        />
+
+        <Route
+          path="/purchasing/boq"
+          element={
+            <ProtectedRoute>
+              <BOQPage />
             </ProtectedRoute>
           }
         />

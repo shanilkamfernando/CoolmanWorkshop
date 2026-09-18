@@ -7,7 +7,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./Customers.css";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -60,7 +61,7 @@ const ProjectsPortal = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
@@ -117,7 +118,7 @@ const ProjectsPortal = () => {
       setLoading(true);
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/projects`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setProjects(response.data.projects || []);
@@ -171,7 +172,7 @@ const ProjectsPortal = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/projects`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects`,
         { name: newProjectName },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -213,7 +214,7 @@ const ProjectsPortal = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectToDelete.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("Project deleted successfully!");
@@ -241,7 +242,7 @@ const ProjectsPortal = () => {
   return (
     <div className="customer-portal">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div className="logo-container" onClick={handleBackToDashboard}>
             <img
@@ -268,7 +269,9 @@ const ProjectsPortal = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+
+      <AppHeader />
 
       {/* Main Content */}
       <div className="main-content-full">
