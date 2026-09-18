@@ -855,15 +855,15 @@ router.put(
       }
 
       const record = existing.rows[0];
-      const isAssignedUser = record.assigned_member === currentUser;
+      // const isAssignedUser = record.assigned_member === currentUser;
 
-      if (!isAdmin && !isAssignedUser) {
-        res.status(403).json({
-          success: false,
-          error: "You can only update your own assignments",
-        });
-        return;
-      }
+      // if (!isAdmin && !isAssignedUser) {
+      //   res.status(403).json({
+      //     success: false,
+      //     error: "You can only update your own assignments",
+      //   });
+      //   return;
+      // }
 
       // ── Once done, locked for everyone — read only ──
       if (record.status === "done") {

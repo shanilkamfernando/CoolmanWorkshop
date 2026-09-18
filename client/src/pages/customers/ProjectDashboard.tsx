@@ -192,7 +192,11 @@ const MeetingDetailPanel = ({
     if (!newNote.trim()) return;
     setSaving(true);
     try {
-      await axios.post(BASE, { update_note: newNote }, { headers: hdr() });
+      await axios.post(
+        BASE,
+        { update_note: newNote, status: "todo" },
+        { headers: hdr() },
+      );
       setNewNote("");
       fetchUpdates();
     } catch (err: any) {
@@ -566,6 +570,7 @@ const MemberUpdateLog = ({
   customerId,
   projectId,
   memberId,
+  currentStatus,
   canEdit,
   isAdmin,
   readOnly,
@@ -574,6 +579,7 @@ const MemberUpdateLog = ({
   customerId: string | undefined;
   projectId: string | undefined;
   memberId: number;
+  currentStatus: string;
   canEdit: boolean;
   isAdmin: boolean;
   readOnly: boolean;
@@ -1822,7 +1828,7 @@ const ProjectDashboard = () => {
                 const isAssignedToMe =
                   member.assigned_member === user?.username;
                 const isDone = member.status === "done";
-                const canEditUpdate = !isDone && (isAdmin || isAssignedToMe);
+                const canEditUpdate = !isDone;
                 const st = getStatusStyle(member.status);
                 const isExpanded = expandedMemberId === member.id;
                 const { date: memberDate, time: memberTime } =
@@ -2130,6 +2136,7 @@ const ProjectDashboard = () => {
                                   customerId={customerId}
                                   projectId={projectId}
                                   memberId={member.id}
+                                  currentStatus={member.status}
                                   canEdit={canEditUpdate}
                                   isAdmin={isAdmin}
                                   readOnly={isDone}
