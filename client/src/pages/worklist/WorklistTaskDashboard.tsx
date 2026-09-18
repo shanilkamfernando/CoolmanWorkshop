@@ -107,19 +107,15 @@ const getStatus = (val: string) =>
 
 const fmtDate = (d: string) => {
   if (!d) return "—";
+
   const datePart = d.split("T")[0];
   const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
   if (!match) return "—";
 
   const [, year, month, day] = match;
-  const date = new Date(Number(year), Number(month) - 1, Number(day));
 
-  if (isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
+  return `${day}/${month}/${year}`;
 };
 
 const fmtTime = (t: string) => {
@@ -228,16 +224,23 @@ const TaskUpdateLog = ({
 
   const fmtLogDateTime = (raw: string) => {
     if (!raw) return { date: "—", time: "—" };
+
     const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
     const isoString = hasTimezone ? raw : `${raw.replace(" ", "T")}Z`;
+
     const d = new Date(isoString);
-    if (isNaN(d.getTime())) return { date: "—", time: "—" };
+
+    if (isNaN(d.getTime())) {
+      return { date: "—", time: "—" };
+    }
+
     return {
       date: d.toLocaleDateString("en-GB", {
         day: "2-digit",
-        month: "short",
+        month: "2-digit",
         year: "numeric",
       }),
+
       time: d.toLocaleTimeString("en-US", {
         hour: "numeric",
         minute: "2-digit",
@@ -809,13 +812,39 @@ const WorklistTasksDashboard = () => {
   };
 
   // Main table date/time formatter (NO timezone conversion)
-  function fmtMainDateTime(
-    rawDate?: string | null,
-    rawTime?: string | null,
-  ): { date: string; time: string } {
-    const date = rawDate ? fmtDate(rawDate) : "—";
-    const time = rawTime ? fmtTime(rawTime) : "—";
-    return { date, time };
+  function fmtMainDateTime(rawCreatedAt?: string | null): {
+    date: string;
+    time: string;
+  } {
+    if (!rawCreatedAt) {
+      return { date: "—", time: "—" };
+    }
+
+    const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(rawCreatedAt);
+
+    const isoString = hasTimezone
+      ? rawCreatedAt
+      : `${rawCreatedAt.replace(" ", "T")}Z`;
+
+    const d = new Date(isoString);
+
+    if (isNaN(d.getTime())) {
+      return { date: "—", time: "—" };
+    }
+
+    return {
+      date: d.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+      }),
+
+      time: d.toLocaleTimeString("en-US", {
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true,
+      }),
+    };
   }
 
   return (
@@ -964,8 +993,7 @@ const WorklistTasksDashboard = () => {
               <tbody>
                 {filtered.map((task) => {
                   const { date: mainDate, time: mainTime } = fmtMainDateTime(
-                    task.date,
-                    task.time,
+                    task.created_at,
                   );
                   const isExpanded = expandedId === task.id;
                   const st = getStatus(task.status);
