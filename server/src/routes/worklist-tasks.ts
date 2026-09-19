@@ -191,6 +191,50 @@ router.get(
   },
 );
 
+//get tasks assigned to a the currently logged-in user for a specific year
+router.get(
+  "/myTasks/tasks/:year",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { year } = req.params;
+    const username = req.user?.username;
+    const pool = getPool(req);
+
+    try {
+      const result = await pool.query(
+        `SELECT t.*,
+          EXISTS (
+            SELECT 1
+            FROM worklist_task_updates u
+            WHERE u.task_id = t.id
+              AND u.third_party IS NOT NULL
+              AND u.third_party <> ''
+          ) AS has_third_party,
+          (
+            SELECT STRING_AGG(DISTINCT u.third_party, ', ')
+            FROM worklist_task_updates u
+            WHERE u.task_id = t.id
+              AND u.third_party IS NOT NULL
+              AND u.third_party <> ''
+          ) AS third_party_names
+        FROM worklist_tasks_v2 t
+        WHERE t.year = $1
+          AND t.assigned_member = $2
+        ORDER BY t.task_no ASC`,
+        [year, username],
+      );
+
+      res.json({ success: true, tasks: result.rows });
+    } catch (error) {
+      console.error("Fetch my tasks error:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch my tasks",
+      });
+    }
+  },
+);
+
 // POST create new task — syncs to project_assigned_members if job_type = "project"
 router.post(
   "/jobAssigned/tasks",

@@ -56,7 +56,7 @@ const Dashboard = () => {
     {
       id: "myTasks",
       label: "My Tasks",
-      icon: "⏱️",
+      icon: "☑️",
       path: "/myTasks",
       description: "Specific Users Task management",
     },

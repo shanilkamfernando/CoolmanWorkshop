@@ -60,6 +60,7 @@ import Documents from "./pages/documents/Documents";
 //worklist - worklist years
 import WorklistDashboard from "./pages/worklist/WorklistDashboard";
 import WorklistTasksDashboard from "./pages/worklist/WorklistTaskDashboard";
+import MyTasks from "./pages/worklist/MyTasks";
 
 //meetings
 import MeetingsDashboard from "./pages/meetings/MeetingsDashboard";
@@ -388,6 +389,8 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/myTasks" element={<MyTasks />} />
 
         <Route
           path="/jobAssigned"
