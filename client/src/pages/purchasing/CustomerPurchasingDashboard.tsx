@@ -77,12 +77,12 @@ const fmtDT = (dt: string) => {
 };
 
 const STEPS = [
-  { label: "Request", icon: "📋" },
-  { label: "Order", icon: "📝" },
-  { label: "Approval", icon: "✓" },
-  { label: "PO", icon: "🧾" },
-  { label: "Invoice", icon: "🗂️" },
-  { label: "Delivered", icon: "🚚" },
+  { label: "Request", icon: "📋", color: "#dc2626", bg: "#fee2e2" },
+  { label: "Order", icon: "📝", color: "#ca8a04", bg: "#fef9c3" },
+  { label: "Approval", icon: "✓", color: "#16a34a", bg: "#dcfce7" },
+  { label: "PO", icon: "🧾", color: "#2563eb", bg: "#dbeafe" },
+  { label: "Invoice", icon: "🗂️", color: "#111827", bg: "#e5e7eb" },
+  { label: "Delivered", icon: "🚚", color: "#6b7280", bg: "#f3f4f6" },
 ];
 
 const getEntryStep = (e: Entry): number => {
@@ -1312,6 +1312,7 @@ const CustomerPurchasingDashboard = () => {
                     ) : (
                       boqEntries.map((entry) => {
                         const hasShortage = entry.shortage_quantity > 0;
+                        const stage = STEPS[getEntryStep(entry)];
                         return (
                           <>
                             {/* Normal row */}
@@ -1345,14 +1346,36 @@ const CustomerPurchasingDashboard = () => {
                                       expandedEntryId === entry.id
                                         ? "rotate(90deg)"
                                         : "none",
-                                    color: "#6b7280",
+                                    color: stage.color,
+                                    fontWeight: 700,
                                   }}
                                 >
                                   ▶
                                 </span>
                               </td>
                               <td style={td({ fontWeight: 500 })}>
-                                {entry.product}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: "10px",
+                                      fontWeight: 700,
+                                      color: stage.color,
+                                      background: stage.bg,
+                                      padding: "2px 8px",
+                                      borderRadius: "4px",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {stage.label}
+                                  </span>
+                                  <span>{entry.product}</span>
+                                </div>
                               </td>
                               <td style={td()}>{entry.specification || "—"}</td>
                               <td style={td()}>{entry.part_number || "—"}</td>
@@ -1694,103 +1717,153 @@ const CustomerPurchasingDashboard = () => {
                         </td>
                       </tr>
                     ) : (
-                      nonBOQEntries.map((entry) => (
-                        <React.Fragment key={entry.id}>
-                          <tr
-                            onMouseEnter={(e) =>
-                              (e.currentTarget.style.background = "#fff7ed")
-                            }
-                            onMouseLeave={(e) =>
-                              (e.currentTarget.style.background = "#fff")
-                            }
-                          >
-                            <td
-                              style={td({
-                                width: "30px",
-                                textAlign: "center",
-                                cursor: "pointer",
-                              })}
-                              onClick={() =>
-                                setExpandedEntryId(
-                                  expandedEntryId === entry.id
-                                    ? null
-                                    : entry.id,
-                                )
+                      nonBOQEntries.map((entry) => {
+                        const isShortage = (entry.description || "").includes(
+                          "Shortage from BOQ stock",
+                        );
+                        const stage = STEPS[getEntryStep(entry)];
+                        const baseColor = isShortage ? "#fef2f2" : "#fff";
+                        const hoverColor = isShortage ? "#fee2e2" : "#fff7ed";
+
+                        return (
+                          <React.Fragment key={entry.id}>
+                            <tr
+                              style={{ background: baseColor }}
+                              onMouseEnter={(e) =>
+                                (e.currentTarget.style.background = hoverColor)
+                              }
+                              onMouseLeave={(e) =>
+                                (e.currentTarget.style.background = baseColor)
                               }
                             >
-                              <span
-                                style={{
-                                  display: "inline-block",
-                                  transition: "transform 0.2s",
-                                  transform:
-                                    expandedEntryId === entry.id
-                                      ? "rotate(90deg)"
-                                      : "none",
-                                  color: "#6b7280",
-                                }}
-                              >
-                                ▶
-                              </span>
-                            </td>
-                            <td
-                              style={td({ fontWeight: 600, color: "#ea580c" })}
-                            >
-                              {entry.product}
-                            </td>
-                            <td style={td()}>{entry.specification || "—"}</td>
-                            <td style={td()}>{entry.part_number || "—"}</td>
-                            <td style={td()}>
-                              {fmtQty(entry.required_quantity)}
-                            </td>
-                            <td style={td()}>
-                              {entry.required_date
-                                ? fmtDate(entry.required_date)
-                                : "—"}
-                            </td>
-                            <td style={td({ color: "#6b7280" })}>
-                              {entry.description || "—"}
-                            </td>
-                            <td style={td()}>{entry.requested_by || "—"}</td>
-                            {isAdmin && (
-                              <td style={td({ textAlign: "center" })}>
-                                <button
-                                  onClick={() => handleDelete(entry.id)}
-                                  style={{
-                                    background: "none",
-                                    border: "none",
-                                    cursor: "pointer",
-                                    color: "#d1d5db",
-                                    fontSize: "16px",
-                                  }}
-                                  onMouseEnter={(e) =>
-                                    (e.currentTarget.style.color = "#ef4444")
-                                  }
-                                  onMouseLeave={(e) =>
-                                    (e.currentTarget.style.color = "#d1d5db")
-                                  }
-                                >
-                                  🗑️
-                                </button>
-                              </td>
-                            )}
-                          </tr>
-                          {expandedEntryId === entry.id && (
-                            <tr>
                               <td
-                                colSpan={isAdmin ? 9 : 8}
-                                style={{ padding: 0 }}
+                                style={td({
+                                  width: "30px",
+                                  textAlign: "center",
+                                  cursor: "pointer",
+                                })}
+                                onClick={() =>
+                                  setExpandedEntryId(
+                                    expandedEntryId === entry.id
+                                      ? null
+                                      : entry.id,
+                                  )
+                                }
                               >
-                                <EntryFlowPanel
-                                  entry={entry}
-                                  userRole={user?.role || "user"}
-                                  onSaveStage={handleSaveStage}
-                                  onApprove={handleApprove}
-                                />
+                                <span
+                                  style={{
+                                    display: "inline-block",
+                                    transition: "transform 0.2s",
+                                    transform:
+                                      expandedEntryId === entry.id
+                                        ? "rotate(90deg)"
+                                        : "none",
+                                    color: stage.color,
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  ▶
+                                </span>
                               </td>
+                              <td
+                                style={td({
+                                  fontWeight: 600,
+                                  color: "#ea580c",
+                                })}
+                              >
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    flexWrap: "wrap",
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      fontSize: "10px",
+                                      fontWeight: 700,
+                                      color: stage.color,
+                                      background: stage.bg,
+                                      padding: "2px 8px",
+                                      borderRadius: "4px",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {stage.label}
+                                  </span>
+                                  <span>{entry.product}</span>
+                                  {isShortage && (
+                                    <span
+                                      style={{
+                                        fontSize: "10px",
+                                        fontWeight: 700,
+                                        background: "#fecaca",
+                                        color: "#dc2626",
+                                        padding: "1px 6px",
+                                        borderRadius: "4px",
+                                      }}
+                                    >
+                                      SHORTAGE
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td style={td()}>{entry.specification || "—"}</td>
+                              <td style={td()}>{entry.part_number || "—"}</td>
+                              <td style={td()}>
+                                {fmtQty(entry.required_quantity)}
+                              </td>
+                              <td style={td()}>
+                                {entry.required_date
+                                  ? fmtDate(entry.required_date)
+                                  : "—"}
+                              </td>
+                              <td style={td({ color: "#6b7280" })}>
+                                {entry.description || "—"}
+                              </td>
+                              <td style={td()}>{entry.requested_by || "—"}</td>
+                              {isAdmin && (
+                                <td style={td({ textAlign: "center" })}>
+                                  <button
+                                    onClick={() => handleDelete(entry.id)}
+                                    style={{
+                                      background: "none",
+                                      border: "none",
+                                      cursor: "pointer",
+                                      color: "#d1d5db",
+                                      fontSize: "16px",
+                                    }}
+                                    onMouseEnter={(e) =>
+                                      (e.currentTarget.style.color = "#ef4444")
+                                    }
+                                    onMouseLeave={(e) =>
+                                      (e.currentTarget.style.color = "#d1d5db")
+                                    }
+                                  >
+                                    🗑️
+                                  </button>
+                                </td>
+                              )}
                             </tr>
-                          )}
-                        </React.Fragment>
-                      ))
+                            {expandedEntryId === entry.id && (
+                              <tr>
+                                <td
+                                  colSpan={isAdmin ? 9 : 8}
+                                  style={{ padding: 0 }}
+                                >
+                                  <EntryFlowPanel
+                                    entry={entry}
+                                    userRole={user?.role || "user"}
+                                    onSaveStage={handleSaveStage}
+                                    onApprove={handleApprove}
+                                  />
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
