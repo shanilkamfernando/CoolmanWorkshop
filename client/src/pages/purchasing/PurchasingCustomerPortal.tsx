@@ -191,9 +191,14 @@ const PurchasingCustomerPortal = () => {
             </p>
           </div>
           <div style={{ display: "flex", gap: "10px" }}>
-            <button className="btn-add-small" onClick={() => setShowAdd(true)}>
-              + Add Customer
-            </button>
+            {isAdmin && (
+              <button
+                className="btn-add-small"
+                onClick={() => setShowAdd(true)}
+              >
+                + Add Customer
+              </button>
+            )}
             <button
               className="btn-back"
               onClick={() => navigate("/purchasing/workshop")}

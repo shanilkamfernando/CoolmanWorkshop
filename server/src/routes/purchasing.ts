@@ -20,76 +20,126 @@ interface AuthRequest extends Request {
 
 const getPool = (req: Request): Pool => req.app.locals.pool;
 
-// ─── PURCHASING CUSTOMER PROJECTS ─────────────────────────────────
+// ─── PURCHASING CUSTOMERS & PROJECTS ──────────────────────────────
 
-// GET all purchasing customer projects
+// GET all purchasing customers
 router.get(
   "/purchasing/customers",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
+
     try {
       const result = await pool.query(
-        `SELECT * FROM purchasing_customer_projects ORDER BY name ASC`,
+        `SELECT *
+         FROM purchasing_customers
+         ORDER BY name ASC`,
       );
-      res.json({ success: true, customers: result.rows });
+
+      res.json({
+        success: true,
+        customers: result.rows,
+      });
     } catch (error) {
-      console.error("Get purchasing customer projects error:", error);
-      res
-        .status(500)
-        .json({ success: false, error: "Failed to fetch customers" });
+      console.error("Get purchasing customers error:", error);
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch customers",
+      });
     }
   },
 );
 
-// GET single purchasing customer project
+// GET single purchasing customer
 router.get(
   "/purchasing/customers/:customerId",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
     const pool = getPool(req);
+
     try {
       const result = await pool.query(
-        `SELECT * FROM purchasing_customer_projects WHERE id = $1`,
+        `SELECT *
+         FROM purchasing_customers
+         WHERE id = $1`,
         [customerId],
       );
+
       if (result.rows.length === 0) {
-        res.status(404).json({ success: false, error: "Customer not found" });
+        res.status(404).json({
+          success: false,
+          error: "Customer not found",
+        });
         return;
       }
-      res.json({ success: true, customer: result.rows[0] });
+
+      res.json({
+        success: true,
+        customer: result.rows[0],
+      });
     } catch (error) {
-      res
-        .status(500)
-        .json({ success: false, error: "Failed to fetch customer" });
+      console.error("Get purchasing customer error:", error);
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch customer",
+      });
     }
   },
 );
 
-// GET projects for a purchasing customer
+// GET projects for a specific purchasing customer
 router.get(
   "/purchasing/customers/:customerId/projects",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
     const pool = getPool(req);
+
     try {
-      const result = await pool.query(
-        `SELECT * FROM purchasing_customer_projects WHERE id = $1`,
+      // First check that the customer exists
+      const customerResult = await pool.query(
+        `SELECT id, name
+         FROM purchasing_customers
+         WHERE id = $1`,
         [customerId],
       );
-      res.json({ success: true, projects: result.rows });
+
+      if (customerResult.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          error: "Customer not found",
+        });
+        return;
+      }
+
+      // Get ONLY projects belonging to this customer
+      const result = await pool.query(
+        `SELECT *
+         FROM purchasing_customer_projects
+         WHERE customer_id = $1
+         ORDER BY name ASC`,
+        [customerId],
+      );
+
+      res.json({
+        success: true,
+        projects: result.rows,
+      });
     } catch (error) {
       console.error("Get customer projects error:", error);
-      res
-        .status(500)
-        .json({ success: false, error: "Failed to fetch projects" });
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch projects",
+      });
     }
   },
 );
 
-// POST create project for a purchasing customer
+// POST create project for a specific purchasing customer
 router.post(
   "/purchasing/customers/:customerId/projects",
   authenticateToken,
@@ -98,66 +148,135 @@ router.post(
     const { name } = req.body;
     const pool = getPool(req);
 
+    // Only admins can create projects
+    if (req.user?.role !== "admin") {
+      res.status(403).json({
+        success: false,
+        error: "Only admins can create projects",
+      });
+      return;
+    }
+
     if (!name || !name.trim()) {
-      res
-        .status(400)
-        .json({ success: false, error: "Project name is required" });
+      res.status(400).json({
+        success: false,
+        error: "Project name is required",
+      });
       return;
     }
 
     try {
-      const result = await pool.query(
-        `INSERT INTO purchasing_customer_projects (name, created_by)
-         VALUES ($1, $2) RETURNING *`,
-        [name.trim(), req.user?.username || "Unknown"],
+      // Make sure the customer exists
+      const customerResult = await pool.query(
+        `SELECT id, name
+         FROM purchasing_customers
+         WHERE id = $1`,
+        [customerId],
       );
-      res.status(201).json({ success: true, project: result.rows[0] });
+
+      if (customerResult.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          error: "Customer not found",
+        });
+        return;
+      }
+
+      // Create ONLY the project
+      // It is linked to the customer using customer_id
+      const result = await pool.query(
+        `INSERT INTO purchasing_customer_projects
+          (name, customer_id, created_by)
+         VALUES
+          ($1, $2, $3)
+         RETURNING *`,
+        [name.trim(), customerId, req.user?.username || "Unknown"],
+      );
+
+      res.status(201).json({
+        success: true,
+        project: result.rows[0],
+      });
     } catch (error) {
       console.error("Create project error:", error);
-      res
-        .status(500)
-        .json({ success: false, error: "Failed to create project" });
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to create project",
+      });
     }
   },
 );
 
-// POST create purchasing customer project
+// POST create purchasing customer
 router.post(
   "/purchasing/customers",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
-    const { name, contact_number, email, address } = req.body;
+    const { name, contact_number, email, address, workshop_customer_id } =
+      req.body;
+
     const pool = getPool(req);
 
+    // Only admins can create customers
+    if (req.user?.role !== "admin") {
+      res.status(403).json({
+        success: false,
+        error: "Only admins can create customers",
+      });
+      return;
+    }
+
     if (!name || !name.trim()) {
-      res
-        .status(400)
-        .json({ success: false, error: "Customer name is required" });
+      res.status(400).json({
+        success: false,
+        error: "Customer name is required",
+      });
       return;
     }
 
     try {
+      // Create ONLY the customer
+      // This does NOT create a project
       const result = await pool.query(
-        `INSERT INTO purchasing_customer_projects (name, contact_number, email, address, created_by)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        `INSERT INTO purchasing_customers
+          (
+            name,
+            contact_number,
+            email,
+            address,
+            created_by,
+            workshop_customer_id
+          )
+         VALUES
+          ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
         [
           name.trim(),
           contact_number || null,
           email || null,
           address || null,
           req.user?.username || "Unknown",
+          workshop_customer_id || null,
         ],
       );
-      res.status(201).json({ success: true, customer: result.rows[0] });
+
+      res.status(201).json({
+        success: true,
+        customer: result.rows[0],
+      });
     } catch (error) {
-      res
-        .status(500)
-        .json({ success: false, error: "Failed to create customer" });
+      console.error("Create purchasing customer error:", error);
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to create customer",
+      });
     }
   },
 );
 
-// DELETE purchasing customer project (admin only)
+// DELETE purchasing customer (admin only)
 router.delete(
   "/purchasing/customers/:customerId",
   authenticateToken,
@@ -166,29 +285,50 @@ router.delete(
     const pool = getPool(req);
 
     if (req.user?.role !== "admin") {
-      res
-        .status(403)
-        .json({ success: false, error: "Only admins can delete customers" });
+      res.status(403).json({
+        success: false,
+        error: "Only admins can delete customers",
+      });
       return;
     }
 
     try {
-      const result = await pool.query(
-        "DELETE FROM purchasing_customer_projects WHERE id = $1 RETURNING id, name",
+      // Get customer first
+      const customerResult = await pool.query(
+        `SELECT id, name
+         FROM purchasing_customers
+         WHERE id = $1`,
         [customerId],
       );
-      if (result.rows.length === 0) {
-        res.status(404).json({ success: false, error: "Customer not found" });
+
+      if (customerResult.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          error: "Customer not found",
+        });
         return;
       }
+
+      // Because the project table has ON DELETE CASCADE,
+      // projects belonging to this customer will also be deleted.
+      const result = await pool.query(
+        `DELETE FROM purchasing_customers
+         WHERE id = $1
+         RETURNING id, name`,
+        [customerId],
+      );
+
       res.json({
         success: true,
         message: `Customer "${result.rows[0].name}" deleted`,
       });
     } catch (error) {
-      res
-        .status(500)
-        .json({ success: false, error: "Failed to delete customer" });
+      console.error("Delete purchasing customer error:", error);
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to delete customer",
+      });
     }
   },
 );
