@@ -16,6 +16,7 @@ interface BOQItem {
   boq_quantity: number;
 }
 interface Entry {
+  remark: string;
   id: number;
   entry_type: string;
   product: string;
@@ -55,8 +56,10 @@ interface Entry {
 
 const fmtDate = (d: string) => {
   if (!d) return "—";
+
   const [y, m, day] = d.split("T")[0].split("-");
-  return `${day} ${["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][parseInt(m) - 1]} ${y}`;
+
+  return `${day}/${m}/${y}`;
 };
 
 // Strip trailing .00 / .50 → 5, 5.5 etc. Returns "—" for null/empty.
@@ -78,8 +81,8 @@ const fmtDT = (dt: string) => {
 
 const STEPS = [
   { label: "Request", icon: "📋", color: "#dc2626", bg: "#fee2e2" },
-  { label: "Order", icon: "📝", color: "#ca8a04", bg: "#fef9c3" },
   { label: "Approval", icon: "✓", color: "#16a34a", bg: "#dcfce7" },
+  { label: "Order", icon: "📝", color: "#ca8a04", bg: "#fef9c3" },
   { label: "PO", icon: "🧾", color: "#2563eb", bg: "#dbeafe" },
   { label: "Invoice", icon: "🗂️", color: "#111827", bg: "#e5e7eb" },
   { label: "Delivered", icon: "🚚", color: "#6b7280", bg: "#f3f4f6" },
@@ -127,12 +130,13 @@ const EntryFlowPanel = ({
   entry: Entry;
   userRole: string;
   onSaveStage: (entryId: number, action: string, data: any) => void;
-  onApprove: (entryId: number, approvedQty: string) => void;
+  onApprove: (entryId: number, approvedQty: string, remark: string) => void;
 }) => {
   const completed = getEntryStep(entry);
   const [selectedTab, setSelectedTab] = useState(completed);
   const [draft, setDraft] = useState<any>({});
   const [approveQty, setApproveQty] = useState<string>("");
+  const [approveRemark, setApproveRemark] = useState("");
 
   useEffect(() => {
     setSelectedTab(getEntryStep(entry));
@@ -242,8 +246,100 @@ const EntryFlowPanel = ({
         </div>
       );
     }
-
     if (tab === 1) {
+      if (entry.approved) {
+        return (
+          <div>
+            <div style={{ color: "#059669", fontWeight: 600 }}>
+              ✓ Approved by {entry.approved_by} on {fmtDT(entry.approved_at)}
+            </div>
+
+            <div style={{ marginTop: "8px" }}>
+              <span style={labelStyle}>Approved Qty</span>
+              {renderEntryQty(entry)}
+            </div>
+
+            {entry.remark && (
+              <div style={{ marginTop: "8px" }}>
+                <span style={labelStyle}>Remark</span>
+                <div
+                  style={{
+                    marginTop: "4px",
+                    padding: "8px",
+                    background: "#f9fafb",
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "6px",
+                  }}
+                >
+                  {entry.remark}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      }
+
+      if (canApprove) {
+        return (
+          <div style={{ maxWidth: "400px" }}>
+            <div>
+              <span style={labelStyle}>Approved Quantity</span>
+
+              <input
+                style={{ ...fStyle, width: "120px" }}
+                value={approveQty}
+                onChange={(e) => setApproveQty(e.target.value)}
+              />
+
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "#6b7280",
+                  marginTop: "4px",
+                }}
+              >
+                Original: {fmtQty(entry.required_quantity)} — change here if you
+                want to approve a different qty
+              </div>
+            </div>
+
+            {/* Remark / Description */}
+            <div style={{ marginTop: "12px" }}>
+              <span style={labelStyle}>Remark</span>
+
+              <textarea
+                style={{
+                  ...fStyle,
+                  width: "100%",
+                  minHeight: "80px",
+                  marginTop: "5px",
+                  resize: "vertical",
+                  boxSizing: "border-box",
+                }}
+                placeholder="Enter a remark or description..."
+                value={approveRemark}
+                onChange={(e) => setApproveRemark(e.target.value)}
+              />
+            </div>
+
+            <button
+              style={{ ...saveBtnStyle, background: "#059669" }}
+              onClick={() => onApprove(entry.id, approveQty, approveRemark)}
+            >
+              ✓ Approve
+            </button>
+          </div>
+        );
+      }
+
+      return (
+        <div style={{ fontStyle: "italic", color: "#9ca3af" }}>
+          ⏳ Waiting for approval.
+        </div>
+      );
+    }
+
+    if (tab === 2) {
       const locked = isStageLocked("order");
       return (
         <div style={{ maxWidth: "500px" }}>
@@ -297,53 +393,6 @@ const EntryFlowPanel = ({
               Save Order
             </button>
           )}
-        </div>
-      );
-    }
-
-    if (tab === 2) {
-      if (entry.approved) {
-        return (
-          <div>
-            <div style={{ color: "#059669", fontWeight: 600 }}>
-              ✓ Approved by {entry.approved_by} on {fmtDT(entry.approved_at)}
-            </div>
-            <div style={{ marginTop: "8px" }}>
-              <span style={labelStyle}>Approved Qty</span>
-              {renderEntryQty(entry)}
-            </div>
-          </div>
-        );
-      }
-      if (canApprove) {
-        return (
-          <div style={{ maxWidth: "400px" }}>
-            <div>
-              <span style={labelStyle}>Approved Quantity</span>
-              <input
-                style={{ ...fStyle, width: "120px" }}
-                value={approveQty}
-                onChange={(e) => setApproveQty(e.target.value)}
-              />
-              <div
-                style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}
-              >
-                Original: {fmtQty(entry.required_quantity)} — change here if you
-                want to approve a different qty
-              </div>
-            </div>
-            <button
-              style={{ ...saveBtnStyle, background: "#059669" }}
-              onClick={() => onApprove(entry.id, approveQty)}
-            >
-              ✓ Approve
-            </button>
-          </div>
-        );
-      }
-      return (
-        <div style={{ fontStyle: "italic", color: "#9ca3af" }}>
-          ⏳ Waiting for approval.
         </div>
       );
     }
@@ -771,11 +820,15 @@ const CustomerPurchasingDashboard = () => {
     }
   };
 
-  const handleApprove = async (entryId: number, approvedQty: string) => {
+  const handleApprove = async (
+    entryId: number,
+    approvedQty: string,
+    remark: string,
+  ) => {
     try {
       const r = await axios.put(
         `${BASE}/${entryId}/approve`,
-        { approved_quantity: approvedQty },
+        { approved_quantity: approvedQty, remark: remark },
         { headers: hdr() },
       );
       setEntries((prev) =>
@@ -1394,7 +1447,9 @@ const CustomerPurchasingDashboard = () => {
                                   ? fmtDate(entry.required_date)
                                   : "—"}
                               </td>
-                              <td style={td({ color: "#6b7280" })}>
+                              <td
+                                style={td({ color: "#6b7280", width: "500px" })}
+                              >
                                 {entry.description || "—"}
                               </td>
                               <td style={td()}>{entry.requested_by || "—"}</td>
