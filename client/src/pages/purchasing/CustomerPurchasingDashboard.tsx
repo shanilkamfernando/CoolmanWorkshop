@@ -92,8 +92,8 @@ const getEntryStep = (e: Entry): number => {
   if (e.drivers_name || e.purchase_date) return 5;
   if (e.invoice_no) return 4;
   if (e.po_no) return 3;
-  if (e.approved) return 2;
-  if (e.order_form_no) return 1;
+  if (e.order_form_no) return 2;
+  if (e.approved) return 1;
   return 0;
 };
 
