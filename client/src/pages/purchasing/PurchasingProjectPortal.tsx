@@ -57,7 +57,8 @@ const PurchasingProjectsPortal = () => {
     if (!customerId) return;
     setCustomerLoading(true);
     try {
-      const res = await axios.get(`${API}/customers/${customerId}`, {
+      // Fixed: prefixed with /purchasing
+      const res = await axios.get(`${API}/purchasing/customers/${customerId}`, {
         headers: getHeaders(),
       });
       if (res.data?.customer) {
@@ -74,9 +75,13 @@ const PurchasingProjectsPortal = () => {
     if (!customerId) return;
     setLoading(true);
     try {
-      const res = await axios.get(`${API}/customers/${customerId}/projects`, {
-        headers: getHeaders(),
-      });
+      // Fixed: prefixed with /purchasing
+      const res = await axios.get(
+        `${API}/purchasing/customers/${customerId}/projects`,
+        {
+          headers: getHeaders(),
+        },
+      );
       setProjects(res.data?.projects || []);
     } catch (error) {
       console.error("Failed to fetch projects:", error);
@@ -111,8 +116,9 @@ const PurchasingProjectsPortal = () => {
     }
 
     try {
+      // Fixed: prefixed with /purchasing
       await axios.post(
-        `${API}/customers/${customerId}/projects`,
+        `${API}/purchasing/customers/${customerId}/projects`,
         { name: newProjectName.trim() },
         { headers: getHeaders() },
       );

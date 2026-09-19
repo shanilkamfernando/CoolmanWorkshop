@@ -20,9 +20,9 @@ interface AuthRequest extends Request {
 
 const getPool = (req: Request): Pool => req.app.locals.pool;
 
-// ─── PURCHASING CUSTOMERS ─────────────────────────────────────────
+// ─── PURCHASING CUSTOMER PROJECTS ─────────────────────────────────
 
-// GET all purchasing customers
+// GET all purchasing customer projects
 router.get(
   "/purchasing/customers",
   authenticateToken,
@@ -30,11 +30,11 @@ router.get(
     const pool = getPool(req);
     try {
       const result = await pool.query(
-        `SELECT * FROM purchasing_customers ORDER BY name ASC`,
+        `SELECT * FROM purchasing_customer_projects ORDER BY name ASC`,
       );
       res.json({ success: true, customers: result.rows });
     } catch (error) {
-      console.error("Get purchasing customers error:", error);
+      console.error("Get purchasing customer projects error:", error);
       res
         .status(500)
         .json({ success: false, error: "Failed to fetch customers" });
@@ -42,7 +42,7 @@ router.get(
   },
 );
 
-// GET single purchasing customer
+// GET single purchasing customer project
 router.get(
   "/purchasing/customers/:customerId",
   authenticateToken,
@@ -51,7 +51,7 @@ router.get(
     const pool = getPool(req);
     try {
       const result = await pool.query(
-        `SELECT * FROM purchasing_customers WHERE id = $1`,
+        `SELECT * FROM purchasing_customer_projects WHERE id = $1`,
         [customerId],
       );
       if (result.rows.length === 0) {
@@ -67,7 +67,61 @@ router.get(
   },
 );
 
-// POST create purchasing customer
+// GET projects for a purchasing customer
+router.get(
+  "/purchasing/customers/:customerId/projects",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { customerId } = req.params;
+    const pool = getPool(req);
+    try {
+      const result = await pool.query(
+        `SELECT * FROM purchasing_customer_projects WHERE id = $1`,
+        [customerId],
+      );
+      res.json({ success: true, projects: result.rows });
+    } catch (error) {
+      console.error("Get customer projects error:", error);
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to fetch projects" });
+    }
+  },
+);
+
+// POST create project for a purchasing customer
+router.post(
+  "/purchasing/customers/:customerId/projects",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { customerId } = req.params;
+    const { name } = req.body;
+    const pool = getPool(req);
+
+    if (!name || !name.trim()) {
+      res
+        .status(400)
+        .json({ success: false, error: "Project name is required" });
+      return;
+    }
+
+    try {
+      const result = await pool.query(
+        `INSERT INTO purchasing_customer_projects (name, created_by)
+         VALUES ($1, $2) RETURNING *`,
+        [name.trim(), req.user?.username || "Unknown"],
+      );
+      res.status(201).json({ success: true, project: result.rows[0] });
+    } catch (error) {
+      console.error("Create project error:", error);
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to create project" });
+    }
+  },
+);
+
+// POST create purchasing customer project
 router.post(
   "/purchasing/customers",
   authenticateToken,
@@ -84,7 +138,7 @@ router.post(
 
     try {
       const result = await pool.query(
-        `INSERT INTO purchasing_customers (name, contact_number, email, address, created_by)
+        `INSERT INTO purchasing_customer_projects (name, contact_number, email, address, created_by)
          VALUES ($1, $2, $3, $4, $5) RETURNING *`,
         [
           name.trim(),
@@ -103,7 +157,7 @@ router.post(
   },
 );
 
-// DELETE purchasing customer (admin only)
+// DELETE purchasing customer project (admin only)
 router.delete(
   "/purchasing/customers/:customerId",
   authenticateToken,
@@ -120,7 +174,7 @@ router.delete(
 
     try {
       const result = await pool.query(
-        "DELETE FROM purchasing_customers WHERE id = $1 RETURNING id, name",
+        "DELETE FROM purchasing_customer_projects WHERE id = $1 RETURNING id, name",
         [customerId],
       );
       if (result.rows.length === 0) {
@@ -160,8 +214,7 @@ router.get(
           [workshop_customer_id],
         );
       } else {
-        // Fetch by customer_id OR any entries whose workshop customer
-        // maps to this purchasing customer
+        // Fetch by customer_id
         result = await pool.query(
           `SELECT * FROM purchasing_entries 
            WHERE customer_id = $1
@@ -177,6 +230,7 @@ router.get(
     }
   },
 );
+
 // POST create entry — auto creates a workshop job card
 router.post(
   "/purchasing/customers/:customerId/entries",
@@ -386,7 +440,7 @@ router.get(
   },
 );
 
-// Add this new route in purchasing.ts — GET entries by workshop_customer_id
+// GET entries by workshop_customer_id
 router.get(
   "/purchasing/workshop-customers/:workshopCustomerId/entries",
   authenticateToken,
@@ -434,7 +488,6 @@ router.get(
 );
 
 // PUT batch-update per-product stage fields for an entry
-// body: { stage: "order"|"po"|"invoice"|"driver", products: [{ id, ...fields }] }
 router.put(
   "/purchasing/entries/:entryId/products",
   authenticateToken,
@@ -504,12 +557,10 @@ router.put(
           );
         } else if (stage === "approve") {
           if (!["admin", "office_admin"].includes(role)) {
-            res
-              .status(403)
-              .json({
-                success: false,
-                error: "Only admin/office_admin can approve",
-              });
+            res.status(403).json({
+              success: false,
+              error: "Only admin/office_admin can approve",
+            });
             return;
           }
           await pool.query(
