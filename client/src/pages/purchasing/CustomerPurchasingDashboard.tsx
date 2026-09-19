@@ -642,14 +642,6 @@ const CustomerPurchasingDashboard = () => {
     } catch {}
   };
 
-  // const fetchBOQItems = async () => {
-  //   try {
-  //     const r = await axios.get("${API_BASE}/boq", {
-  //       headers: hdr(),
-  //     });
-  //     setBOQItems(r.data.items || []);
-  //   } catch {}
-  // };
   const fetchBOQItems = async () => {
     try {
       const r = await axios.get(`${API_BASE}/boq?customer_id=${customerId}`, {
@@ -850,8 +842,21 @@ const CustomerPurchasingDashboard = () => {
     setShowBOQMasterForm(true);
   };
 
-  const boqEntries = entries.filter((e) => e.entry_type === "boq");
-  const nonBOQEntries = entries.filter((e) => e.entry_type === "non_boq");
+  const boqEntriesRaw = entries.filter((e) => e.entry_type === "boq");
+  const nonBOQEntriesRaw = entries.filter((e) => e.entry_type === "non_boq");
+
+  // Delivered entries (final stage) sink to the bottom; everything else
+  // keeps its normal order.
+  const sortByDelivered = (list: Entry[]) =>
+    [...list].sort((a, b) => {
+      const aDone = getEntryStep(a) === 5 ? 1 : 0;
+      const bDone = getEntryStep(b) === 5 ? 1 : 0;
+      return aDone - bDone;
+    });
+
+  const boqEntries = sortByDelivered(boqEntriesRaw);
+  const nonBOQEntries = sortByDelivered(nonBOQEntriesRaw);
+
   // distinct products for this customer (by item_name)
   const distinctProducts = Array.from(
     new Set(boqItems.map((i) => i.item_name)),
@@ -906,25 +911,6 @@ const CustomerPurchasingDashboard = () => {
 
   return (
     <div className="project-dashboard">
-      {/* Header */}
-      {/* <div className="portal-header">
-        <div className="header-left">
-          <div
-            className="logo-container"
-            onClick={() => navigate("/dashboard")}
-          >
-            <img src={companyLogo} alt="Logo" className="company-logo" />
-          </div>
-          <h1 className="portal-title" onClick={() => navigate("/dashboard")}>
-            <span className="brand-cool">COOL</span>
-            <span className="brand-man">Man</span> Refrigeration
-          </h1>
-        </div>
-        <div className="header-right">
-          <span className="user-icon">👤</span>
-          <span className="username">{user?.username}</span>
-        </div>
-      </div> */}
       <AppHeader />
 
       <div className="project-main-content">
@@ -1282,8 +1268,8 @@ const CustomerPurchasingDashboard = () => {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr>
-                      {/* <th style={th}>#</th> */}
                       <th style={{ ...th, width: "30px" }}></th>
+                      <th style={{ ...th, width: "50px" }}>No</th>
                       <th style={th}>Product</th>
                       <th style={th}>Specification</th>
                       <th style={th}>Part No</th>
@@ -1299,7 +1285,7 @@ const CustomerPurchasingDashboard = () => {
                     {boqEntries.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={11}
+                          colSpan={isAdmin ? 11 : 10}
                           style={td({
                             textAlign: "center",
                             color: "#9ca3af",
@@ -1310,18 +1296,27 @@ const CustomerPurchasingDashboard = () => {
                         </td>
                       </tr>
                     ) : (
-                      boqEntries.map((entry) => {
-                        const hasShortage = entry.shortage_quantity > 0;
+                      boqEntries.map((entry, idx) => {
                         const stage = STEPS[getEntryStep(entry)];
+                        const isDelivered = getEntryStep(entry) === 5;
+
                         return (
-                          <>
+                          <React.Fragment key={entry.id}>
                             {/* Normal row */}
                             <tr
+                              style={{
+                                background: isDelivered ? "#f3f4f6" : "#fff",
+                                opacity: isDelivered ? 0.55 : 1,
+                              }}
                               onMouseEnter={(e) =>
-                                (e.currentTarget.style.background = "#f9fafb")
+                                (e.currentTarget.style.background = isDelivered
+                                  ? "#f3f4f6"
+                                  : "#f9fafb")
                               }
                               onMouseLeave={(e) =>
-                                (e.currentTarget.style.background = "#fff")
+                                (e.currentTarget.style.background = isDelivered
+                                  ? "#f3f4f6"
+                                  : "#fff")
                               }
                             >
                               <td
@@ -1353,6 +1348,15 @@ const CustomerPurchasingDashboard = () => {
                                   ▶
                                 </span>
                               </td>
+                              <td
+                                style={td({
+                                  width: "50px",
+                                  textAlign: "center",
+                                  color: isDelivered ? "#9ca3af" : "#374151",
+                                })}
+                              >
+                                {idx + 1}
+                              </td>
                               <td style={td({ fontWeight: 500 })}>
                                 <div
                                   style={{
@@ -1361,6 +1365,7 @@ const CustomerPurchasingDashboard = () => {
                                     gap: "8px",
                                   }}
                                 >
+                                  <span>{entry.product}</span>
                                   <span
                                     style={{
                                       fontSize: "10px",
@@ -1374,7 +1379,6 @@ const CustomerPurchasingDashboard = () => {
                                   >
                                     {stage.label}
                                   </span>
-                                  <span>{entry.product}</span>
                                 </div>
                               </td>
                               <td style={td()}>{entry.specification || "—"}</td>
@@ -1384,9 +1388,6 @@ const CustomerPurchasingDashboard = () => {
                               </td>
                               <td style={td({ fontWeight: 600 })}>
                                 {fmtQty(entry.required_quantity)}
-                                {/* {hasShortage
-                                  ? fmtQty(entry.available_quantity)
-                                  : fmtQty(entry.required_quantity)} */}
                               </td>
                               <td style={td()}>
                                 {entry.required_date
@@ -1421,65 +1422,10 @@ const CustomerPurchasingDashboard = () => {
                               )}
                             </tr>
 
-                            {/* Shortage row in red */}
-                            {/* {hasShortage && (
-                              <tr
-                                key={`${entry.id}-shortage`}
-                                style={{ background: "#fff5f5" }}
-                              >
-                                <td style={td()}></td>
-                                <td
-                                  style={td({
-                                    color: "#dc2626",
-                                    fontWeight: 500,
-                                  })}
-                                >
-                                  {entry.product}{" "}
-                                  <span
-                                    style={{
-                                      fontSize: "11px",
-                                      background: "#fecaca",
-                                      padding: "1px 6px",
-                                      borderRadius: "4px",
-                                    }}
-                                  >
-                                    SHORTAGE
-                                  </span>
-                                </td>
-                                <td style={td({ color: "#dc2626" })}>
-                                  {entry.specification || "—"}
-                                </td>
-                                <td style={td({ color: "#dc2626" })}>
-                                  {entry.part_number || "—"}
-                                </td>
-                                <td style={td({ color: "#dc2626" })}>0</td>
-                                <td
-                                  style={td({
-                                    color: "#dc2626",
-                                    fontWeight: 700,
-                                  })}
-                                >
-                                  {fmtQty(entry.shortage_quantity)}
-                                </td>
-                                <td style={td({ color: "#dc2626" })}>
-                                  {entry.required_date
-                                    ? fmtDate(entry.required_date)
-                                    : "—"}
-                                </td>
-                                <td style={td({ color: "#dc2626" })}>
-                                  {entry.description || "—"}
-                                </td>
-                                <td style={td({ color: "#dc2626" })}>
-                                  {entry.requested_by || "—"}
-                                </td>
-                                {isAdmin && <td style={td()}></td>}
-                              </tr>
-                            )} */}
-
                             {expandedEntryId === entry.id && (
                               <tr>
                                 <td
-                                  colSpan={isAdmin ? 9 : 8}
+                                  colSpan={isAdmin ? 11 : 10}
                                   style={{ padding: 0 }}
                                 >
                                   <EntryFlowPanel
@@ -1491,7 +1437,7 @@ const CustomerPurchasingDashboard = () => {
                                 </td>
                               </tr>
                             )}
-                          </>
+                          </React.Fragment>
                         );
                       })
                     )}
@@ -1682,6 +1628,11 @@ const CustomerPurchasingDashboard = () => {
                       <th
                         style={{ ...th, background: "#fff7ed", width: "30px" }}
                       ></th>
+                      <th
+                        style={{ ...th, background: "#fff7ed", width: "50px" }}
+                      >
+                        No
+                      </th>
                       <th style={{ ...th, background: "#fff7ed" }}>Product</th>
                       <th style={{ ...th, background: "#fff7ed" }}>
                         Specification
@@ -1706,7 +1657,7 @@ const CustomerPurchasingDashboard = () => {
                     {nonBOQEntries.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={10}
+                          colSpan={isAdmin ? 10 : 9}
                           style={td({
                             textAlign: "center",
                             color: "#9ca3af",
@@ -1717,18 +1668,30 @@ const CustomerPurchasingDashboard = () => {
                         </td>
                       </tr>
                     ) : (
-                      nonBOQEntries.map((entry) => {
+                      nonBOQEntries.map((entry, idx) => {
                         const isShortage = (entry.description || "").includes(
                           "Shortage from BOQ stock",
                         );
                         const stage = STEPS[getEntryStep(entry)];
-                        const baseColor = isShortage ? "#fef2f2" : "#fff";
-                        const hoverColor = isShortage ? "#fee2e2" : "#fff7ed";
+                        const isDelivered = getEntryStep(entry) === 5;
+                        const baseColor = isDelivered
+                          ? "#f3f4f6"
+                          : isShortage
+                            ? "#fef2f2"
+                            : "#fff";
+                        const hoverColor = isDelivered
+                          ? "#f3f4f6"
+                          : isShortage
+                            ? "#fee2e2"
+                            : "#fff7ed";
 
                         return (
                           <React.Fragment key={entry.id}>
                             <tr
-                              style={{ background: baseColor }}
+                              style={{
+                                background: baseColor,
+                                opacity: isDelivered ? 0.55 : 1,
+                              }}
                               onMouseEnter={(e) =>
                                 (e.currentTarget.style.background = hoverColor)
                               }
@@ -1764,6 +1727,15 @@ const CustomerPurchasingDashboard = () => {
                                 >
                                   ▶
                                 </span>
+                              </td>
+                              <td
+                                style={td({
+                                  width: "50px",
+                                  textAlign: "center",
+                                  color: isDelivered ? "#9ca3af" : "#374151",
+                                })}
+                              >
+                                {idx + 1}
                               </td>
                               <td
                                 style={td({
@@ -1849,7 +1821,7 @@ const CustomerPurchasingDashboard = () => {
                             {expandedEntryId === entry.id && (
                               <tr>
                                 <td
-                                  colSpan={isAdmin ? 9 : 8}
+                                  colSpan={isAdmin ? 10 : 9}
                                   style={{ padding: 0 }}
                                 >
                                   <EntryFlowPanel
@@ -1992,23 +1964,6 @@ const CustomerPurchasingDashboard = () => {
                         }
                       />
                     </div>
-                    {/* <div>
-                      <label style={lbl}>BOQ Quantity</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={boqMasterForm.boq_quantity}
-                        style={inp}
-                        placeholder="0"
-                        onKeyDown={blockNeg}
-                        onChange={(e) =>
-                          setBOQMasterForm((p) => ({
-                            ...p,
-                            boq_quantity: posOnly(e.target.value),
-                          }))
-                        }
-                      />
-                    </div> */}
                     <div>
                       <label style={lbl}>Available Quantity</label>
                       <input
@@ -2070,7 +2025,6 @@ const CustomerPurchasingDashboard = () => {
                     <th style={th}>Item Name</th>
                     <th style={th}>Specification</th>
                     <th style={th}>Part Number</th>
-                    {/* <th style={th}>BOQ Qty</th> */}
                     <th style={th}>Available Qty</th>
                     <th style={th}>Remaining Qty</th>
                     {isAdmin && (
@@ -2084,7 +2038,7 @@ const CustomerPurchasingDashboard = () => {
                   {boqItems.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={isAdmin ? 7 : 6}
+                        colSpan={isAdmin ? 6 : 5}
                         style={td({
                           textAlign: "center",
                           color: "#9ca3af",
@@ -2118,7 +2072,6 @@ const CustomerPurchasingDashboard = () => {
                           </td>
                           <td style={td()}>{item.specification || "—"}</td>
                           <td style={td()}>{item.part_number || "—"}</td>
-                          {/* <td style={td()}>{fmtQty(item.boq_quantity)}</td> */}
                           <td style={td()}>
                             {fmtQty(item.available_quantity)}
                           </td>
