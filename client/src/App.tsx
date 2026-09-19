@@ -71,6 +71,7 @@ import FollowUpDashboard from "./pages/followup/FollowUpDashboard";
 import WorkshopPage from "./pages/workshop/WorkshopPage";
 import WorkshopJobCardsList from "./pages/workshop/WorkshopJobCardsList";
 import WorkshopJobCardDetail from "./pages/workshop/WorkshopJobCardDetail";
+import PurchasingProjectsPortal from "./pages/purchasing/PurchasingProjectPortal";
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -261,6 +262,11 @@ function App() {
         /> */}
 
         <Route path="/purchasing" element={<PurchasingPortal />} />
+
+        <Route
+          path="/purchasing/customers/:customerId/projects"
+          element={<PurchasingProjectsPortal />}
+        />
 
         <Route path="/purchasing/workshop" element={<WorkshopPortal />} />
         <Route

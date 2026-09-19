@@ -395,13 +395,20 @@ const PurchasingCustomerList = () => {
                       "0 2px 6px rgba(0,0,0,0.05)";
                   }}
                   onClick={() =>
-                    navigate(`/purchasing/customers/${customer.id}/dashboard`, {
+                    navigate(`/purchasing/customers/${customer.id}/projects`, {
                       state: {
                         customer: { id: customer.id, name: customer.name },
-                        // workshopCustomerId: customer.workshop_customer_id, // ← add this
                       },
                     })
                   }
+                  // onClick={() =>
+                  //   navigate(`/purchasing/customers/${customer.id}/dashboard`, {
+                  //     state: {
+                  //       customer: { id: customer.id, name: customer.name },
+                  //       // workshopCustomerId: customer.workshop_customer_id, // ← add this
+                  //     },
+                  //   })
+                  // }
                 >
                   {isAdmin && (
                     <button
