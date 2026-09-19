@@ -14,29 +14,6 @@ interface AuthRequest extends Request {
 }
 const getPool = (req: Request): Pool => req.app.locals.pool;
 
-// GET all BOQ items
-// router.get(
-//   "/boq",
-//   authenticateToken,
-//   async (req: AuthRequest, res: Response): Promise<void> => {
-//     const pool = getPool(req);
-//     const { customer_id } = req.query;
-//     try {
-//       const result = await pool.query(
-//         `SELECT b.*,
-//         (b.available_quantity - COALESCE(SUM(cpe.required_quantity) FILTER (WHERE cpe.entry_type = 'boq'), 0)) AS remaining_quantity
-//        FROM boq_items b
-//        LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id
-//        GROUP BY b.id
-//        ORDER BY b.item_no ASC`,
-//       );
-//       res.json({ success: true, items: result.rows });
-//     } catch (error: any) {
-//       res.status(500).json({ success: false, error: error?.message });
-//     }
-//   },
-// );
-
 router.get(
   "/boq",
   authenticateToken,
@@ -76,51 +53,6 @@ router.get(
     }
   },
 );
-
-// POST create BOQ item (data_entry, admin only)
-// router.post(
-//   "/boq",
-//   authenticateToken,
-//   async (req: AuthRequest, res: Response): Promise<void> => {
-//     const role = req.user?.role;
-//     if (!["admin", "data_entry"].includes(role || "")) {
-//       res.status(403).json({
-//         success: false,
-//         error: "Only data entry or admin can add BOQ items",
-//       });
-//       return;
-//     }
-//     const {
-//       item_no,
-//       item_name,
-//       part_number,
-//       boq_quantity,
-//       available_quantity,
-//     } = req.body;
-//     const pool = getPool(req);
-//     if (!item_name?.trim()) {
-//       res.status(400).json({ success: false, error: "Item name is required" });
-//       return;
-//     }
-//     try {
-//       const result = await pool.query(
-//         `INSERT INTO boq_items (item_no, item_name, part_number, boq_quantity, available_quantity, created_by)
-//        VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
-//         [
-//           item_no || "",
-//           item_name.trim(),
-//           part_number || "",
-//           boq_quantity || 0,
-//           available_quantity || 0,
-//           req.user?.username,
-//         ],
-//       );
-//       res.status(201).json({ success: true, item: result.rows[0] });
-//     } catch (error: any) {
-//       res.status(500).json({ success: false, error: error?.message });
-//     }
-//   },
-// );
 
 router.post(
   "/boq",
@@ -176,47 +108,6 @@ router.post(
   },
 );
 
-// PUT update BOQ item (data_entry, admin only)
-// router.put(
-//   "/boq/:itemId",
-//   authenticateToken,
-//   async (req: AuthRequest, res: Response): Promise<void> => {
-//     const role = req.user?.role;
-//     if (!["admin", "data_entry"].includes(role || "")) {
-//       res.status(403).json({
-//         success: false,
-//         error: "Only data entry or admin can edit BOQ items",
-//       });
-//       return;
-//     }
-//     const { itemId } = req.params;
-//     const {
-//       item_no,
-//       item_name,
-//       part_number,
-//       boq_quantity,
-//       available_quantity,
-//     } = req.body;
-//     const pool = getPool(req);
-//     try {
-//       const result = await pool.query(
-//         `UPDATE boq_items SET item_no=$1, item_name=$2, part_number=$3, boq_quantity=$4, available_quantity=$5, updated_at=NOW()
-//        WHERE id=$6 RETURNING *`,
-//         [
-//           item_no || "",
-//           item_name,
-//           part_number || "",
-//           boq_quantity || 0,
-//           available_quantity || 0,
-//           itemId,
-//         ],
-//       );
-//       res.json({ success: true, item: result.rows[0] });
-//     } catch (error: any) {
-//       res.status(500).json({ success: false, error: error?.message });
-//     }
-//   },
-// );
 router.put(
   "/boq/:id",
   authenticateToken,
@@ -309,6 +200,80 @@ router.get(
 );
 
 // POST create customer entry
+// router.post(
+//   "/boq/customer/:customerId/entries",
+//   authenticateToken,
+//   async (req: AuthRequest, res: Response): Promise<void> => {
+//     const pool = getPool(req);
+//     const { customerId } = req.params;
+//     const {
+//       entry_type,
+//       boq_item_id,
+//       product,
+//       specification,
+//       part_number,
+//       required_quantity,
+//       required_date,
+//       description,
+//     } = req.body;
+
+//     if (!product?.trim()) {
+//       res.status(400).json({ success: false, error: "Product is required" });
+//       return;
+//     }
+
+//     try {
+//       let available_quantity = null;
+//       let shortage_quantity = 0;
+
+//       if (entry_type === "boq" && boq_item_id) {
+//         // Get current remaining quantity for this BOQ item
+//         const boqResult = await pool.query(
+//           `SELECT b.available_quantity,
+//                 COALESCE(SUM(cpe.required_quantity), 0) as total_requested
+//          FROM boq_items b
+//          LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id AND cpe.entry_type = 'boq'
+//          WHERE b.id = $1
+//          GROUP BY b.id, b.available_quantity`,
+//           [boq_item_id],
+//         );
+
+//         if (boqResult.rows.length > 0) {
+//           const { available_quantity: boq_avail, total_requested } =
+//             boqResult.rows[0];
+//           const remaining =
+//             parseFloat(boq_avail) - parseFloat(total_requested || "0");
+//           available_quantity = remaining < 0 ? 0 : remaining;
+//           const req_qty = parseFloat(required_quantity) || 0;
+//           shortage_quantity = req_qty > remaining ? req_qty - remaining : 0;
+//         }
+//       }
+
+//       const result = await pool.query(
+//         `INSERT INTO customer_purchasing_entries
+//     (customer_id, entry_type, boq_item_id, product, specification, part_number, available_quantity, required_quantity, shortage_quantity, required_date, description, requested_by)
+//    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+//         [
+//           customerId,
+//           entry_type || "boq",
+//           boq_item_id || null,
+//           product.trim(),
+//           specification || null,
+//           part_number || null,
+//           available_quantity,
+//           required_quantity || 0,
+//           shortage_quantity,
+//           required_date || null,
+//           description || "",
+//           req.user?.username,
+//         ],
+//       );
+//       res.status(201).json({ success: true, entry: result.rows[0] });
+//     } catch (error: any) {
+//       res.status(500).json({ success: false, error: error?.message });
+//     }
+//   },
+// );
 router.post(
   "/boq/customer/:customerId/entries",
   authenticateToken,
@@ -334,27 +299,34 @@ router.post(
     try {
       let available_quantity = null;
       let shortage_quantity = 0;
+      let fulfilledQuantity = parseFloat(required_quantity) || 0;
+      let boqPartNumber: string | null = null;
 
       if (entry_type === "boq" && boq_item_id) {
-        // Get current remaining quantity for this BOQ item
         const boqResult = await pool.query(
-          `SELECT b.available_quantity,
+          `SELECT b.available_quantity, b.part_number,
                 COALESCE(SUM(cpe.required_quantity), 0) as total_requested
-         FROM boq_items b
-         LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id AND cpe.entry_type = 'boq'
-         WHERE b.id = $1
-         GROUP BY b.id, b.available_quantity`,
+           FROM boq_items b
+           LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id AND cpe.entry_type = 'boq'
+           WHERE b.id = $1
+           GROUP BY b.id, b.available_quantity, b.part_number`,
           [boq_item_id],
         );
 
         if (boqResult.rows.length > 0) {
-          const { available_quantity: boq_avail, total_requested } =
-            boqResult.rows[0];
+          const {
+            available_quantity: boq_avail,
+            total_requested,
+            part_number: boqPn,
+          } = boqResult.rows[0];
+          boqPartNumber = boqPn;
           const remaining =
             parseFloat(boq_avail) - parseFloat(total_requested || "0");
           available_quantity = remaining < 0 ? 0 : remaining;
           const req_qty = parseFloat(required_quantity) || 0;
           shortage_quantity = req_qty > remaining ? req_qty - remaining : 0;
+          // The BOQ entry itself only ever records what BOQ stock can cover
+          fulfilledQuantity = Math.max(req_qty - shortage_quantity, 0);
         }
       }
 
@@ -370,13 +342,37 @@ router.post(
           specification || null,
           part_number || null,
           available_quantity,
-          required_quantity || 0,
-          shortage_quantity,
+          fulfilledQuantity,
+          0, // shortage no longer tracked on the BOQ row itself
           required_date || null,
           description || "",
           req.user?.username,
         ],
       );
+
+      // Uncovered quantity is genuinely a "not in BOQ" purchase — it has to
+      // be sourced outside stock, so it becomes its own row in that table
+      // instead of a synthetic sub-row under the BOQ entry.
+      if (entry_type === "boq" && shortage_quantity > 0) {
+        await pool.query(
+          `INSERT INTO customer_purchasing_entries
+      (customer_id, entry_type, boq_item_id, product, specification, part_number, required_quantity, required_date, description, requested_by)
+     VALUES ($1,'non_boq',NULL,$2,$3,$4,$5,$6,$7,$8)`,
+          [
+            customerId,
+            product.trim(),
+            specification || null,
+            part_number || boqPartNumber || null,
+            shortage_quantity,
+            required_date || null,
+            description
+              ? `${description} — Shortage from BOQ stock`
+              : "Shortage from BOQ stock",
+            req.user?.username,
+          ],
+        );
+      }
+
       res.status(201).json({ success: true, entry: result.rows[0] });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error?.message });
@@ -411,12 +407,10 @@ router.put(
         );
       } else if (action === "approve") {
         if (!["admin", "office_admin"].includes(role)) {
-          res
-            .status(403)
-            .json({
-              success: false,
-              error: "Only admin/office_admin can approve",
-            });
+          res.status(403).json({
+            success: false,
+            error: "Only admin/office_admin can approve",
+          });
           return;
         }
         result = await pool.query(

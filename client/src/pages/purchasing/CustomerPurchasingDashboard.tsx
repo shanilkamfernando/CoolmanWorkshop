@@ -1235,14 +1235,14 @@ const CustomerPurchasingDashboard = () => {
                           ⚠️ Shortage: Required{" "}
                           <strong>{boqForm.required_quantity}</strong> but only{" "}
                           <strong>{selectedBOQItem.remaining_quantity}</strong>{" "}
-                          available. The entry will be split —{" "}
+                          available in BOQ.{" "}
                           <strong>{selectedBOQItem.remaining_quantity}</strong>{" "}
-                          normal +{" "}
+                          will be recorded here, and the remaining{" "}
                           <strong>
                             {parseFloat(boqForm.required_quantity) -
                               selectedBOQItem.remaining_quantity}
                           </strong>{" "}
-                          in red.
+                          will be added to "Items Not in BOQ."
                         </div>
                       )}
 
@@ -1360,9 +1360,10 @@ const CustomerPurchasingDashboard = () => {
                                 {fmtQty(entry.available_quantity ?? "—")}
                               </td>
                               <td style={td({ fontWeight: 600 })}>
-                                {hasShortage
+                                {fmtQty(entry.required_quantity)}
+                                {/* {hasShortage
                                   ? fmtQty(entry.available_quantity)
-                                  : fmtQty(entry.required_quantity)}
+                                  : fmtQty(entry.required_quantity)} */}
                               </td>
                               <td style={td()}>
                                 {entry.required_date
@@ -1398,7 +1399,7 @@ const CustomerPurchasingDashboard = () => {
                             </tr>
 
                             {/* Shortage row in red */}
-                            {hasShortage && (
+                            {/* {hasShortage && (
                               <tr
                                 key={`${entry.id}-shortage`}
                                 style={{ background: "#fff5f5" }}
@@ -1450,7 +1451,7 @@ const CustomerPurchasingDashboard = () => {
                                 </td>
                                 {isAdmin && <td style={td()}></td>}
                               </tr>
-                            )}
+                            )} */}
 
                             {expandedEntryId === entry.id && (
                               <tr>
