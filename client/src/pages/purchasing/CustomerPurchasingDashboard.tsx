@@ -55,10 +55,9 @@ interface Entry {
 }
 
 const fmtDate = (d: string) => {
+  console.log("Date received:", d);
   if (!d) return "—";
-
   const [y, m, day] = d.split("T")[0].split("-");
-
   return `${day}/${m}/${y}`;
 };
 
