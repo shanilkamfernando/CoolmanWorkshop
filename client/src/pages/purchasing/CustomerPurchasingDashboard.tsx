@@ -14,6 +14,7 @@ interface BOQItem {
   remaining_quantity: number;
   available_quantity: number;
   boq_quantity: number;
+  boq_locked: boolean;
 }
 interface Entry {
   remark: string;
@@ -637,6 +638,7 @@ const CustomerPurchasingDashboard = () => {
     available_quantity: "",
   });
   const [savingBOQMaster, setSavingBOQMaster] = useState(false);
+  const [boqDone, setBOQDone] = useState(false);
 
   const [boqForm, setBOQForm] = useState({
     boq_item_id: "",
@@ -894,6 +896,37 @@ const CustomerPurchasingDashboard = () => {
     setShowBOQMasterForm(true);
   };
 
+  const handleBOQDone = async () => {
+    if (boqItems.length === 0) {
+      alert("Please add at least one BOQ item before clicking Done.");
+      return;
+    }
+
+    if (
+      !confirm(
+        "Are you sure you have finished adding all BOQ items? Once completed, the BOQ Master cannot be changed.",
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await axios.put(
+        `${API_BASE}/boq/customer/${customerId}/complete`,
+        {},
+        { headers: hdr() },
+      );
+
+      setBOQDone(true);
+      setShowBOQMasterForm(false);
+      setEditingBOQItem(null);
+
+      alert("BOQ Master has been completed and locked.");
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to complete BOQ Master");
+    }
+  };
+
   const boqEntriesRaw = entries.filter((e) => e.entry_type === "boq");
   const nonBOQEntriesRaw = entries.filter((e) => e.entry_type === "non_boq");
 
@@ -1065,7 +1098,7 @@ const CustomerPurchasingDashboard = () => {
                     {boqEntries.length} entries
                   </p>
                 </div>
-                {!showBOQForm && (
+                {boqDone && !showBOQForm && (
                   <button
                     className="btn-save-project"
                     onClick={async () => {
@@ -1078,6 +1111,21 @@ const CustomerPurchasingDashboard = () => {
                 )}
               </div>
 
+              {!boqDone && (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    background: "#fff7ed",
+                    border: "1px solid #fed7aa",
+                    borderRadius: "8px",
+                    color: "#c2410c",
+                    fontSize: "13px",
+                  }}
+                >
+                  🔒 Customer Purchasing is locked until the BOQ Master is
+                  completed.
+                </div>
+              )}
               {/* BOQ Add Form */}
               {showBOQForm && (
                 <div
@@ -1923,25 +1971,36 @@ const CustomerPurchasingDashboard = () => {
                   {boqItems.length} items in BOQ
                 </p>
               </div>
-              {canAddBOQ && !showBOQMasterForm && (
-                <button
-                  className="btn-save-project"
-                  style={{ background: "#0891b2" }}
-                  onClick={() => {
-                    setShowBOQMasterForm(true);
-                    setEditingBOQItem(null);
-                    setBOQMasterForm({
-                      specification: "",
-                      item_name: "",
-                      part_number: "",
-                      boq_quantity: "",
-                      available_quantity: "",
-                    });
-                  }}
-                >
-                  + Add Item
-                </button>
-              )}
+              <div style={{ display: "flex", gap: "8px" }}>
+                {canAddBOQ && !boqDone && !showBOQMasterForm && (
+                  <button
+                    className="btn-save-project"
+                    style={{ background: "#0891b2" }}
+                    onClick={() => {
+                      setShowBOQMasterForm(true);
+                      setEditingBOQItem(null);
+                      setBOQMasterForm({
+                        specification: "",
+                        item_name: "",
+                        part_number: "",
+                        boq_quantity: "",
+                        available_quantity: "",
+                      });
+                    }}
+                  >
+                    + Add Item
+                  </button>
+                )}
+                {canAddBOQ && !boqDone && (
+                  <button
+                    className="btn-save-project"
+                    style={{ background: "#16a34a" }}
+                    onClick={handleBOQDone}
+                  >
+                    ✓ Done
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* BOQ Master Add/Edit Form */}
@@ -2151,7 +2210,7 @@ const CustomerPurchasingDashboard = () => {
                               {remaining <= 0 ? "0 (Depleted)" : remaining}
                             </span>
                           </td>
-                          {isAdmin && (
+                          {/* {isAdmin && (
                             <td style={td({ textAlign: "center" })}>
                               <div
                                 style={{
@@ -2198,6 +2257,11 @@ const CustomerPurchasingDashboard = () => {
                                 )}
                               </div>
                             </td>
+                          )} */}
+                          {isAdmin && (
+                            <th style={{ ...th, textAlign: "center" as const }}>
+                              Actions
+                            </th>
                           )}
                         </tr>
                       );
