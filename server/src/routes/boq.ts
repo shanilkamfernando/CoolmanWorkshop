@@ -83,6 +83,23 @@ router.post(
       res.status(400).json({ success: false, error: "Customer is required" });
       return;
     }
+    const lockCheck = await pool.query(
+      `SELECT EXISTS (
+     SELECT 1
+     FROM boq_items
+     WHERE customer_id = $1
+       AND boq_locked = TRUE
+   ) AS locked`,
+      [customer_id],
+    );
+
+    if (lockCheck.rows[0].locked) {
+      res.status(409).json({
+        success: false,
+        error: "BOQ Master is already completed and locked",
+      });
+      return;
+    }
 
     try {
       const result = await pool.query(
@@ -120,6 +137,7 @@ router.put(
         .json({ success: false, error: "Only admins can edit BOQ items" });
       return;
     }
+
     const { id } = req.params;
     const {
       item_name,
@@ -128,6 +146,29 @@ router.put(
       boq_quantity,
       available_quantity,
     } = req.body;
+
+    const lockCheck = await pool.query(
+      `SELECT boq_locked
+   FROM boq_items
+   WHERE id = $1`,
+      [id],
+    );
+
+    if (lockCheck.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: "BOQ item not found",
+      });
+      return;
+    }
+
+    if (lockCheck.rows[0].boq_locked) {
+      res.status(409).json({
+        success: false,
+        error: "BOQ Master is completed and locked",
+      });
+      return;
+    }
     try {
       const result = await pool.query(
         `UPDATE boq_items SET
@@ -162,6 +203,29 @@ router.delete(
       return;
     }
     const pool = getPool(req);
+
+    const lockCheck = await pool.query(
+      `SELECT boq_locked
+   FROM boq_items
+   WHERE id = $1`,
+      [req.params.itemId],
+    );
+
+    if (lockCheck.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: "BOQ item not found",
+      });
+      return;
+    }
+
+    if (lockCheck.rows[0].boq_locked) {
+      res.status(409).json({
+        success: false,
+        error: "BOQ Master is completed and locked",
+      });
+      return;
+    }
     try {
       await pool.query("DELETE FROM boq_items WHERE id=$1", [
         req.params.itemId,
@@ -280,6 +344,25 @@ router.post(
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
     const { customerId } = req.params;
+
+    const boqStatus = await pool.query(
+      `SELECT COUNT(*)::int AS total,
+          COUNT(*) FILTER (WHERE boq_locked = TRUE)::int AS locked
+   FROM boq_items
+   WHERE customer_id = $1`,
+      [customerId],
+    );
+
+    const total = boqStatus.rows[0].total;
+    const locked = boqStatus.rows[0].locked;
+
+    if (total === 0 || locked !== total) {
+      res.status(409).json({
+        success: false,
+        error: "BOQ Master must be completed before adding purchasing entries",
+      });
+      return;
+    }
     const {
       entry_type,
       boq_item_id,
@@ -486,6 +569,68 @@ router.delete(
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error?.message });
+    }
+  },
+);
+
+// ============================================================
+// COMPLETE / LOCK BOQ MASTER FOR A CUSTOMER
+// ============================================================
+router.put(
+  "/boq/customer/:customerId/complete",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const pool = getPool(req);
+    const { customerId } = req.params;
+
+    // Only admin/data-entry can complete the BOQ
+    if (!["admin", "data_entry"].includes(req.user?.role || "")) {
+      res.status(403).json({
+        success: false,
+        error: "Only admin or data entry can complete the BOQ",
+      });
+      return;
+    }
+
+    try {
+      // Make sure the customer has at least one BOQ item
+      const checkResult = await pool.query(
+        `SELECT COUNT(*)::int AS count
+         FROM boq_items
+         WHERE customer_id = $1`,
+        [customerId],
+      );
+
+      if (checkResult.rows[0].count === 0) {
+        res.status(400).json({
+          success: false,
+          error: "Cannot complete BOQ because no BOQ items exist",
+        });
+        return;
+      }
+
+      // Lock all BOQ items for this customer
+      const result = await pool.query(
+        `UPDATE boq_items
+         SET boq_locked = TRUE,
+             updated_at = NOW()
+         WHERE customer_id = $1
+         RETURNING *`,
+        [customerId],
+      );
+
+      res.json({
+        success: true,
+        message: "BOQ Master completed and locked successfully",
+        items: result.rows,
+      });
+    } catch (error: any) {
+      console.error("Complete BOQ error:", error?.message || error);
+
+      res.status(500).json({
+        success: false,
+        error: error?.message || "Failed to complete BOQ Master",
+      });
     }
   },
 );
