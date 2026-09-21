@@ -979,9 +979,14 @@ const WorklistTasksDashboard = () => {
             <button className="btn-back" onClick={() => navigate("/worklist")}>
               ← Back to Years
             </button>
-            <button className="btn-add-small" onClick={() => setShowAdd(true)}>
-              + Add Task
-            </button>
+            {isAdmin && (
+              <button
+                className="btn-add-small"
+                onClick={() => setShowAdd(true)}
+              >
+                + Add Task
+              </button>
+            )}
           </div>
         </div>
 

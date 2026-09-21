@@ -240,6 +240,14 @@ router.post(
   "/jobAssigned/tasks",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
+    if (req.user?.role !== "admin") {
+      res.status(403).json({
+        success: false,
+        error: "Only admins can add tasks",
+      });
+      return;
+    }
+
     const {
       year,
       customer_id,
