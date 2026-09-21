@@ -370,10 +370,6 @@ router.put(
 
       const record = existing.rows[0];
 
-      // Any authenticated user may update a task's status/notes — not just
-      // the assigned member or an admin. Only the field allow-list below
-      // and the done/todo guards constrain what a non-admin can change.
-
       // ── Once a task is done, it's locked — no further edits by anyone ──
       if (record.status === "done") {
         res.status(403).json({
@@ -438,6 +434,16 @@ router.put(
       );
 
       const updatedTask = result.rows[0];
+
+      // ── Automatically log who completed the task ──
+      if (record.status !== "done" && updatedTask.status === "done") {
+        await pool.query(
+          `INSERT INTO worklist_task_updates
+      (task_id, update_note, status, created_by)
+     VALUES ($1, $2, $3, $4)`,
+          [taskId, "Task Completed", "done", req.user?.username || "Unknown"],
+        );
+      }
 
       // ── Sync status/finish_date back to project_assigned_members (non-blocking) ──
       if (updatedTask.job_type === "project" && updatedTask.job_reference_id) {
