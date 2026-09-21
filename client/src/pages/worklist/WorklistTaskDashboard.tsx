@@ -144,6 +144,7 @@ const API = "https://coolmanworkshop-production.up.railway.app/api";
 // ── Update Log Component ──────────────────────────────────────
 const TaskUpdateLog = ({
   taskId,
+  status,
   canEdit,
   isAdmin,
   readOnly,
@@ -151,6 +152,7 @@ const TaskUpdateLog = ({
   authHeaders,
 }: {
   taskId: number;
+  status: string;
   canEdit: boolean;
   isAdmin: boolean;
   readOnly: boolean;
@@ -165,7 +167,10 @@ const TaskUpdateLog = ({
 
   useEffect(() => {
     fetchUpdates();
-  }, [taskId]);
+    // Refetch whenever the task's status changes — this covers the
+    // server's auto-inserted "Task Completed" row the moment a task is
+    // marked done, without requiring the row to be collapsed/reopened.
+  }, [taskId, status]);
 
   const fetchUpdates = async () => {
     try {
@@ -702,32 +707,6 @@ const WorklistTasksDashboard = () => {
       setSaving(false);
     }
   };
-
-  // const handleStatusChange = async (task: WorklistTask, newStatus: string) => {
-  //   if (newStatus === "todo" && task.status !== "todo") {
-  //     alert("A task can't be moved back to To Do once it has started.");
-  //     return;
-  //   }
-
-  //   const updates: Record<string, string> = { status: newStatus };
-  //   if (newStatus === "done" && !task.finish_date) {
-  //     updates.finish_date = todayISO();
-  //   }
-
-  //   setTasks((prev) =>
-  //     prev.map((t) => (t.id === task.id ? { ...t, ...updates } : t)),
-  //   );
-
-  //   try {
-  //     await axios.put(`${API}/jobAssigned/tasks/${task.id}`, updates, {
-  //       headers: authHeaders(),
-  //     });
-  //     fetchTasks();
-  //   } catch (e: any) {
-  //     alert(e.response?.data?.error || "Failed to update status");
-  //     fetchTasks();
-  //   }
-  // };
 
   const handleStatusChange = async (task: WorklistTask, newStatus: string) => {
     // Cannot move a completed task back to another status
@@ -1463,6 +1442,7 @@ const WorklistTasksDashboard = () => {
                                 <div>
                                   <TaskUpdateLog
                                     taskId={task.id}
+                                    status={task.status}
                                     canEdit={canEditUpdate}
                                     isAdmin={isAdmin}
                                     readOnly={isDone}
@@ -1491,12 +1471,6 @@ const WorklistTasksDashboard = () => {
                                     gap: "12px",
                                   }}
                                 >
-                                  {/* <span
-                                    style={{ fontSize: "13px", color: "#888" }}
-                                  >
-                                    Created by:{" "}
-                                    <strong>{task.created_by || "—"}</strong>
-                                  </span> */}
                                   {jobLink && (
                                     <button
                                       onClick={(e) =>
