@@ -145,6 +145,7 @@ const API = "https://coolmanworkshop-production.up.railway.app/api";
 const TaskUpdateLog = ({
   taskId,
   status,
+  description,
   canEdit,
   isAdmin,
   readOnly,
@@ -153,6 +154,7 @@ const TaskUpdateLog = ({
 }: {
   taskId: number;
   status: string;
+  description: string;
   canEdit: boolean;
   isAdmin: boolean;
   readOnly: boolean;
@@ -256,6 +258,35 @@ const TaskUpdateLog = ({
 
   return (
     <div>
+      {description && (
+        <div
+          style={{
+            fontSize: "13px",
+            color: "#555",
+            background: "#f8f9ff",
+            border: "1px solid #e8f0fe",
+            borderRadius: "6px",
+            padding: "8px 12px",
+            marginBottom: "12px",
+            lineHeight: 1.5,
+          }}
+        >
+          <span
+            style={{
+              fontSize: "10px",
+              fontWeight: 700,
+              color: "#667eea",
+              textTransform: "uppercase",
+              letterSpacing: "0.5px",
+              display: "block",
+              marginBottom: "3px",
+            }}
+          >
+            Description
+          </span>
+          {description}
+        </div>
+      )}
       <div
         style={{
           fontSize: "11px",
@@ -1448,6 +1479,7 @@ const WorklistTasksDashboard = () => {
                                     readOnly={isDone}
                                     systemUsers={systemUsers}
                                     authHeaders={authHeaders}
+                                    description={task.job_description}
                                   />
                                 </div>
                               </div>
