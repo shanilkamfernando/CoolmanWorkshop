@@ -976,7 +976,10 @@ const WorklistTasksDashboard = () => {
         <div className="project-header-row">
           <h2>Job Assigned — {year}</h2>
           <div style={{ display: "flex", gap: "10px" }}>
-            <button className="btn-back" onClick={() => navigate("/worklist")}>
+            <button
+              className="btn-back"
+              onClick={() => navigate("/jobAssigned")}
+            >
               ← Back to Years
             </button>
             {isAdmin && (
