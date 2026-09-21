@@ -216,10 +216,19 @@ router.get(
             WHERE u.task_id = t.id
               AND u.third_party IS NOT NULL
               AND u.third_party <> ''
-          ) AS third_party_names
+          ) AS third_party_names,
+          -- true when this task is only in the list because I was
+          -- tagged as a third party on an update row, not directly assigned
+          (t.assigned_member IS DISTINCT FROM $2) AS is_third_party_assignment
         FROM worklist_tasks_v2 t
         WHERE t.year = $1
-          AND t.assigned_member = $2
+          AND (
+            t.assigned_member = $2
+            OR EXISTS (
+              SELECT 1 FROM worklist_task_updates u
+              WHERE u.task_id = t.id AND u.third_party = $2
+            )
+          )
         ORDER BY t.task_no ASC`,
         [year, username],
       );

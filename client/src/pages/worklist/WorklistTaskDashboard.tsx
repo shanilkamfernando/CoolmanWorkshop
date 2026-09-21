@@ -38,6 +38,7 @@ interface WorklistTask {
   created_at: string;
   has_third_party?: boolean;
   third_party_names?: string | null;
+  is_third_party_assignment?: boolean;
 }
 
 interface Customer {
@@ -1338,8 +1339,25 @@ const WorklistTasksDashboard = () => {
                           >
                             ▶
                           </span>
+                          {task.is_third_party_assignment && (
+  <span
+    style={{
+      fontSize: "10px",
+      fontWeight: 700,
+      color: "#7e57c2",
+      background: "#ede7f6",
+      padding: "2px 7px",
+      borderRadius: "8px",
+    }}
+  >
+    TAGGED IN
+  </span>
+)}
                         </td>
+                        
                       </tr>
+
+                     
 
                       {isExpanded && (
                         <tr>
