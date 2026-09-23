@@ -144,7 +144,7 @@ const API = "https://coolmanworkshop-production.up.railway.app/api";
 
 // ── Update Log Component ──────────────────────────────────────
 const TaskUpdateLog = ({
-  taskId,
+  task,
   status,
   refreshKey,
   description,
@@ -153,7 +153,7 @@ const TaskUpdateLog = ({
   systemUsers,
   authHeaders,
 }: {
-  taskId: number;
+  task: WorklistTask;
   status: string;
   refreshKey: number;
   description: string;
@@ -162,6 +162,7 @@ const TaskUpdateLog = ({
   systemUsers: SystemUser[];
   authHeaders: () => { Authorization: string };
 }) => {
+  const taskId = task.id;
   const [updates, setUpdates] = useState<any[]>([]);
   const updatesRequest = React.useRef(0);
   const [newNote, setNewNote] = useState("");
@@ -243,8 +244,47 @@ const TaskUpdateLog = ({
     };
   };
 
+  const assignedAt = fmtLogDateTime(task.created_at);
+  const completedEntry = [...updates]
+    .reverse()
+    .find(
+      (entry) =>
+        entry.status === "done" && entry.update_note === "Task Completed",
+    );
+  const completedAt = completedEntry
+    ? fmtLogDateTime(completedEntry.created_at)
+    : null;
+  const summary = [
+    ["Assigned By", task.created_by || "—"],
+    ["Assigned To", task.assigned_member || "—"],
+    ["Assigned Date", assignedAt.date],
+    ["Assigned Time", assignedAt.time],
+    ["Finished Date", task.finish_date ? fmtDate(task.finish_date) : "—"],
+    ["Finished Time", task.status === "done" ? completedAt?.time || "—" : "—"],
+  ];
+
   return (
     <div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+          gap: "8px 16px",
+          padding: "10px 12px",
+          marginBottom: "12px",
+          background: "#f8f9ff",
+          border: "1px solid #e8f0fe",
+          borderRadius: "6px",
+          fontSize: "13px",
+        }}
+      >
+        {summary.map(([label, value]) => (
+          <div key={label}>
+            <span style={{ color: "#667eea", fontWeight: 700 }}>{label}: </span>
+            <span style={{ color: "#333" }}>{value}</span>
+          </div>
+        ))}
+      </div>
       {description && (
         <div
           style={{
@@ -1458,11 +1498,6 @@ const WorklistTasksDashboard = () => {
                                 borderBottom: "1px solid #e8e8e8",
                               }}
                             >
-                              <div style={{ fontSize: "13px", color: "#888" }}>
-                                Assigned by:{" "}
-                                <strong>{task.created_by || "—"}</strong>
-                              </div>
-
                               <div
                                 style={{
                                   display: "grid",
@@ -1477,26 +1512,6 @@ const WorklistTasksDashboard = () => {
                                     gap: "16px",
                                   }}
                                 >
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "11px",
-                                        fontWeight: 700,
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.6px",
-                                        color: "#667eea",
-                                        marginBottom: "8px",
-                                        paddingBottom: "6px",
-                                        borderBottom: "2px solid #e8f0fe",
-                                      }}
-                                    >
-                                      Finish Date
-                                    </div>
-                                    <span style={{ fontSize: "14px" }}>
-                                      {fmtDate(task.finish_date)}
-                                    </span>
-                                  </div>
-
                                   <div>
                                     <div
                                       style={{
@@ -1576,7 +1591,7 @@ const WorklistTasksDashboard = () => {
 
                                 <div>
                                   <TaskUpdateLog
-                                    taskId={task.id}
+                                    task={task}
                                     status={task.status}
                                     refreshKey={logRefreshKeys[task.id] || 0}
                                     canEdit={canEditUpdate}
