@@ -1866,7 +1866,9 @@ const WorklistTasksDashboard = () => {
                       <>
                         <SearchableSelect
                           value={form.customer_id}
-                          placeholder="Select customer..."
+                          placeholder={
+                            form.customer_name || "Select customer..."
+                          }
                           options={customers.map((c) => ({
                             value: String(c.id),
                             label: c.name,
@@ -1885,6 +1887,22 @@ const WorklistTasksDashboard = () => {
                             }));
                           }}
                         />
+                        {form.customer_name && !form.customer_id && (
+                          <div
+                            style={{
+                              marginTop: "6px",
+                              padding: "7px 10px",
+                              background: "#f5f7ff",
+                              border: "1px solid #dbe2ff",
+                              borderRadius: "6px",
+                              fontSize: "12px",
+                              color: "#4b5563",
+                            }}
+                          >
+                            Manual reference:{" "}
+                            <strong>{form.customer_name}</strong>
+                          </div>
+                        )}
                         {isAdmin && (
                           <button
                             type="button"
