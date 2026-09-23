@@ -53,7 +53,7 @@ const UserManagement = () => {
     { id: "documents", label: "Documents", icon: "📄" },
     { id: "jobAssigned", label: "jobAssigned", icon: "⏱️" },
     { id: "meetings", label: "Meetings", icon: "👨‍💼" },
-    { id: "followup", label: "Follow Up", icon: "🔄" },
+    // { id: "followup", label: "Follow Up", icon: "🔄" },
     { id: "staff", label: "Staff", icon: "👤" },
     { id: "myTasks", label: "My Tasks", icon: "☑️" },
   ];
