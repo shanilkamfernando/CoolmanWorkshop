@@ -148,7 +148,6 @@ const TaskUpdateLog = ({
   status,
   description,
   canEdit,
-  isAdmin,
   readOnly,
   systemUsers,
   authHeaders,
@@ -157,7 +156,6 @@ const TaskUpdateLog = ({
   status: string;
   description: string;
   canEdit: boolean;
-  isAdmin: boolean;
   readOnly: boolean;
   systemUsers: SystemUser[];
   authHeaders: () => { Authorization: string };
@@ -165,11 +163,8 @@ const TaskUpdateLog = ({
   const [updates, setUpdates] = useState<any[]>([]);
   const [newNote, setNewNote] = useState("");
   const [saving, setSaving] = useState(false);
-  const [assignOpenFor, setAssignOpenFor] = useState<number | null>(null);
-  const [assigning, setAssigning] = useState(false);
-  const [thirdPartySearch, setThirdPartySearch] = useState<
-    Record<number, string>
-  >({});
+  const [newThirdParties, setNewThirdParties] = useState<string[]>([]);
+  const [thirdPartySearch, setThirdPartySearch] = useState("");
 
   useEffect(() => {
     fetchUpdates();
@@ -193,47 +188,17 @@ const TaskUpdateLog = ({
     try {
       await axios.post(
         `${API}/jobAssigned/tasks/${taskId}/updates`,
-        { update_note: newNote },
+        { update_note: newNote, third_parties: newThirdParties },
         { headers: authHeaders() },
       );
       setNewNote("");
+      setNewThirdParties([]);
+      setThirdPartySearch("");
       fetchUpdates();
     } catch (err: any) {
       alert(err.response?.data?.error || "Failed to add update");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleDelete = async (updateId: number) => {
-    if (!confirm("Delete this update?")) return;
-    try {
-      await axios.delete(
-        `${API}/jobAssigned/tasks/${taskId}/updates/${updateId}`,
-        { headers: authHeaders() },
-      );
-      fetchUpdates();
-    } catch {}
-  };
-
-  const handleAssignThirdParty = async (
-    updateId: number,
-    usernames: string[],
-  ) => {
-    setAssigning(true);
-    try {
-      await axios.put(
-        `${API}/jobAssigned/tasks/${taskId}/updates/${updateId}/third-party`,
-        { third_parties: usernames },
-        { headers: authHeaders() },
-      );
-      fetchUpdates();
-    } catch (err: any) {
-      alert(
-        err.response?.data?.error || "Failed to update third-party assignees",
-      );
-    } finally {
-      setAssigning(false);
     }
   };
 
@@ -334,16 +299,13 @@ const TaskUpdateLog = ({
             <th style={thStyle()}>Update</th>
             <th style={thStyle("100px")}>Status</th>
             <th style={thStyle("120px")}>Third Party</th>
-            {isAdmin && (
-              <th style={{ ...thStyle("40px"), padding: "6px 10px" }}></th>
-            )}
           </tr>
         </thead>
         <tbody>
           {updates.length === 0 ? (
             <tr>
               <td
-                colSpan={isAdmin ? 7 : 6}
+                colSpan={6}
                 style={{
                   padding: "16px 10px",
                   textAlign: "center",
@@ -411,191 +373,11 @@ const TaskUpdateLog = ({
                             @{username}
                           </span>
                         ))}
-                        {!readOnly && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAssignOpenFor(
-                                assignOpenFor === u.id ? null : u.id,
-                              );
-                            }}
-                            style={{
-                              background: "none",
-                              border: "1px dashed #bbb",
-                              borderRadius: "5px",
-                              color: "#888",
-                              fontSize: "11px",
-                              padding: "2px 6px",
-                              cursor: "pointer",
-                            }}
-                          >
-                            + Add
-                          </button>
-                        )}
                       </div>
-                    ) : !readOnly ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAssignOpenFor(
-                            assignOpenFor === u.id ? null : u.id,
-                          );
-                        }}
-                        style={{
-                          background: "none",
-                          border: "1px dashed #bbb",
-                          borderRadius: "5px",
-                          color: "#888",
-                          fontSize: "12px",
-                          padding: "2px 8px",
-                          cursor: "pointer",
-                        }}
-                      >
-                        @ Assign
-                      </button>
                     ) : (
                       <span style={{ color: "#ccc", fontSize: "12px" }}>—</span>
                     )}
-
-                    {assignOpenFor === u.id && !readOnly && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          position: "absolute",
-                          top: "100%",
-                          left: 0,
-                          zIndex: 20,
-                          background: "#fff",
-                          border: "1px solid #ddd",
-                          borderRadius: "8px",
-                          boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
-                          minWidth: "260px",
-                          marginTop: "4px",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            padding: "8px",
-                            borderBottom: "1px solid #eee",
-                          }}
-                        >
-                          <input
-                            value={thirdPartySearch[u.id] || ""}
-                            onChange={(e) =>
-                              setThirdPartySearch((p) => ({
-                                ...p,
-                                [u.id]: e.target.value,
-                              }))
-                            }
-                            placeholder="Search members..."
-                            className="form-input"
-                            style={{ width: "100%", boxSizing: "border-box" }}
-                          />
-                        </div>
-
-                        <div style={{ maxHeight: "180px", overflowY: "auto" }}>
-                          {systemUsers
-                            .filter((su) => {
-                              const q = (
-                                thirdPartySearch[u.id] || ""
-                              ).toLowerCase();
-                              return (
-                                !q ||
-                                `${su.first_name} ${su.last_name} ${su.username}`
-                                  .toLowerCase()
-                                  .includes(q)
-                              );
-                            })
-                            .map((su) => {
-                              const selected = getThirdParties(
-                                u.third_party,
-                              ).includes(su.username);
-                              const current = getThirdParties(u.third_party);
-
-                              return (
-                                <label
-                                  key={su.username}
-                                  style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "8px",
-                                    padding: "8px 10px",
-                                    cursor: "pointer",
-                                    borderBottom: "1px solid #f5f5f5",
-                                    fontSize: "12px",
-                                  }}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={selected}
-                                    disabled={assigning}
-                                    onChange={(e) => {
-                                      const next = e.target.checked
-                                        ? [...current, su.username]
-                                        : current.filter(
-                                            (x) => x !== su.username,
-                                          );
-                                      handleAssignThirdParty(u.id, next);
-                                    }}
-                                  />
-                                  <span>
-                                    {su.first_name} {su.last_name}{" "}
-                                    <span style={{ color: "#aaa" }}>
-                                      ({su.username})
-                                    </span>
-                                  </span>
-                                </label>
-                              );
-                            })}
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAssignOpenFor(null);
-                            setThirdPartySearch((p) => ({ ...p, [u.id]: "" }));
-                          }}
-                          style={{
-                            width: "100%",
-                            padding: "7px",
-                            border: "none",
-                            borderTop: "1px solid #eee",
-                            background: "#f8f9ff",
-                            cursor: "pointer",
-                            fontSize: "12px",
-                            color: "#667eea",
-                          }}
-                        >
-                          Done
-                        </button>
-                      </div>
-                    )}
                   </td>
-                  {isAdmin && (
-                    <td style={{ ...tdStyle, textAlign: "center" }}>
-                      {!readOnly && (
-                        <button
-                          onClick={() => handleDelete(u.id)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: "#ddd",
-                            fontSize: "14px",
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.color = "#ef4444")
-                          }
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.color = "#ddd")
-                          }
-                        >
-                          🗑️
-                        </button>
-                      )}
-                    </td>
-                  )}
                 </tr>
               );
             })
@@ -604,42 +386,78 @@ const TaskUpdateLog = ({
       </table>
 
       {canEdit && !readOnly && (
-        <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           <textarea
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
             placeholder="Add update note..."
             rows={2}
             onClick={(e) => e.stopPropagation()}
-            style={{
-              flex: 1,
-              padding: "7px 10px",
-              fontSize: "13px",
-              border: "1.5px solid #ddd",
-              borderRadius: "6px",
-              resize: "vertical",
-              fontFamily: "inherit",
-              boxSizing: "border-box",
-            }}
+            className="form-input"
           />
-          <button
-            onClick={handleAdd}
-            disabled={saving || !newNote.trim()}
+          <div style={{ fontSize: "12px", fontWeight: 600 }}>
+            Third-party assignees (optional)
+          </div>
+          <input
+            className="form-input"
+            value={thirdPartySearch}
+            onChange={(e) => setThirdPartySearch(e.target.value)}
+            placeholder="Search members..."
+          />
+          <div
             style={{
-              padding: "8px 16px",
-              background: "#667eea",
-              color: "#fff",
-              border: "none",
+              maxHeight: "150px",
+              overflowY: "auto",
+              border: "1px solid #ddd",
               borderRadius: "6px",
-              cursor: "pointer",
-              fontSize: "13px",
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-              opacity: !newNote.trim() ? 0.5 : 1,
             }}
           >
-            {saving ? "..." : "+ Add"}
+            {systemUsers
+              .filter((su) =>
+                `${su.first_name} ${su.last_name} ${su.username}`
+                  .toLowerCase()
+                  .includes(thirdPartySearch.toLowerCase()),
+              )
+              .map((su) => (
+                <label
+                  key={su.username}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "5px 10px",
+                    fontSize: "12px",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={newThirdParties.includes(su.username)}
+                    disabled={saving}
+                    onChange={(e) =>
+                      setNewThirdParties((previous) =>
+                        e.target.checked
+                          ? [...previous, su.username]
+                          : previous.filter(
+                              (username) => username !== su.username,
+                            ),
+                      )
+                    }
+                  />
+                  {su.first_name} {su.last_name} ({su.username})
+                </label>
+              ))}
+          </div>
+          <button
+            type="button"
+            className="btn-save"
+            onClick={handleAdd}
+            disabled={saving || !newNote.trim()}
+          >
+            {saving ? "Adding..." : "+ Add"}
           </button>
+          <div style={{ fontSize: "11px", color: "#777" }}>
+            The update and its assignees cannot be changed after you add it.
+          </div>
         </div>
       )}
       {!canEdit && !readOnly && (
@@ -1748,7 +1566,6 @@ const WorklistTasksDashboard = () => {
                                     taskId={task.id}
                                     status={task.status}
                                     canEdit={canEditUpdate}
-                                    isAdmin={isAdmin}
                                     readOnly={isDone}
                                     systemUsers={systemUsers}
                                     authHeaders={authHeaders}

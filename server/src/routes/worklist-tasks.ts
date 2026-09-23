@@ -226,7 +226,8 @@ router.get(
             t.assigned_member = $2
             OR EXISTS (
               SELECT 1 FROM worklist_task_updates u
-              WHERE u.task_id = t.id AND u.third_party = $2
+              WHERE u.task_id = t.id
+                AND $2 = ANY(string_to_array(replace(COALESCE(u.third_party, ''), ' ', ''), ','))
             )
           )
         ORDER BY t.task_no ASC`,
@@ -539,7 +540,7 @@ router.post(
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { taskId } = req.params;
-    const { update_note } = req.body;
+    const { update_note, third_parties } = req.body;
     const pool = getPool(req);
 
     if (!update_note?.trim()) {
@@ -548,6 +549,27 @@ router.post(
         .json({ success: false, error: "Update note is required" });
       return;
     }
+
+    if (
+      third_parties !== undefined &&
+      (!Array.isArray(third_parties) ||
+        third_parties.some(
+          (name: unknown) => typeof name !== "string" || !name.trim(),
+        ))
+    ) {
+      res
+        .status(400)
+        .json({
+          success: false,
+          error: "Third-party assignees must be usernames",
+        });
+      return;
+    }
+    const assignees: string[] = [
+      ...new Set(
+        ((third_parties || []) as string[]).map((name) => name.trim()),
+      ),
+    ];
 
     try {
       const taskResult = await pool.query(
@@ -579,9 +601,15 @@ router.post(
       }
 
       const result = await pool.query(
-        `INSERT INTO worklist_task_updates (task_id, update_note, status, created_by)
-   VALUES ($1, $2, $3, $4) RETURNING *`,
-        [taskId, update_note.trim(), task.status, req.user?.username],
+        `INSERT INTO worklist_task_updates (task_id, update_note, status, created_by, third_party)
+   VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [
+          taskId,
+          update_note.trim(),
+          task.status,
+          req.user?.username,
+          assignees.length ? assignees.join(",") : null,
+        ],
       );
 
       // Sync to project_member_updates if task is linked to a project
@@ -625,138 +653,25 @@ router.post(
   },
 );
 
-// PUT assign (or clear) a third-party member on a single update-log row
-// Any authenticated user may do this, as long as the task isn't done.
+// Update-log rows are immutable once created, including third-party assignments.
+// Keep the old routes explicitly denied so older clients cannot change existing rows.
 router.put(
   "/jobAssigned/tasks/:taskId/updates/:updateId/third-party",
   authenticateToken,
-  async (req: AuthRequest, res: Response): Promise<void> => {
-    const { taskId, updateId } = req.params;
-    const { third_party, third_parties } = req.body;
-    const pool = getPool(req);
-
-    // Accept either the new array format or the old single username format.
-    // Values are stored in the existing text column as comma-separated usernames
-    // so no table migration is required.
-    const assignees: string[] = Array.isArray(third_parties)
-      ? third_parties.filter(
-          (v: unknown): v is string => typeof v === "string" && v.trim() !== "",
-        )
-      : typeof third_party === "string" && third_party.trim()
-        ? [third_party.trim()]
-        : [];
-
-    try {
-      const taskResult = await pool.query(
-        "SELECT status FROM worklist_tasks_v2 WHERE id = $1",
-        [taskId],
-      );
-      if (taskResult.rows.length === 0) {
-        res.status(404).json({ success: false, error: "Task not found" });
-        return;
-      }
-      if (taskResult.rows[0].status === "done") {
-        res.status(403).json({
-          success: false,
-          error: "This task is marked done and can no longer be edited",
-        });
-        return;
-      }
-
-      const result = await pool.query(
-        `UPDATE worklist_task_updates
-         SET third_party = $1
-         WHERE id = $2 AND task_id = $3
-         RETURNING *`,
-        [assignees.length ? assignees.join(",") : null, updateId, taskId],
-      );
-
-      if (result.rows.length === 0) {
-        res.status(404).json({ success: false, error: "Update row not found" });
-        return;
-      }
-
-      res.json({ success: true, update: result.rows[0] });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error?.message });
-    }
+  async (_req: AuthRequest, res: Response): Promise<void> => {
+    res
+      .status(403)
+      .json({ success: false, error: "Saved update rows cannot be changed" });
   },
 );
 
-// DELETE update log row (admin only)
 router.delete(
   "/jobAssigned/tasks/:taskId/updates/:updateId",
   authenticateToken,
-  async (req: AuthRequest, res: Response): Promise<void> => {
-    const { taskId, updateId } = req.params;
-    const pool = getPool(req);
-
-    if (req.user?.role !== "admin") {
-      res.status(403).json({ success: false, error: "Admin only" });
-      return;
-    }
-
-    try {
-      // Get the update note before deleting so we can match it in project_member_updates
-      const updateResult = await pool.query(
-        "SELECT * FROM worklist_task_updates WHERE id = $1",
-        [updateId],
-      );
-
-      if (updateResult.rows.length === 0) {
-        res.status(404).json({ success: false, error: "Update not found" });
-        return;
-      }
-
-      const updateRow = updateResult.rows[0];
-
-      // Delete from worklist_task_updates
-      await pool.query("DELETE FROM worklist_task_updates WHERE id = $1", [
-        updateId,
-      ]);
-
-      // Sync delete to project_member_updates (non-blocking)
-      pool
-        .query(`SELECT * FROM worklist_tasks_v2 WHERE id = $1`, [taskId])
-        .then(async (taskResult) => {
-          const task = taskResult.rows[0];
-          if (
-            task?.job_type === "project" &&
-            task?.job_reference_id &&
-            task?.assigned_member
-          ) {
-            const memberResult = await pool.query(
-              `SELECT id FROM project_assigned_members
-             WHERE project_id = $1 AND assigned_member = $2
-             LIMIT 1`,
-              [task.job_reference_id, task.assigned_member],
-            );
-            if (memberResult.rows.length > 0) {
-              const memberId = memberResult.rows[0].id;
-              // Delete matching entry by member_id + note + created_by
-              await pool.query(
-                `DELETE FROM project_member_updates
-                  WHERE id = (
-                    SELECT id FROM project_member_updates
-                    WHERE member_id = $1
-                      AND update_note = $2
-                      AND created_by = $3
-                    ORDER BY created_at ASC
-                    LIMIT 1
-                  )`,
-                [memberId, updateRow.update_note, updateRow.created_by],
-              );
-            }
-          }
-        })
-        .catch((err) =>
-          console.error("Sync delete to project_member_updates failed:", err),
-        );
-
-      res.json({ success: true });
-    } catch (error: any) {
-      res.status(500).json({ success: false, error: error?.message });
-    }
+  async (_req: AuthRequest, res: Response): Promise<void> => {
+    res
+      .status(403)
+      .json({ success: false, error: "Saved update rows cannot be deleted" });
   },
 );
 
