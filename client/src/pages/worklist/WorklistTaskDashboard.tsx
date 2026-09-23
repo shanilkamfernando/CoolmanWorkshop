@@ -849,7 +849,6 @@ const WorklistTasksDashboard = () => {
     } else {
       setJobItems([]);
     }
-    setForm((f) => ({ ...f, job_reference_id: "", job_reference_name: "" }));
   }, [form.customer_id, form.job_type]);
 
   const fetchTasks = async (retryCount = 0) => {
@@ -1970,7 +1969,7 @@ const WorklistTasksDashboard = () => {
                     {jobItems.length > 0 && form.customer_id ? (
                       <SearchableSelect
                         value={form.job_reference_id}
-                        placeholder="Select..."
+                        placeholder={form.job_reference_name || "Select..."}
                         options={jobItems.map((i) => ({
                           value: String(i.id),
                           label: i.name,
@@ -1986,7 +1985,7 @@ const WorklistTasksDashboard = () => {
                           }));
                         }}
                       />
-                    ) : (
+                    ) : !form.job_reference_name ? (
                       <div
                         style={{
                           fontSize: "12px",
@@ -2000,7 +1999,7 @@ const WorklistTasksDashboard = () => {
                         )?.label?.toLowerCase() || "reference"}{" "}
                         available.
                       </div>
-                    )}
+                    ) : null}
                     {form.job_reference_name && !form.job_reference_id && (
                       <div
                         style={{
