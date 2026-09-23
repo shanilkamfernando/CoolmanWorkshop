@@ -146,6 +146,7 @@ const API = "https://coolmanworkshop-production.up.railway.app/api";
 const TaskUpdateLog = ({
   taskId,
   status,
+  refreshKey,
   description,
   canEdit,
   readOnly,
@@ -154,6 +155,7 @@ const TaskUpdateLog = ({
 }: {
   taskId: number;
   status: string;
+  refreshKey: number;
   description: string;
   canEdit: boolean;
   readOnly: boolean;
@@ -161,6 +163,7 @@ const TaskUpdateLog = ({
   authHeaders: () => { Authorization: string };
 }) => {
   const [updates, setUpdates] = useState<any[]>([]);
+  const updatesRequest = React.useRef(0);
   const [newNote, setNewNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [newThirdParties, setNewThirdParties] = useState<string[]>([]);
@@ -171,14 +174,17 @@ const TaskUpdateLog = ({
     // Refetch whenever the task's status changes — this covers the
     // server's auto-inserted "Task Completed" row the moment a task is
     // marked done, without requiring the row to be collapsed/reopened.
-  }, [taskId, status]);
+  }, [taskId, status, refreshKey]);
 
   const fetchUpdates = async () => {
+    const requestId = ++updatesRequest.current;
     try {
       const r = await axios.get(`${API}/jobAssigned/tasks/${taskId}/updates`, {
         headers: authHeaders(),
       });
-      setUpdates(r.data.updates || []);
+      if (requestId === updatesRequest.current) {
+        setUpdates(r.data.updates || []);
+      }
     } catch {}
   };
 
@@ -617,6 +623,9 @@ const WorklistTasksDashboard = () => {
   const [tasks, setTasks] = useState<WorklistTask[]>([]);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [logRefreshKeys, setLogRefreshKeys] = useState<Record<number, number>>(
+    {},
+  );
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
@@ -844,6 +853,10 @@ const WorklistTasksDashboard = () => {
         headers: authHeaders(),
       });
 
+      setLogRefreshKeys((previous) => ({
+        ...previous,
+        [task.id]: (previous[task.id] || 0) + 1,
+      }));
       fetchTasks();
     } catch (e: any) {
       alert(e.response?.data?.error || "Failed to update status");
@@ -1399,7 +1412,7 @@ const WorklistTasksDashboard = () => {
                           <span
                             style={{
                               display: "inline-block",
-                              color: task.has_third_party ? "#f44336" : "#999",
+                              color: st.color,
                               fontSize: "12px",
                               fontWeight: task.has_third_party ? 700 : 400,
                               transition: "transform 0.2s",
@@ -1565,6 +1578,7 @@ const WorklistTasksDashboard = () => {
                                   <TaskUpdateLog
                                     taskId={task.id}
                                     status={task.status}
+                                    refreshKey={logRefreshKeys[task.id] || 0}
                                     canEdit={canEditUpdate}
                                     readOnly={isDone}
                                     systemUsers={systemUsers}
