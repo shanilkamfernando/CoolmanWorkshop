@@ -557,12 +557,10 @@ router.post(
           (name: unknown) => typeof name !== "string" || !name.trim(),
         ))
     ) {
-      res
-        .status(400)
-        .json({
-          success: false,
-          error: "Third-party assignees must be usernames",
-        });
+      res.status(400).json({
+        success: false,
+        error: "Third-party assignees must be usernames",
+      });
       return;
     }
     const assignees: string[] = [
@@ -690,21 +688,61 @@ router.delete(
       return;
     }
 
+    const client = await pool.connect();
     try {
-      const result = await pool.query(
-        "DELETE FROM worklist_tasks_v2 WHERE id = $1 RETURNING id",
+      await client.query("BEGIN");
+      const taskResult = await client.query(
+        `SELECT id, job_type, job_reference_id, linked_member_id
+         FROM worklist_tasks_v2 WHERE id = $1 FOR UPDATE`,
         [taskId],
       );
 
-      if (result.rows.length === 0) {
+      if (taskResult.rows.length === 0) {
+        await client.query("ROLLBACK");
         res.status(404).json({ success: false, error: "Task not found" });
         return;
       }
 
-      res.json({ success: true, message: "Task deleted" });
+      const task = taskResult.rows[0];
+      if (task.job_type === "project" && task.job_reference_id) {
+        // Match the actual linked project assignment, never another row
+        // belonging to the same member or project.
+        const memberResult = await client.query(
+          `SELECT id FROM project_assigned_members
+           WHERE project_id = $1
+             AND (linked_task_id = $2
+               OR (id = $3 AND (linked_task_id IS NULL OR linked_task_id = $2)))
+           FOR UPDATE`,
+          [task.job_reference_id, taskId, task.linked_member_id],
+        );
+
+        // Break the task -> assignment link before removing the assignment.
+        await client.query(
+          `UPDATE worklist_tasks_v2 SET linked_member_id = NULL WHERE id = $1`,
+          [taskId],
+        );
+        for (const member of memberResult.rows) {
+          await client.query(
+            `DELETE FROM project_assigned_members WHERE id = $1`,
+            [member.id],
+          );
+        }
+      }
+
+      await client.query("DELETE FROM worklist_tasks_v2 WHERE id = $1", [
+        taskId,
+      ]);
+      await client.query("COMMIT");
+      res.json({
+        success: true,
+        message: "Task and linked project assignment deleted",
+      });
     } catch (error) {
+      await client.query("ROLLBACK");
       console.error("Delete task error:", error);
       res.status(500).json({ success: false, error: "Failed to delete task" });
+    } finally {
+      client.release();
     }
   },
 );
