@@ -284,6 +284,9 @@ router.post(
       );
       const nextTaskNo = maxNoResult.rows[0].max_no + 1;
 
+      // customer_name and job_reference_name may contain manually entered
+      // reference text. When entered manually, their IDs remain NULL.
+      // No customer/project master record is created here.
       const result = await pool.query(
         `INSERT INTO worklist_tasks_v2
         (year, task_no, customer_id, customer_name, job_type, job_reference_id,
@@ -629,8 +632,19 @@ router.put(
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { taskId, updateId } = req.params;
-    const { third_party } = req.body; // username string, or null to clear
+    const { third_party, third_parties } = req.body;
     const pool = getPool(req);
+
+    // Accept either the new array format or the old single username format.
+    // Values are stored in the existing text column as comma-separated usernames
+    // so no table migration is required.
+    const assignees: string[] = Array.isArray(third_parties)
+      ? third_parties.filter(
+          (v: unknown): v is string => typeof v === "string" && v.trim() !== "",
+        )
+      : typeof third_party === "string" && third_party.trim()
+        ? [third_party.trim()]
+        : [];
 
     try {
       const taskResult = await pool.query(
@@ -650,8 +664,11 @@ router.put(
       }
 
       const result = await pool.query(
-        `UPDATE worklist_task_updates SET third_party = $1 WHERE id = $2 AND task_id = $3 RETURNING *`,
-        [third_party || null, updateId, taskId],
+        `UPDATE worklist_task_updates
+         SET third_party = $1
+         WHERE id = $2 AND task_id = $3
+         RETURNING *`,
+        [assignees.length ? assignees.join(",") : null, updateId, taskId],
       );
 
       if (result.rows.length === 0) {

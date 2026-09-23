@@ -167,6 +167,9 @@ const TaskUpdateLog = ({
   const [saving, setSaving] = useState(false);
   const [assignOpenFor, setAssignOpenFor] = useState<number | null>(null);
   const [assigning, setAssigning] = useState(false);
+  const [thirdPartySearch, setThirdPartySearch] = useState<
+    Record<number, string>
+  >({});
 
   useEffect(() => {
     fetchUpdates();
@@ -213,22 +216,34 @@ const TaskUpdateLog = ({
     } catch {}
   };
 
-  const handleAssignThirdParty = async (updateId: number, username: string) => {
+  const handleAssignThirdParty = async (
+    updateId: number,
+    usernames: string[],
+  ) => {
     setAssigning(true);
     try {
       await axios.put(
         `${API}/jobAssigned/tasks/${taskId}/updates/${updateId}/third-party`,
-        { third_party: username },
+        { third_parties: usernames },
         { headers: authHeaders() },
       );
-      setAssignOpenFor(null);
       fetchUpdates();
     } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to assign");
+      alert(
+        err.response?.data?.error || "Failed to update third-party assignees",
+      );
     } finally {
       setAssigning(false);
     }
   };
+
+  const getThirdParties = (raw: string | null | undefined): string[] =>
+    raw
+      ? raw
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean)
+      : [];
 
   const fmtLogDateTime = (raw: string) => {
     if (!raw) return { date: "—", time: "—" };
@@ -372,16 +387,52 @@ const TaskUpdateLog = ({
                     </span>
                   </td>
                   <td style={{ ...tdStyle, position: "relative" }}>
-                    {u.third_party ? (
-                      <span
+                    {getThirdParties(u.third_party).length > 0 ? (
+                      <div
                         style={{
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          color: "#c62828",
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: "4px",
                         }}
                       >
-                        @{u.third_party}
-                      </span>
+                        {getThirdParties(u.third_party).map((username) => (
+                          <span
+                            key={username}
+                            style={{
+                              fontSize: "11px",
+                              fontWeight: 600,
+                              color: "#c62828",
+                              background: "#fff1f1",
+                              border: "1px solid #ffcdd2",
+                              borderRadius: "10px",
+                              padding: "2px 7px",
+                            }}
+                          >
+                            @{username}
+                          </span>
+                        ))}
+                        {!readOnly && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAssignOpenFor(
+                                assignOpenFor === u.id ? null : u.id,
+                              );
+                            }}
+                            style={{
+                              background: "none",
+                              border: "1px dashed #bbb",
+                              borderRadius: "5px",
+                              color: "#888",
+                              fontSize: "11px",
+                              padding: "2px 6px",
+                              cursor: "pointer",
+                            }}
+                          >
+                            + Add
+                          </button>
+                        )}
+                      </div>
                     ) : !readOnly ? (
                       <button
                         onClick={(e) => {
@@ -406,7 +457,7 @@ const TaskUpdateLog = ({
                       <span style={{ color: "#ccc", fontSize: "12px" }}>—</span>
                     )}
 
-                    {assignOpenFor === u.id && (
+                    {assignOpenFor === u.id && !readOnly && (
                       <div
                         onClick={(e) => e.stopPropagation()}
                         style={{
@@ -418,50 +469,106 @@ const TaskUpdateLog = ({
                           border: "1px solid #ddd",
                           borderRadius: "8px",
                           boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
-                          minWidth: "180px",
-                          maxHeight: "220px",
-                          overflowY: "auto",
+                          minWidth: "260px",
                           marginTop: "4px",
+                          overflow: "hidden",
                         }}
                       >
-                        {systemUsers.length === 0 ? (
-                          <div
-                            style={{
-                              padding: "10px",
-                              fontSize: "12px",
-                              color: "#999",
-                            }}
-                          >
-                            No members found
-                          </div>
-                        ) : (
-                          systemUsers.map((su) => (
-                            <div
-                              key={su.username}
-                              onClick={() =>
-                                !assigning &&
-                                handleAssignThirdParty(u.id, su.username)
-                              }
-                              style={{
-                                padding: "8px 12px",
-                                fontSize: "13px",
-                                cursor: "pointer",
-                                borderBottom: "1px solid #f2f2f2",
-                              }}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.background = "#f8f9ff")
-                              }
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.background = "")
-                              }
-                            >
-                              {su.first_name} {su.last_name}{" "}
-                              <span style={{ color: "#aaa" }}>
-                                ({su.username})
-                              </span>
-                            </div>
-                          ))
-                        )}
+                        <div
+                          style={{
+                            padding: "8px",
+                            borderBottom: "1px solid #eee",
+                          }}
+                        >
+                          <input
+                            value={thirdPartySearch[u.id] || ""}
+                            onChange={(e) =>
+                              setThirdPartySearch((p) => ({
+                                ...p,
+                                [u.id]: e.target.value,
+                              }))
+                            }
+                            placeholder="Search members..."
+                            className="form-input"
+                            style={{ width: "100%", boxSizing: "border-box" }}
+                          />
+                        </div>
+
+                        <div style={{ maxHeight: "180px", overflowY: "auto" }}>
+                          {systemUsers
+                            .filter((su) => {
+                              const q = (
+                                thirdPartySearch[u.id] || ""
+                              ).toLowerCase();
+                              return (
+                                !q ||
+                                `${su.first_name} ${su.last_name} ${su.username}`
+                                  .toLowerCase()
+                                  .includes(q)
+                              );
+                            })
+                            .map((su) => {
+                              const selected = getThirdParties(
+                                u.third_party,
+                              ).includes(su.username);
+                              const current = getThirdParties(u.third_party);
+
+                              return (
+                                <label
+                                  key={su.username}
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: "8px",
+                                    padding: "8px 10px",
+                                    cursor: "pointer",
+                                    borderBottom: "1px solid #f5f5f5",
+                                    fontSize: "12px",
+                                  }}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selected}
+                                    disabled={assigning}
+                                    onChange={(e) => {
+                                      const next = e.target.checked
+                                        ? [...current, su.username]
+                                        : current.filter(
+                                            (x) => x !== su.username,
+                                          );
+                                      handleAssignThirdParty(u.id, next);
+                                    }}
+                                  />
+                                  <span>
+                                    {su.first_name} {su.last_name}{" "}
+                                    <span style={{ color: "#aaa" }}>
+                                      ({su.username})
+                                    </span>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAssignOpenFor(null);
+                            setThirdPartySearch((p) => ({ ...p, [u.id]: "" }));
+                          }}
+                          style={{
+                            width: "100%",
+                            padding: "7px",
+                            border: "none",
+                            borderTop: "1px solid #eee",
+                            background: "#f8f9ff",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            color: "#667eea",
+                          }}
+                        >
+                          Done
+                        </button>
                       </div>
                     )}
                   </td>
@@ -561,6 +668,129 @@ const tdStyle = {
   borderBottom: "1px solid #f0f0f0",
 };
 
+// Searchable dropdown used in the Add Task modal.
+// Keeps the native form behaviour while making large customer/project/member
+// lists much easier to use.
+const SearchableSelect = ({
+  value,
+  options,
+  placeholder,
+  onChange,
+  disabled = false,
+}: {
+  value: string;
+  options: { value: string; label: string }[];
+  placeholder: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const selected = options.find((o) => o.value === value);
+  const filtered = options.filter((o) =>
+    o.label.toLowerCase().includes(query.toLowerCase()),
+  );
+
+  useEffect(() => {
+    if (!open) setQuery("");
+  }, [open]);
+
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((v) => !v)}
+        className="form-input"
+        style={{
+          width: "100%",
+          textAlign: "left",
+          background: disabled ? "#f5f5f5" : "#fff",
+          cursor: disabled ? "not-allowed" : "pointer",
+          position: "relative",
+          paddingRight: "32px",
+        }}
+      >
+        <span style={{ color: selected ? "#333" : "#999" }}>
+          {selected?.label || placeholder}
+        </span>
+        <span style={{ position: "absolute", right: 10, color: "#888" }}>
+          ▾
+        </span>
+      </button>
+
+      {open && !disabled && (
+        <>
+          <div
+            onClick={() => setOpen(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 99 }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 4px)",
+              left: 0,
+              right: 0,
+              zIndex: 100,
+              background: "#fff",
+              border: "1px solid #ddd",
+              borderRadius: "7px",
+              boxShadow: "0 8px 22px rgba(0,0,0,0.12)",
+              overflow: "hidden",
+            }}
+          >
+            <div style={{ padding: "8px", borderBottom: "1px solid #eee" }}>
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                placeholder="Search..."
+                className="form-input"
+                style={{ width: "100%", boxSizing: "border-box" }}
+              />
+            </div>
+
+            <div style={{ maxHeight: "210px", overflowY: "auto" }}>
+              {filtered.length === 0 ? (
+                <div
+                  style={{ padding: "12px", color: "#999", fontSize: "13px" }}
+                >
+                  No results found
+                </div>
+              ) : (
+                filtered.map((option) => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    onClick={() => {
+                      onChange(option.value);
+                      setOpen(false);
+                    }}
+                    style={{
+                      width: "100%",
+                      padding: "9px 12px",
+                      border: "none",
+                      borderBottom: "1px solid #f2f2f2",
+                      background: option.value === value ? "#f3f5ff" : "#fff",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                    }}
+                  >
+                    {option.label}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 const WorklistTasksDashboard = () => {
   const navigate = useNavigate();
   const { year } = useParams<{ year: string }>();
@@ -573,22 +803,6 @@ const WorklistTasksDashboard = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [jobItems, setJobItems] = useState<JobItem[]>([]);
-
-  useEffect(() => {
-    setLoading(true);
-    const u = localStorage.getItem("user");
-
-    if (u) {
-      try {
-        setUser(JSON.parse(u));
-      } catch (error) {
-        console.error("Failed to parse user:", error);
-      }
-    }
-
-    fetchTasks();
-    fetchDropdownData();
-  }, [year]);
 
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
@@ -604,6 +818,10 @@ const WorklistTasksDashboard = () => {
   });
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<WorklistTask | null>(null);
+  const [showAddCustomer, setShowAddCustomer] = useState(false);
+  const [showAddProject, setShowAddProject] = useState(false);
+  const [manualName, setManualName] = useState("");
+  const [manualSaving, setManualSaving] = useState(false);
 
   const isAdmin = user?.role === "admin";
   const authHeaders = () => ({
@@ -717,7 +935,7 @@ const WorklistTasksDashboard = () => {
     try {
       await axios.post(
         `${API}/jobAssigned/tasks`,
-        { ...form, year: parseInt(year || "0") },
+        { ...form, year: parseInt(year || "0", 10) },
         { headers: authHeaders() },
       );
       setShowAdd(false);
@@ -738,6 +956,43 @@ const WorklistTasksDashboard = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Manual customer/project entries are reference text only.
+  // They are saved directly on the worklist task and do NOT create
+  // records in the customers/projects master tables.
+  // Manual customer = reference text on this worklist task only.
+  // No customer master record is created.
+  const handleAddCustomer = async () => {
+    const name = manualName.trim();
+    if (!name) return;
+
+    setForm((f) => ({
+      ...f,
+      customer_id: "",
+      customer_name: name,
+      job_type: "",
+      job_reference_id: "",
+      job_reference_name: "",
+    }));
+    setManualName("");
+    setShowAddCustomer(false);
+  };
+
+  // Manual project = reference text on this worklist task only.
+  // No project master record is created.
+  const handleAddProject = async () => {
+    const name = manualName.trim();
+    if (!name) return;
+
+    setForm((f) => ({
+      ...f,
+      job_type: "project",
+      job_reference_id: "",
+      job_reference_name: name,
+    }));
+    setManualName("");
+    setShowAddProject(false);
   };
 
   const handleStatusChange = async (task: WorklistTask, newStatus: string) => {
@@ -1088,12 +1343,16 @@ const WorklistTasksDashboard = () => {
             <table className="meetings-table" style={{ tableLayout: "fixed" }}>
               <thead>
                 <tr>
-                  <th style={{ width: "55px" }}>No</th>
-                  <th style={{ width: "110px" }}>Date</th>
-                  <th style={{ width: "75px" }}>Time</th>
-                  <th style={{ width: "160px" }}>Customer</th>
-                  <th style={{ width: "200px" }}>Job</th>
-                  <th style={{ width: "140px" }}>Assigned To</th>
+                  <th style={{ width: "55px", textAlign: "center" }}>No</th>
+                  <th style={{ width: "110px", textAlign: "center" }}>Date</th>
+                  <th style={{ width: "75px", textAlign: "center" }}>Time</th>
+                  <th style={{ width: "160px", textAlign: "center" }}>
+                    Customer
+                  </th>
+                  <th style={{ width: "200px", textAlign: "center" }}>Job</th>
+                  <th style={{ width: "140px", textAlign: "center" }}>
+                    Assigned To
+                  </th>
                   <th>Description</th>
                   <th style={{ width: "110px" }}>Due Date</th>
                   <th style={{ width: "110px" }}>Finish Date</th>
@@ -1340,24 +1599,21 @@ const WorklistTasksDashboard = () => {
                             ▶
                           </span>
                           {task.is_third_party_assignment && (
-  <span
-    style={{
-      fontSize: "10px",
-      fontWeight: 700,
-      color: "#7e57c2",
-      background: "#ede7f6",
-      padding: "2px 7px",
-      borderRadius: "8px",
-    }}
-  >
-    TAGGED IN
-  </span>
-)}
+                            <span
+                              style={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                color: "#7e57c2",
+                                background: "#ede7f6",
+                                padding: "2px 7px",
+                                borderRadius: "8px",
+                              }}
+                            >
+                              TAGGED IN
+                            </span>
+                          )}
                         </td>
-                        
                       </tr>
-
-                     
 
                       {isExpanded && (
                         <tr>
@@ -1607,30 +1863,49 @@ const WorklistTasksDashboard = () => {
                     label: "Customer",
                     full: false,
                     el: (
-                      <select
-                        value={form.customer_id}
-                        onChange={(e) => {
-                          const c = customers.find(
-                            (c) => c.id === Number(e.target.value),
-                          );
-                          setForm((f) => ({
-                            ...f,
-                            customer_id: e.target.value,
-                            customer_name: c?.name || "",
-                            job_type: "",
-                            job_reference_id: "",
-                            job_reference_name: "",
-                          }));
-                        }}
-                        className="form-input"
-                      >
-                        <option value="">Select customer...</option>
-                        {customers.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
+                      <>
+                        <SearchableSelect
+                          value={form.customer_id}
+                          placeholder="Select customer..."
+                          options={customers.map((c) => ({
+                            value: String(c.id),
+                            label: c.name,
+                          }))}
+                          onChange={(value) => {
+                            const customer = customers.find(
+                              (c) => c.id === Number(value),
+                            );
+                            setForm((f) => ({
+                              ...f,
+                              customer_id: value,
+                              customer_name: customer?.name || "",
+                              job_type: "",
+                              job_reference_id: "",
+                              job_reference_name: "",
+                            }));
+                          }}
+                        />
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setManualName("");
+                              setShowAddCustomer(true);
+                            }}
+                            style={{
+                              marginTop: "6px",
+                              border: "none",
+                              background: "none",
+                              color: "#667eea",
+                              cursor: "pointer",
+                              fontSize: "12px",
+                              padding: 0,
+                            }}
+                          >
+                            + Add customer manually (reference only)
+                          </button>
+                        )}
+                      </>
                     ),
                   },
                   {
@@ -1648,7 +1923,7 @@ const WorklistTasksDashboard = () => {
                           }))
                         }
                         className="form-input"
-                        disabled={!form.customer_id}
+                        disabled={!form.customer_name}
                       >
                         <option value="">Select job type...</option>
                         {JOB_TYPES.map((j) => (
@@ -1669,55 +1944,99 @@ const WorklistTasksDashboard = () => {
                   </div>
                 ))}
 
-                {form.job_type && jobItems.length > 0 && (
+                {form.job_type && (
                   <div className="form-group full-width">
                     <label>
-                      Select{" "}
                       {JOB_TYPES.find((j) => j.value === form.job_type)?.label}
                     </label>
-                    <select
-                      value={form.job_reference_id}
-                      onChange={(e) => {
-                        const item = jobItems.find(
-                          (i) => i.id === Number(e.target.value),
-                        );
-                        setForm((f) => ({
-                          ...f,
-                          job_reference_id: e.target.value,
-                          job_reference_name: item?.name || "",
-                        }));
-                      }}
-                      className="form-input"
-                    >
-                      <option value="">Select...</option>
-                      {jobItems.map((i) => (
-                        <option key={i.id} value={i.id}>
-                          {i.name}
-                        </option>
-                      ))}
-                    </select>
+                    {jobItems.length > 0 && form.customer_id ? (
+                      <SearchableSelect
+                        value={form.job_reference_id}
+                        placeholder="Select..."
+                        options={jobItems.map((i) => ({
+                          value: String(i.id),
+                          label: i.name,
+                        }))}
+                        onChange={(value) => {
+                          const item = jobItems.find(
+                            (i) => i.id === Number(value),
+                          );
+                          setForm((f) => ({
+                            ...f,
+                            job_reference_id: value,
+                            job_reference_name: item?.name || "",
+                          }));
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: "#777",
+                          padding: "8px 0",
+                        }}
+                      >
+                        No existing{" "}
+                        {JOB_TYPES.find(
+                          (j) => j.value === form.job_type,
+                        )?.label?.toLowerCase() || "reference"}{" "}
+                        available.
+                      </div>
+                    )}
+                    {form.job_reference_name && !form.job_reference_id && (
+                      <div
+                        style={{
+                          marginTop: "6px",
+                          padding: "7px 10px",
+                          background: "#f5f7ff",
+                          border: "1px solid #dbe2ff",
+                          borderRadius: "6px",
+                          fontSize: "12px",
+                          color: "#4b5563",
+                        }}
+                      >
+                        Manual reference:{" "}
+                        <strong>{form.job_reference_name}</strong>
+                      </div>
+                    )}
+                    {/* Manual projects are reference-only and must be available even
+                        when there are no existing projects for the selected customer. */}
+                    {isAdmin && form.job_type === "project" && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualName("");
+                          setShowAddProject(true);
+                        }}
+                        style={{
+                          marginTop: "6px",
+                          border: "none",
+                          background: "none",
+                          color: "#667eea",
+                          cursor: "pointer",
+                          fontSize: "12px",
+                          padding: 0,
+                        }}
+                      >
+                        + Add project manually (reference only)
+                      </button>
+                    )}
                   </div>
                 )}
 
                 <div className="form-group">
                   <label>Assign To</label>
-                  <select
+                  <SearchableSelect
                     value={form.assigned_member}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        assigned_member: e.target.value,
-                      }))
+                    placeholder="Select member..."
+                    options={systemUsers.map((u) => ({
+                      value: u.username,
+                      label: `${u.first_name} ${u.last_name} (${u.username})`,
+                    }))}
+                    onChange={(value) =>
+                      setForm((f) => ({ ...f, assigned_member: value }))
                     }
-                    className="form-input"
-                  >
-                    <option value="">Select member...</option>
-                    {systemUsers.map((u) => (
-                      <option key={u.username} value={u.username}>
-                        {u.first_name} {u.last_name} ({u.username})
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <div className="form-group">
@@ -1776,6 +2095,152 @@ const WorklistTasksDashboard = () => {
                 disabled={saving}
               >
                 {saving ? "⏳ Adding..." : "Add Task"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddCustomer && (
+        <div
+          className="modal-overlay"
+          onClick={() => setShowAddCustomer(false)}
+        >
+          <div
+            className="modal-content-simple"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>+ Add Customer Reference</h2>
+              <button
+                className="close-button"
+                onClick={() => setShowAddCustomer(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#777",
+                  marginBottom: "12px",
+                }}
+              >
+                This is for Worklist reference only. It will not create a
+                customer in the main customer list.
+              </div>
+              <label className="form-group" style={{ display: "block" }}>
+                <span
+                  style={{
+                    display: "block",
+                    marginBottom: "6px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Customer Name (reference only)
+                </span>
+                <input
+                  autoFocus
+                  className="form-input"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  placeholder="Enter customer name..."
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddCustomer();
+                  }}
+                />
+              </label>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn-cancel"
+                onClick={() => setShowAddCustomer(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-save"
+                onClick={handleAddCustomer}
+                disabled={manualSaving || !manualName.trim()}
+              >
+                {manualSaving ? "⏳ Adding..." : "Add Customer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAddProject && (
+        <div className="modal-overlay" onClick={() => setShowAddProject(false)}>
+          <div
+            className="modal-content-simple"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>+ Add Project Reference</h2>
+              <button
+                className="close-button"
+                onClick={() => setShowAddProject(false)}
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#777",
+                  marginBottom: "12px",
+                }}
+              >
+                This is for Worklist reference only. It will not create a
+                project in the main project list.
+              </div>
+              <div
+                style={{
+                  fontSize: "12px",
+                  color: "#777",
+                  marginBottom: "10px",
+                }}
+              >
+                Customer: <strong>{form.customer_name}</strong>
+              </div>
+              <label className="form-group" style={{ display: "block" }}>
+                <span
+                  style={{
+                    display: "block",
+                    marginBottom: "6px",
+                    fontWeight: 600,
+                  }}
+                >
+                  Project Name (reference only)
+                </span>
+                <input
+                  autoFocus
+                  className="form-input"
+                  value={manualName}
+                  onChange={(e) => setManualName(e.target.value)}
+                  placeholder="Enter project name..."
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddProject();
+                  }}
+                />
+              </label>
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn-cancel"
+                onClick={() => setShowAddProject(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="btn-save"
+                onClick={handleAddProject}
+                disabled={manualSaving || !manualName.trim()}
+              >
+                {manualSaving ? "⏳ Adding..." : "Add Project"}
               </button>
             </div>
           </div>
