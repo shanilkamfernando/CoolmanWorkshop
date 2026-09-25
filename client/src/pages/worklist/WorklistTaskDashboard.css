@@ -440,6 +440,55 @@
   box-sizing: border-box;
 }
 
+/* Append to client/src/pages/worklist/WorklistTaskDashboard.css */
+.worklist-filter-groups {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+.worklist-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.worklist-filter-group strong {
+  font-size: 12px;
+  min-width: 64px;
+  color: #555;
+}
+.worklist-filter-chip {
+  border: 2px solid transparent;
+  border-radius: 16px;
+  background: #f0f2f7;
+  color: #333;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 11px;
+  cursor: pointer;
+}
+.worklist-filter-chip.selected {
+  border-color: #667eea;
+  box-shadow: 0 0 0 1px #667eea;
+}
+.worklist-filter-chip:focus-visible {
+  outline: 2px solid #333;
+  outline-offset: 2px;
+}
+
+/* Keep the prior small-screen table fix in place. */
+.worklist-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.worklist-task-table {
+  width: 100%;
+  min-width: 1320px;
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .tasks-main-content {

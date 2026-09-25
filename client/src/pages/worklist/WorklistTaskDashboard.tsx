@@ -56,7 +56,13 @@ interface SystemUser {
   last_name: string;
 }
 
-const JOB_TYPES = [
+type JobTypeOption = {
+  value: string;
+  label: string;
+  path?: (customerId: number, referenceId: number) => string;
+};
+
+const JOB_TYPES: JobTypeOption[] = [
   {
     value: "project",
     label: "Projects",
@@ -84,6 +90,11 @@ const JOB_TYPES = [
     label: "System Inspection",
     path: (cId: number, _rId?: number) => `/customers/${cId}/system-inspection`,
   },
+  { value: "emails", label: "Emails" },
+  { value: "quotations", label: "Quotations" },
+  { value: "invoices", label: "Invoices" },
+  { value: "followup", label: "Follow Up" },
+  { value: "other", label: "Other" },
 ];
 
 const STATUS_OPTIONS = [
@@ -664,6 +675,8 @@ const WorklistTasksDashboard = () => {
   const [tasks, setTasks] = useState<WorklistTask[]>([]);
   const [accessScope, setAccessScope] = useState<"all" | "own">("own");
   const [myTasksOnly, setMyTasksOnly] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [jobTypeFilter, setJobTypeFilter] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [logRefreshKeys, setLogRefreshKeys] = useState<Record<number, number>>(
@@ -789,6 +802,10 @@ const WorklistTasksDashboard = () => {
       system_repair: "system-repair",
       system_inspection: "system-inspection",
     };
+    if (!endpointMap[jobType]) {
+      setJobItems([]);
+      return;
+    }
     try {
       const res = await axios.get(
         `${API}/worklist/dropdown/customers/${customerId}/${endpointMap[jobType]}`,
@@ -923,7 +940,7 @@ const WorklistTasksDashboard = () => {
   const getJobLink = (task: WorklistTask): string | null => {
     if (!task.customer_id || !task.job_type) return null;
     const jt = JOB_TYPES.find((j) => j.value === task.job_type);
-    if (!jt) return null;
+    if (!jt?.path) return null;
     return jt.path(task.customer_id, task.job_reference_id ?? 0);
   };
 
@@ -994,7 +1011,7 @@ const WorklistTasksDashboard = () => {
     }
   };
 
-  const filtered = tasks
+  const searchedTasks = tasks
     .filter(
       (t) => accessScope !== "all" || !myTasksOnly || t.is_my_task === true,
     )
@@ -1009,10 +1026,30 @@ const WorklistTasksDashboard = () => {
         (t.job_description || "")
           .toLowerCase()
           .includes(search.toLowerCase()) ||
+        (JOB_TYPES.find((j) => j.value === t.job_type)?.label || "")
+          .toLowerCase()
+          .includes(search.toLowerCase()) ||
         (t.third_party_names || "")
           .toLowerCase()
           .includes(search.toLowerCase()),
-    )
+    );
+
+  const statusCounts = (status: string | null) =>
+    searchedTasks.filter(
+      (t) =>
+        (!jobTypeFilter || t.job_type === jobTypeFilter) &&
+        (!status || t.status === status),
+    ).length;
+  const jobTypeCounts = (jobType: string | null) =>
+    searchedTasks.filter(
+      (t) =>
+        (!statusFilter || t.status === statusFilter) &&
+        (!jobType || t.job_type === jobType),
+    ).length;
+
+  const filtered = searchedTasks
+    .filter((t) => !statusFilter || t.status === statusFilter)
+    .filter((t) => !jobTypeFilter || t.job_type === jobTypeFilter)
     .sort((a, b) => {
       const aDone = a.status === "done" ? 1 : 0;
       const bDone = b.status === "done" ? 1 : 0;
@@ -1182,29 +1219,72 @@ const WorklistTasksDashboard = () => {
             </span>
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              gap: "8px",
-              marginBottom: "16px",
-              flexWrap: "wrap",
-            }}
-          >
-            {STATUS_OPTIONS.map((s) => (
-              <span
-                key={s.value}
-                style={{
-                  padding: "3px 12px",
-                  borderRadius: "12px",
-                  fontSize: "12px",
-                  fontWeight: 600,
-                  background: s.bg,
-                  color: s.color,
+          <div className="worklist-filter-groups">
+            <div
+              className="worklist-filter-group"
+              aria-label="Filter by status"
+            >
+              <strong>Status:</strong>
+              <button
+                type="button"
+                aria-pressed={statusFilter === null}
+                className={`worklist-filter-chip${statusFilter === null ? " selected" : ""}`}
+                onClick={() => {
+                  setStatusFilter(null);
+                  setExpandedId(null);
                 }}
               >
-                {s.label}
-              </span>
-            ))}
+                All ({statusCounts(null)})
+              </button>
+              {STATUS_OPTIONS.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  aria-pressed={statusFilter === s.value}
+                  className={`worklist-filter-chip${statusFilter === s.value ? " selected" : ""}`}
+                  style={{ background: s.bg, color: s.color }}
+                  onClick={() => {
+                    setStatusFilter(s.value === statusFilter ? null : s.value);
+                    setExpandedId(null);
+                  }}
+                >
+                  {s.label} ({statusCounts(s.value)})
+                </button>
+              ))}
+            </div>
+            <div
+              className="worklist-filter-group"
+              aria-label="Filter by job type"
+            >
+              <strong>Job Type:</strong>
+              <button
+                type="button"
+                aria-pressed={jobTypeFilter === null}
+                className={`worklist-filter-chip${jobTypeFilter === null ? " selected" : ""}`}
+                onClick={() => {
+                  setJobTypeFilter(null);
+                  setExpandedId(null);
+                }}
+              >
+                All ({jobTypeCounts(null)})
+              </button>
+              {JOB_TYPES.map((job) => (
+                <button
+                  key={job.value}
+                  type="button"
+                  aria-pressed={jobTypeFilter === job.value}
+                  className={`worklist-filter-chip${jobTypeFilter === job.value ? " selected" : ""}`}
+                  onClick={() => {
+                    setJobTypeFilter(
+                      job.value === jobTypeFilter ? null : job.value,
+                    );
+                    setExpandedId(null);
+                  }}
+                >
+                  {job.label} ({jobTypeCounts(job.value)})
+                </button>
+              ))}
+            </div>
           </div>
 
           {filtered.length === 0 ? (
@@ -1219,7 +1299,7 @@ const WorklistTasksDashboard = () => {
               <h3 style={{ color: "#666", marginBottom: "8px" }}>
                 {search ? "No tasks match your search" : `No tasks for ${year}`}
               </h3>
-              {!search && isAdmin && (
+              {!search && tasks.length === 0 && isAdmin && (
                 <button
                   className="btn-add-meeting"
                   style={{ marginTop: "12px" }}
@@ -1843,85 +1923,89 @@ const WorklistTasksDashboard = () => {
                   </div>
                 ))}
 
-                {form.job_type && (
-                  <div className="form-group full-width">
-                    <label>
-                      {JOB_TYPES.find((j) => j.value === form.job_type)?.label}
-                    </label>
-                    {jobItems.length > 0 && form.customer_id ? (
-                      <SearchableSelect
-                        value={form.job_reference_id}
-                        placeholder={form.job_reference_name || "Select..."}
-                        options={jobItems.map((i) => ({
-                          value: String(i.id),
-                          label: i.name,
-                        }))}
-                        onChange={(value) => {
-                          const item = jobItems.find(
-                            (i) => i.id === Number(value),
-                          );
-                          setForm((f) => ({
-                            ...f,
-                            job_reference_id: value,
-                            job_reference_name: item?.name || "",
-                          }));
-                        }}
-                      />
-                    ) : !form.job_reference_name ? (
-                      <div
-                        style={{
-                          fontSize: "12px",
-                          color: "#777",
-                          padding: "8px 0",
-                        }}
-                      >
-                        No existing{" "}
-                        {JOB_TYPES.find(
-                          (j) => j.value === form.job_type,
-                        )?.label?.toLowerCase() || "reference"}{" "}
-                        available.
-                      </div>
-                    ) : null}
-                    {form.job_reference_name && !form.job_reference_id && (
-                      <div
-                        style={{
-                          marginTop: "6px",
-                          padding: "7px 10px",
-                          background: "#f5f7ff",
-                          border: "1px solid #dbe2ff",
-                          borderRadius: "6px",
-                          fontSize: "12px",
-                          color: "#4b5563",
-                        }}
-                      >
-                        Manual reference:{" "}
-                        <strong>{form.job_reference_name}</strong>
-                      </div>
-                    )}
-                    {/* Manual projects are reference-only and must be available even
+                {form.job_type &&
+                  JOB_TYPES.find((j) => j.value === form.job_type)?.path && (
+                    <div className="form-group full-width">
+                      <label>
+                        {
+                          JOB_TYPES.find((j) => j.value === form.job_type)
+                            ?.label
+                        }
+                      </label>
+                      {jobItems.length > 0 && form.customer_id ? (
+                        <SearchableSelect
+                          value={form.job_reference_id}
+                          placeholder={form.job_reference_name || "Select..."}
+                          options={jobItems.map((i) => ({
+                            value: String(i.id),
+                            label: i.name,
+                          }))}
+                          onChange={(value) => {
+                            const item = jobItems.find(
+                              (i) => i.id === Number(value),
+                            );
+                            setForm((f) => ({
+                              ...f,
+                              job_reference_id: value,
+                              job_reference_name: item?.name || "",
+                            }));
+                          }}
+                        />
+                      ) : !form.job_reference_name ? (
+                        <div
+                          style={{
+                            fontSize: "12px",
+                            color: "#777",
+                            padding: "8px 0",
+                          }}
+                        >
+                          No existing{" "}
+                          {JOB_TYPES.find(
+                            (j) => j.value === form.job_type,
+                          )?.label?.toLowerCase() || "reference"}{" "}
+                          available.
+                        </div>
+                      ) : null}
+                      {form.job_reference_name && !form.job_reference_id && (
+                        <div
+                          style={{
+                            marginTop: "6px",
+                            padding: "7px 10px",
+                            background: "#f5f7ff",
+                            border: "1px solid #dbe2ff",
+                            borderRadius: "6px",
+                            fontSize: "12px",
+                            color: "#4b5563",
+                          }}
+                        >
+                          Manual reference:{" "}
+                          <strong>{form.job_reference_name}</strong>
+                        </div>
+                      )}
+                      {/* Manual projects are reference-only and must be available even
                         when there are no existing projects for the selected customer. */}
-                    {isAdmin && form.job_type === "project" && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setManualName("");
-                          setShowAddProject(true);
-                        }}
-                        style={{
-                          marginTop: "6px",
-                          border: "none",
-                          background: "none",
-                          color: "#667eea",
-                          cursor: "pointer",
-                          fontSize: "12px",
-                          padding: 0,
-                        }}
-                      >
-                        + Add project manually (reference only)
-                      </button>
-                    )}
-                  </div>
-                )}
+                      {isAdmin && form.job_type === "project" && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setManualName("");
+                            setShowAddProject(true);
+                          }}
+                          style={{
+                            marginTop: "6px",
+                            border: "none",
+                            background: "none",
+                            color: "#667eea",
+                            cursor: "pointer",
+                            fontSize: "12px",
+                            padding: 0,
+                          }}
+                        >
+                          + Add project manually (reference only)
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                 <div className="form-group">
                   <label>Assign To</label>
