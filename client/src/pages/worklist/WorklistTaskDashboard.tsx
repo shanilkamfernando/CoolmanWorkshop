@@ -1537,7 +1537,7 @@ const WorklistTasksDashboard = () => {
                             </span>
                           </td>
 
-                          <td
+                          {/* <td
                             style={{
                               fontSize: "14px",
                               color: "#555",
@@ -1548,7 +1548,7 @@ const WorklistTasksDashboard = () => {
                             }}
                           >
                             {task.job_description || "—"}
-                          </td>
+                          </td> */}
 
                           <td
                             style={{
