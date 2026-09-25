@@ -23,6 +23,7 @@ interface User {
   permissions: {
     portals: PortalId[];
     canManageUsers?: boolean;
+    jobAssignedScope?: "all" | "own";
   };
   isActive: boolean;
   createdAt: string;
@@ -42,6 +43,9 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedPortals, setSelectedPortals] = useState<PortalId[]>([]);
+  const [jobAssignedScope, setJobAssignedScope] = useState<"all" | "own">(
+    "own",
+  );
   const [isUserActive, setIsUserActive] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>("user");
 
@@ -51,7 +55,7 @@ const UserManagement = () => {
     { id: "stores", label: "Stores", icon: "🏪" },
     { id: "workshop", label: "Workshop", icon: "🔧" },
     { id: "documents", label: "Documents", icon: "📄" },
-    { id: "jobAssigned", label: "jobAssigned", icon: "⏱️" },
+    { id: "jobAssigned", label: "Job Assigned", icon: "⏱️" },
     { id: "meetings", label: "Meetings", icon: "👨‍💼" },
     // { id: "followup", label: "Follow Up", icon: "🔄" },
     { id: "staff", label: "Staff", icon: "👤" },
@@ -87,7 +91,10 @@ const UserManagement = () => {
 
   const openEditModal = (user: User) => {
     setSelectedUser(user);
-    setSelectedPortals(user.permissions.portals || []);
+    setSelectedPortals(user.permissions?.portals || []);
+    setJobAssignedScope(
+      user.permissions?.jobAssignedScope === "all" ? "all" : "own",
+    );
     setIsUserActive(user.isActive);
     setSelectedRole(user.role);
     setShowModal(true);
@@ -96,6 +103,7 @@ const UserManagement = () => {
   const closeModal = () => {
     setSelectedUser(null);
     setSelectedPortals([]);
+    setJobAssignedScope("own");
     setIsUserActive(false);
     setShowModal(false);
   };
@@ -123,7 +131,11 @@ const UserManagement = () => {
       await axios.put(
         `https://coolmanworkshop-production.up.railway.app/api/auth/users/${selectedUser.id}/permissions`,
         {
-          permissions: { portals: selectedPortals },
+          permissions: {
+            ...selectedUser.permissions,
+            portals: selectedPortals,
+            jobAssignedScope,
+          },
           isActive: isUserActive,
           role: selectedRole,
         },
@@ -400,6 +412,32 @@ const UserManagement = () => {
                   </div>
                 ))}
               </div>
+              {selectedPortals.includes("jobAssigned") &&
+                selectedRole !== "admin" && (
+                  <fieldset className="job-scope-fieldset">
+                    <legend>Job Assigned visibility</legend>
+                    <label>
+                      <input
+                        type="radio"
+                        name="jobAssignedScope"
+                        value="own"
+                        checked={jobAssignedScope === "own"}
+                        onChange={() => setJobAssignedScope("own")}
+                      />
+                      My tasks only (including third-party assignments)
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="jobAssignedScope"
+                        value="all"
+                        checked={jobAssignedScope === "all"}
+                        onChange={() => setJobAssignedScope("all")}
+                      />
+                      All tasks, with a My Tasks filter
+                    </label>
+                  </fieldset>
+                )}
             </div>
 
             <div className="modal-footer">

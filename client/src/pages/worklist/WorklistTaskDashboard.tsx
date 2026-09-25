@@ -39,6 +39,7 @@ interface WorklistTask {
   has_third_party?: boolean;
   third_party_names?: string | null;
   is_third_party_assignment?: boolean;
+  is_my_task?: boolean;
 }
 
 interface Customer {
@@ -661,6 +662,8 @@ const WorklistTasksDashboard = () => {
 
   const [user, setUser] = useState<User | null>(null);
   const [tasks, setTasks] = useState<WorklistTask[]>([]);
+  const [accessScope, setAccessScope] = useState<"all" | "own">("own");
+  const [myTasksOnly, setMyTasksOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [logRefreshKeys, setLogRefreshKeys] = useState<Record<number, number>>(
@@ -739,6 +742,7 @@ const WorklistTasksDashboard = () => {
       });
 
       setTasks(res.data.tasks || []);
+      setAccessScope(res.data.accessScope === "all" ? "all" : "own");
     } catch (error: any) {
       console.error(
         `Failed to fetch tasks (attempt ${retryCount + 1}):`,
@@ -992,6 +996,9 @@ const WorklistTasksDashboard = () => {
 
   const filtered = tasks
     .filter(
+      (t) => accessScope !== "all" || !myTasksOnly || t.is_my_task === true,
+    )
+    .filter(
       (t) =>
         !search ||
         String(t.task_no).includes(search) ||
@@ -1112,6 +1119,19 @@ const WorklistTasksDashboard = () => {
         <div className="project-header-row">
           <h2>Job Assigned — {year}</h2>
           <div style={{ display: "flex", gap: "10px" }}>
+            {accessScope === "all" && (
+              <button
+                type="button"
+                className="btn-back"
+                aria-pressed={myTasksOnly}
+                onClick={() => {
+                  setMyTasksOnly((previous) => !previous);
+                  setExpandedId(null);
+                }}
+              >
+                {myTasksOnly ? "All Tasks" : "My Tasks"}
+              </button>
+            )}
             <button
               className="btn-back"
               onClick={() => navigate("/jobAssigned")}
@@ -1199,7 +1219,7 @@ const WorklistTasksDashboard = () => {
               <h3 style={{ color: "#666", marginBottom: "8px" }}>
                 {search ? "No tasks match your search" : `No tasks for ${year}`}
               </h3>
-              {!search && (
+              {!search && isAdmin && (
                 <button
                   className="btn-add-meeting"
                   style={{ marginTop: "12px" }}

@@ -20,6 +20,68 @@ interface AuthRequest extends Request {
 
 const getPool = (req: Request): Pool => req.app.locals.pool;
 
+type JobAccess = { scope: "all" | "own" | "none"; username: string };
+
+// Fetch the current permission for each request so admin changes apply immediately.
+const getJobAccess = async (
+  req: AuthRequest,
+  pool: Pool,
+): Promise<JobAccess> => {
+  if (!req.user?.id) return { scope: "none", username: "" };
+  const result = await pool.query(
+    "SELECT username, role, permissions, is_active FROM users WHERE id = $1",
+    [req.user.id],
+  );
+  const account = result.rows[0];
+  if (!account || !account.is_active) return { scope: "none", username: "" };
+  if (account.role === "admin")
+    return { scope: "all", username: account.username };
+  let permissions = account.permissions;
+  if (typeof permissions === "string") {
+    try {
+      permissions = JSON.parse(permissions);
+    } catch {
+      permissions = {};
+    }
+  }
+  if (
+    !permissions?.portals?.includes("jobAssigned") &&
+    !permissions?.portals?.includes("myTasks")
+  ) {
+    return { scope: "none", username: account.username };
+  }
+  return {
+    scope:
+      permissions?.jobAssignedScope === "all" &&
+      permissions?.portals?.includes("jobAssigned")
+        ? "all"
+        : "own",
+    username: account.username,
+  };
+};
+
+const canAccessTask = async (
+  pool: Pool,
+  access: JobAccess,
+  taskId: string,
+): Promise<boolean> => {
+  if (access.scope === "all") return true;
+  if (access.scope === "none") return false;
+  const result = await pool.query(
+    `SELECT EXISTS (
+      SELECT 1 FROM worklist_tasks_v2 t
+      WHERE t.id = $1 AND (
+        t.assigned_member = $2 OR EXISTS (
+          SELECT 1 FROM worklist_task_updates u WHERE u.task_id = t.id
+            AND $2 = ANY(string_to_array(replace(COALESCE(u.third_party, ''), ' ', ''), ','))
+        )
+      )
+    ) AS allowed`,
+    [taskId, access.username],
+  );
+  return result.rows[0]?.allowed === true;
+};
+
 // Valid status values — keep in sync with frontend STATUS_OPTIONS
 const VALID_STATUSES = ["todo", "in_progress", "on_hold", "permission", "done"];
 
@@ -164,6 +226,13 @@ router.get(
     const { year } = req.params;
     const pool = getPool(req);
     try {
+      const access = await getJobAccess(req, pool);
+      if (access.scope === "none") {
+        res
+          .status(403)
+          .json({ success: false, error: "Job Assigned access required" });
+        return;
+      }
       const result = await pool.query(
         `SELECT t.*,
           EXISTS (
@@ -178,13 +247,27 @@ router.get(
             WHERE u.task_id = t.id
               AND u.third_party IS NOT NULL
               AND u.third_party <> ''
-          ) AS third_party_names
+          ) AS third_party_names,
+          (t.assigned_member = $2 OR EXISTS (
+            SELECT 1 FROM worklist_task_updates own_update
+            WHERE own_update.task_id = t.id
+              AND $2 = ANY(string_to_array(replace(COALESCE(own_update.third_party, ''), ' ', ''), ','))
+          )) AS is_my_task
         FROM worklist_tasks_v2 t
         WHERE t.year = $1
+          AND ($3 = 'all' OR t.assigned_member = $2 OR EXISTS (
+            SELECT 1 FROM worklist_task_updates own_update
+            WHERE own_update.task_id = t.id
+              AND $2 = ANY(string_to_array(replace(COALESCE(own_update.third_party, ''), ' ', ''), ','))
+          ))
         ORDER BY t.task_no ASC`,
-        [year],
+        [year, access.username, access.scope],
       );
-      res.json({ success: true, tasks: result.rows });
+      res.json({
+        success: true,
+        tasks: result.rows,
+        accessScope: access.scope,
+      });
     } catch (error) {
       res.status(500).json({ success: false, error: "Failed to fetch tasks" });
     }
@@ -197,10 +280,17 @@ router.get(
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { year } = req.params;
-    const username = req.user?.username;
     const pool = getPool(req);
 
     try {
+      const access = await getJobAccess(req, pool);
+      if (access.scope === "none") {
+        res
+          .status(403)
+          .json({ success: false, error: "My Tasks access required" });
+        return;
+      }
+      const username = access.username;
       const result = await pool.query(
         `SELECT t.*,
           EXISTS (
@@ -371,6 +461,13 @@ router.put(
     const isAdmin = req.user?.role === "admin";
 
     try {
+      const access = await getJobAccess(req, pool);
+      if (!(await canAccessTask(pool, access, taskId))) {
+        res
+          .status(403)
+          .json({ success: false, error: "You cannot update this task" });
+        return;
+      }
       const existing = await pool.query(
         "SELECT * FROM worklist_tasks_v2 WHERE id = $1",
         [taskId],
@@ -520,6 +617,13 @@ router.get(
     const { taskId } = req.params;
     const pool = getPool(req);
     try {
+      const access = await getJobAccess(req, pool);
+      if (!(await canAccessTask(pool, access, taskId))) {
+        res
+          .status(403)
+          .json({ success: false, error: "You cannot view this task" });
+        return;
+      }
       const result = await pool.query(
         `SELECT * FROM worklist_task_updates WHERE task_id = $1 ORDER BY created_at ASC`,
         [taskId],
@@ -570,6 +674,13 @@ router.post(
     ];
 
     try {
+      const access = await getJobAccess(req, pool);
+      if (!(await canAccessTask(pool, access, taskId))) {
+        res
+          .status(403)
+          .json({ success: false, error: "You cannot update this task" });
+        return;
+      }
       const taskResult = await pool.query(
         `SELECT * FROM worklist_tasks_v2 WHERE id = $1`,
         [taskId],
