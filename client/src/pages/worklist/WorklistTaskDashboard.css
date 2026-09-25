@@ -488,6 +488,50 @@
   width: 100%;
   min-width: 1320px;
 }
+/* Append to client/src/pages/worklist/WorklistTaskDashboard.css */
+.worklist-expanded-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+}
+.worklist-log-layout {
+  display: contents;
+}
+.worklist-expanded-status,
+.worklist-detail-summary,
+.worklist-detail-updates {
+  min-width: 0;
+}
+.worklist-detail-summary {
+  grid-column: 2;
+}
+.worklist-detail-updates {
+  grid-column: 1 / -1;
+}
+.worklist-summary-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.worklist-update-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.worklist-update-table-scroll table {
+  min-width: 720px;
+}
+@media (max-width: 768px) {
+  .worklist-expanded-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .worklist-detail-summary,
+  .worklist-detail-updates {
+    grid-column: 1;
+  }
+}
+@media (max-width: 540px) {
+  .worklist-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* ── Responsive ── */
 @media (max-width: 768px) {

@@ -90,6 +90,9 @@ const JOB_TYPES: JobTypeOption[] = [
     label: "System Inspection",
     path: (cId: number, _rId?: number) => `/customers/${cId}/system-inspection`,
   },
+  { value: "compressorInspection", label: "Compressor Inspection" },
+  { value: "customerVisits", label: "Customer Visits" },
+  { value: "iceFactories", label: "Ice Factories" },
   { value: "emails", label: "Emails" },
   { value: "quotations", label: "Quotations" },
   { value: "invoices", label: "Invoices" },
@@ -266,263 +269,293 @@ const TaskUpdateLog = ({
   const completedAt = completedEntry
     ? fmtLogDateTime(completedEntry.created_at)
     : null;
-  const summary = [
-    ["Assigned By", task.created_by || "—"],
-    ["Assigned To", task.assigned_member || "—"],
-    ["Assigned Date", assignedAt.date],
-    ["Assigned Time", assignedAt.time],
-    ["Finished Date", task.finish_date ? fmtDate(task.finish_date) : "—"],
-    ["Finished Time", task.status === "done" ? completedAt?.time || "—" : "—"],
+  const summaryGroups = [
+    [
+      ["Assigned By", task.created_by || "—"],
+      ["Assigned To", task.assigned_member || "—"],
+    ],
+    [
+      ["Assigned Date", assignedAt.date],
+      ["Assigned Time", assignedAt.time],
+    ],
+    [
+      ["Finished Date", task.finish_date ? fmtDate(task.finish_date) : "—"],
+      [
+        "Finished Time",
+        task.status === "done" ? completedAt?.time || "—" : "—",
+      ],
+    ],
   ];
 
   return (
-    <div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-          gap: "8px 16px",
-          padding: "10px 12px",
-          marginBottom: "12px",
-          background: "#f8f9ff",
-          border: "1px solid #e8f0fe",
-          borderRadius: "6px",
-          fontSize: "13px",
-        }}
-      >
-        {summary.map(([label, value]) => (
-          <div key={label}>
-            <span style={{ color: "#667eea", fontWeight: 700 }}>{label}: </span>
-            <span style={{ color: "#333" }}>{value}</span>
-          </div>
-        ))}
-      </div>
-      {description && (
+    <div className="worklist-log-layout">
+      <div className="worklist-detail-summary">
         <div
+          className="worklist-summary-grid"
           style={{
-            fontSize: "13px",
-            color: "#555",
+            display: "grid",
+            gap: "8px 16px",
+            padding: "10px 12px",
+            marginBottom: "12px",
             background: "#f8f9ff",
             border: "1px solid #e8f0fe",
             borderRadius: "6px",
-            padding: "8px 12px",
-            marginBottom: "12px",
-            lineHeight: 1.5,
+            fontSize: "13px",
           }}
         >
-          <span
-            style={{
-              fontSize: "10px",
-              fontWeight: 700,
-              color: "#667eea",
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
-              display: "block",
-              marginBottom: "3px",
-            }}
-          >
-            Description
-          </span>
-          {description}
+          {summaryGroups.map((group, index) => (
+            <div
+              key={index}
+              style={{ display: "grid", gap: "8px", minWidth: 0 }}
+            >
+              {group.map(([label, value]) => (
+                <div key={label}>
+                  <span style={{ color: "#667eea", fontWeight: 700 }}>
+                    {label}:{" "}
+                  </span>
+                  <span style={{ color: "#333" }}>{value}</span>
+                </div>
+              ))}
+            </div>
+          ))}
         </div>
-      )}
-      <div
-        style={{
-          fontSize: "11px",
-          fontWeight: 700,
-          textTransform: "uppercase",
-          letterSpacing: "0.6px",
-          color: "#667eea",
-          marginBottom: "8px",
-          paddingBottom: "6px",
-          borderBottom: "2px solid #e8f0fe",
-        }}
-      >
-        Update Log
-      </div>
-
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontSize: "13px",
-          marginBottom: "10px",
-        }}
-      >
-        <thead>
-          <tr style={{ background: "#f8f9ff" }}>
-            <th style={thStyle("90px")}>Date</th>
-            <th style={thStyle("70px")}>Time</th>
-            <th style={thStyle("80px")}>By</th>
-            <th style={thStyle()}>Update</th>
-            <th style={thStyle("100px")}>Status</th>
-            <th style={thStyle("120px")}>Third Party</th>
-          </tr>
-        </thead>
-        <tbody>
-          {updates.length === 0 ? (
-            <tr>
-              <td
-                colSpan={6}
-                style={{
-                  padding: "16px 10px",
-                  textAlign: "center",
-                  color: "#bbb",
-                  fontStyle: "italic",
-                }}
-              >
-                No updates yet
-              </td>
-            </tr>
-          ) : (
-            updates.map((u, idx) => {
-              const rowStatus = getStatus(u.status || "todo");
-              const { date: logDate, time: logTime } = fmtLogDateTime(
-                u.created_at,
-              );
-              return (
-                <tr
-                  key={u.id}
-                  style={{ background: idx % 2 === 0 ? "#fff" : "#fafbff" }}
-                >
-                  <td style={tdStyle}>{logDate}</td>
-                  <td style={tdStyle}>{logTime}</td>
-                  <td style={{ ...tdStyle, color: "#888", fontSize: "12px" }}>
-                    {u.created_by || "—"}
-                  </td>
-                  <td style={{ ...tdStyle, color: "#333" }}>{u.update_note}</td>
-                  <td style={tdStyle}>
-                    <span
-                      style={{
-                        padding: "2px 8px",
-                        borderRadius: "9px",
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        background: rowStatus.bg,
-                        color: rowStatus.color,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {rowStatus.label}
-                    </span>
-                  </td>
-                  <td style={{ ...tdStyle, position: "relative" }}>
-                    {getThirdParties(u.third_party).length > 0 ? (
-                      <div
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: "4px",
-                        }}
-                      >
-                        {getThirdParties(u.third_party).map((username) => (
-                          <span
-                            key={username}
-                            style={{
-                              fontSize: "11px",
-                              fontWeight: 600,
-                              color: "#c62828",
-                              background: "#fff1f1",
-                              border: "1px solid #ffcdd2",
-                              borderRadius: "10px",
-                              padding: "2px 7px",
-                            }}
-                          >
-                            @{username}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span style={{ color: "#ccc", fontSize: "12px" }}>—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })
-          )}
-        </tbody>
-      </table>
-
-      {canEdit && !readOnly && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <textarea
-            value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
-            placeholder="Add update note..."
-            rows={2}
-            onClick={(e) => e.stopPropagation()}
-            className="form-input"
-          />
-          <div style={{ fontSize: "12px", fontWeight: 600 }}>
-            Third-party assignees (optional)
-          </div>
-          <input
-            className="form-input"
-            value={thirdPartySearch}
-            onChange={(e) => setThirdPartySearch(e.target.value)}
-            placeholder="Search members..."
-          />
+        {description && (
           <div
             style={{
-              maxHeight: "150px",
-              overflowY: "auto",
-              border: "1px solid #ddd",
+              fontSize: "13px",
+              color: "#555",
+              background: "#f8f9ff",
+              border: "1px solid #e8f0fe",
               borderRadius: "6px",
+              padding: "8px 12px",
+              marginBottom: "12px",
+              lineHeight: 1.5,
             }}
           >
-            {systemUsers
-              .filter((su) =>
-                `${su.first_name} ${su.last_name} ${su.username}`
-                  .toLowerCase()
-                  .includes(thirdPartySearch.toLowerCase()),
-              )
-              .map((su) => (
-                <label
-                  key={su.username}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    padding: "5px 10px",
-                    fontSize: "12px",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={newThirdParties.includes(su.username)}
-                    disabled={saving}
-                    onChange={(e) =>
-                      setNewThirdParties((previous) =>
-                        e.target.checked
-                          ? [...previous, su.username]
-                          : previous.filter(
-                              (username) => username !== su.username,
-                            ),
-                      )
-                    }
-                  />
-                  {su.first_name} {su.last_name} ({su.username})
-                </label>
-              ))}
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                color: "#667eea",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                display: "block",
+                marginBottom: "3px",
+              }}
+            >
+              Description
+            </span>
+            {description}
           </div>
-          <button
-            type="button"
-            className="btn-save"
-            onClick={handleAdd}
-            disabled={saving || !newNote.trim()}
+        )}
+      </div>
+      <div className="worklist-detail-updates">
+        <div
+          style={{
+            fontSize: "11px",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.6px",
+            color: "#667eea",
+            marginBottom: "8px",
+            paddingBottom: "6px",
+            borderBottom: "2px solid #e8f0fe",
+          }}
+        >
+          Update Log
+        </div>
+
+        <div className="worklist-update-table-scroll">
+          <table
+            style={{
+              width: "100%",
+              borderCollapse: "collapse",
+              fontSize: "13px",
+              marginBottom: "10px",
+            }}
           >
-            {saving ? "Adding..." : "+ Add"}
-          </button>
-          <div style={{ fontSize: "11px", color: "#777" }}>
-            The update and its assignees cannot be changed after you add it.
+            <thead>
+              <tr style={{ background: "#f8f9ff" }}>
+                <th style={thStyle("90px")}>Date</th>
+                <th style={thStyle("70px")}>Time</th>
+                <th style={thStyle("80px")}>By</th>
+                <th style={thStyle()}>Update</th>
+                <th style={thStyle("100px")}>Status</th>
+                <th style={thStyle("120px")}>Third Party</th>
+              </tr>
+            </thead>
+            <tbody>
+              {updates.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={6}
+                    style={{
+                      padding: "16px 10px",
+                      textAlign: "center",
+                      color: "#bbb",
+                      fontStyle: "italic",
+                    }}
+                  >
+                    No updates yet
+                  </td>
+                </tr>
+              ) : (
+                updates.map((u, idx) => {
+                  const rowStatus = getStatus(u.status || "todo");
+                  const { date: logDate, time: logTime } = fmtLogDateTime(
+                    u.created_at,
+                  );
+                  return (
+                    <tr
+                      key={u.id}
+                      style={{ background: idx % 2 === 0 ? "#fff" : "#fafbff" }}
+                    >
+                      <td style={tdStyle}>{logDate}</td>
+                      <td style={tdStyle}>{logTime}</td>
+                      <td
+                        style={{ ...tdStyle, color: "#888", fontSize: "12px" }}
+                      >
+                        {u.created_by || "—"}
+                      </td>
+                      <td style={{ ...tdStyle, color: "#333" }}>
+                        {u.update_note}
+                      </td>
+                      <td style={tdStyle}>
+                        <span
+                          style={{
+                            padding: "2px 8px",
+                            borderRadius: "9px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            background: rowStatus.bg,
+                            color: rowStatus.color,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {rowStatus.label}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, position: "relative" }}>
+                        {getThirdParties(u.third_party).length > 0 ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              flexWrap: "wrap",
+                              gap: "4px",
+                            }}
+                          >
+                            {getThirdParties(u.third_party).map((username) => (
+                              <span
+                                key={username}
+                                style={{
+                                  fontSize: "11px",
+                                  fontWeight: 600,
+                                  color: "#c62828",
+                                  background: "#fff1f1",
+                                  border: "1px solid #ffcdd2",
+                                  borderRadius: "10px",
+                                  padding: "2px 7px",
+                                }}
+                              >
+                                @{username}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ color: "#ccc", fontSize: "12px" }}>
+                            —
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {canEdit && !readOnly && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <textarea
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              placeholder="Add update note..."
+              rows={2}
+              onClick={(e) => e.stopPropagation()}
+              className="form-input"
+            />
+            <div style={{ fontSize: "12px", fontWeight: 600 }}>
+              Third-party assignees (optional)
+            </div>
+            <input
+              className="form-input"
+              value={thirdPartySearch}
+              onChange={(e) => setThirdPartySearch(e.target.value)}
+              placeholder="Search members..."
+            />
+            <div
+              style={{
+                maxHeight: "150px",
+                overflowY: "auto",
+                border: "1px solid #ddd",
+                borderRadius: "6px",
+              }}
+            >
+              {systemUsers
+                .filter((su) =>
+                  `${su.first_name} ${su.last_name} ${su.username}`
+                    .toLowerCase()
+                    .includes(thirdPartySearch.toLowerCase()),
+                )
+                .map((su) => (
+                  <label
+                    key={su.username}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      padding: "5px 10px",
+                      fontSize: "12px",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={newThirdParties.includes(su.username)}
+                      disabled={saving}
+                      onChange={(e) =>
+                        setNewThirdParties((previous) =>
+                          e.target.checked
+                            ? [...previous, su.username]
+                            : previous.filter(
+                                (username) => username !== su.username,
+                              ),
+                        )
+                      }
+                    />
+                    {su.first_name} {su.last_name} ({su.username})
+                  </label>
+                ))}
+            </div>
+            <button
+              type="button"
+              className="btn-save"
+              onClick={handleAdd}
+              disabled={saving || !newNote.trim()}
+            >
+              {saving ? "Adding..." : "+ Add"}
+            </button>
+            <div style={{ fontSize: "11px", color: "#777" }}>
+              The update and its assignees cannot be changed after you add it.
+            </div>
           </div>
-        </div>
-      )}
-      {!canEdit && !readOnly && (
-        <div style={{ fontSize: "12px", color: "#aaa", fontStyle: "italic" }}>
-          Move this task to In Progress to start adding updates.
-        </div>
-      )}
+        )}
+        {!canEdit && !readOnly && (
+          <div style={{ fontSize: "12px", color: "#aaa", fontStyle: "italic" }}>
+            Move this task to In Progress to start adding updates.
+          </div>
+        )}
+      </div>
     </div>
   );
 };
@@ -1610,14 +1643,14 @@ const WorklistTasksDashboard = () => {
                                 }}
                               >
                                 <div
+                                  className="worklist-expanded-grid"
                                   style={{
                                     display: "grid",
-                                    gridTemplateColumns:
-                                      "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
                                     gap: "24px",
                                   }}
                                 >
                                   <div
+                                    className="worklist-expanded-status"
                                     style={{
                                       display: "flex",
                                       flexDirection: "column",
@@ -1704,18 +1737,16 @@ const WorklistTasksDashboard = () => {
                                     </div>
                                   </div>
 
-                                  <div>
-                                    <TaskUpdateLog
-                                      task={task}
-                                      status={task.status}
-                                      refreshKey={logRefreshKeys[task.id] || 0}
-                                      canEdit={canEditUpdate}
-                                      readOnly={isDone}
-                                      systemUsers={systemUsers}
-                                      authHeaders={authHeaders}
-                                      description={task.job_description}
-                                    />
-                                  </div>
+                                  <TaskUpdateLog
+                                    task={task}
+                                    status={task.status}
+                                    refreshKey={logRefreshKeys[task.id] || 0}
+                                    canEdit={canEditUpdate}
+                                    readOnly={isDone}
+                                    systemUsers={systemUsers}
+                                    authHeaders={authHeaders}
+                                    description={task.job_description}
+                                  />
                                 </div>
 
                                 <div
