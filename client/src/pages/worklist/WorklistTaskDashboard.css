@@ -432,7 +432,7 @@
 
 .worklist-task-table {
   width: 100%;
-  min-width: 1320px;
+  min-width: 0;
 }
 
 .worklist-task-table th,
@@ -486,7 +486,7 @@
 }
 .worklist-task-table {
   width: 100%;
-  min-width: 1320px;
+  min-width: 0;
 }
 /* Append to client/src/pages/worklist/WorklistTaskDashboard.css */
 .worklist-expanded-grid {
@@ -554,4 +554,19 @@
   .detail-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Keep all ten main-table columns on the same percentage widths. */
+.worklist-task-table {
+  table-layout: fixed;
+}
+.worklist-task-table th,
+.worklist-task-table td {
+  overflow-wrap: anywhere;
+}
+.worklist-task-table td:nth-child(4),
+.worklist-task-table td:nth-child(5),
+.worklist-task-table td:nth-child(6) {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

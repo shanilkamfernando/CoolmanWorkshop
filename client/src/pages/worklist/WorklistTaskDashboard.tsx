@@ -1348,25 +1348,24 @@ const WorklistTasksDashboard = () => {
                 className="meetings-table worklist-task-table"
                 style={{ tableLayout: "fixed" }}
               >
+                <colgroup>
+                  {[5, 10, 7, 14, 18, 13, 10, 10, 10, 3].map((width, index) => (
+                    <col key={index} style={{ width: `${width}%` }} />
+                  ))}
+                </colgroup>
                 <thead>
                   <tr>
-                    <th style={{ width: "55px", textAlign: "center" }}>No</th>
-                    <th style={{ width: "110px", textAlign: "center" }}>
-                      Date
-                    </th>
-                    <th style={{ width: "75px", textAlign: "center" }}>Time</th>
-                    <th style={{ width: "160px", textAlign: "center" }}>
-                      Customer
-                    </th>
-                    <th style={{ width: "200px", textAlign: "center" }}>Job</th>
-                    <th style={{ width: "140px", textAlign: "center" }}>
-                      Assigned To
-                    </th>
+                    <th style={{ textAlign: "center" }}>No</th>
+                    <th style={{ textAlign: "center" }}>Date</th>
+                    <th style={{ textAlign: "center" }}>Time</th>
+                    <th style={{ textAlign: "center" }}>Customer</th>
+                    <th style={{ textAlign: "center" }}>Job</th>
+                    <th style={{ textAlign: "center" }}>Assigned To</th>
                     {/* <th>Description</th> */}
-                    <th style={{ width: "110px" }}>Due Date</th>
-                    <th style={{ width: "110px" }}>Finish Date</th>
-                    <th style={{ width: "105px" }}>Status</th>
-                    <th style={{ width: "36px" }}></th>
+                    <th>Due Date</th>
+                    <th>Finish Date</th>
+                    <th>Status</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1627,7 +1626,7 @@ const WorklistTasksDashboard = () => {
                         {isExpanded && (
                           <tr>
                             <td
-                              colSpan={11}
+                              colSpan={10}
                               style={{ padding: 0, background: "#fafbff" }}
                             >
                               <div
