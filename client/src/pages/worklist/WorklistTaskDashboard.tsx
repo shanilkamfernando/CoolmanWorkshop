@@ -1230,471 +1230,487 @@ const WorklistTasksDashboard = () => {
               )}
             </div>
           ) : (
-            <table className="meetings-table" style={{ tableLayout: "fixed" }}>
-              <thead>
-                <tr>
-                  <th style={{ width: "55px", textAlign: "center" }}>No</th>
-                  <th style={{ width: "110px", textAlign: "center" }}>Date</th>
-                  <th style={{ width: "75px", textAlign: "center" }}>Time</th>
-                  <th style={{ width: "160px", textAlign: "center" }}>
-                    Customer
-                  </th>
-                  <th style={{ width: "200px", textAlign: "center" }}>Job</th>
-                  <th style={{ width: "140px", textAlign: "center" }}>
-                    Assigned To
-                  </th>
-                  <th>Description</th>
-                  <th style={{ width: "110px" }}>Due Date</th>
-                  <th style={{ width: "110px" }}>Finish Date</th>
-                  <th style={{ width: "105px" }}>Status</th>
-                  <th style={{ width: "36px" }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((task) => {
-                  const { date: mainDate, time: mainTime } = fmtMainDateTime(
-                    task.created_at,
-                  );
-                  const isExpanded = expandedId === task.id;
-                  const st = getStatus(task.status);
-                  const isDone = task.status === "done";
-                  const isAssignedToMe =
-                    task.assigned_member === user?.username;
-                  const canEditUpdate = !isDone && task.status !== "todo";
-                  const jobLink = getJobLink(task);
-                  const jobTypeLabel = JOB_TYPES.find(
-                    (j) => j.value === task.job_type,
-                  )?.label;
+            <div
+              className="worklist-table-scroll"
+              role="region"
+              aria-label="Job assigned tasks"
+              tabIndex={0}
+            >
+              <table
+                className="meetings-table worklist-task-table"
+                style={{ tableLayout: "fixed" }}
+              >
+                <thead>
+                  <tr>
+                    <th style={{ width: "55px", textAlign: "center" }}>No</th>
+                    <th style={{ width: "110px", textAlign: "center" }}>
+                      Date
+                    </th>
+                    <th style={{ width: "75px", textAlign: "center" }}>Time</th>
+                    <th style={{ width: "160px", textAlign: "center" }}>
+                      Customer
+                    </th>
+                    <th style={{ width: "200px", textAlign: "center" }}>Job</th>
+                    <th style={{ width: "140px", textAlign: "center" }}>
+                      Assigned To
+                    </th>
+                    <th>Description</th>
+                    <th style={{ width: "110px" }}>Due Date</th>
+                    <th style={{ width: "110px" }}>Finish Date</th>
+                    <th style={{ width: "105px" }}>Status</th>
+                    <th style={{ width: "36px" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((task) => {
+                    const { date: mainDate, time: mainTime } = fmtMainDateTime(
+                      task.created_at,
+                    );
+                    const isExpanded = expandedId === task.id;
+                    const st = getStatus(task.status);
+                    const isDone = task.status === "done";
+                    const isAssignedToMe =
+                      task.assigned_member === user?.username;
+                    const canEditUpdate = !isDone && task.status !== "todo";
+                    const jobLink = getJobLink(task);
+                    const jobTypeLabel = JOB_TYPES.find(
+                      (j) => j.value === task.job_type,
+                    )?.label;
 
-                  return (
-                    <React.Fragment key={task.id}>
-                      <tr
-                        style={{
-                          cursor: "pointer",
-                          transition: "background 0.15s",
-                          background: isExpanded ? "#f8f9ff" : "",
-                          opacity: isDone ? 0.55 : 1,
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isExpanded && !isDone)
-                            e.currentTarget.style.background = "#f8f9ff";
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isExpanded)
-                            e.currentTarget.style.background = "";
-                        }}
-                        onClick={() =>
-                          setExpandedId(isExpanded ? null : task.id)
-                        }
-                      >
-                        <td
+                    return (
+                      <React.Fragment key={task.id}>
+                        <tr
                           style={{
-                            textAlign: "center",
-                            fontWeight: 700,
-                            color: "#667eea",
-                            fontSize: "15px",
+                            cursor: "pointer",
+                            transition: "background 0.15s",
+                            background: isExpanded ? "#f8f9ff" : "",
+                            opacity: isDone ? 0.55 : 1,
                           }}
-                        >
-                          #{task.task_no}
-                        </td>
-                        <td
-                          style={{
-                            fontSize: "14px",
-                            color: "#555",
-                            whiteSpace: "nowrap",
+                          onMouseEnter={(e) => {
+                            if (!isExpanded && !isDone)
+                              e.currentTarget.style.background = "#f8f9ff";
                           }}
+                          onMouseLeave={(e) => {
+                            if (!isExpanded)
+                              e.currentTarget.style.background = "";
+                          }}
+                          onClick={() =>
+                            setExpandedId(isExpanded ? null : task.id)
+                          }
                         >
-                          {mainDate}
-                        </td>
-                        <td style={{ fontSize: "14px", color: "#555" }}>
-                          {mainTime}
-                        </td>
-                        <td>
-                          {task.customer_name ? (
-                            <div
-                              style={{
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                              }}
-                            >
+                          <td
+                            style={{
+                              textAlign: "center",
+                              fontWeight: 700,
+                              color: "#667eea",
+                              fontSize: "15px",
+                            }}
+                          >
+                            #{task.task_no}
+                          </td>
+                          <td
+                            style={{
+                              fontSize: "14px",
+                              color: "#555",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {mainDate}
+                          </td>
+                          <td style={{ fontSize: "14px", color: "#555" }}>
+                            {mainTime}
+                          </td>
+                          <td>
+                            {task.customer_name ? (
                               <div
                                 style={{
-                                  width: "24px",
-                                  height: "24px",
-                                  borderRadius: "6px",
-                                  flexShrink: 0,
-                                  background: getColor(task.customer_name),
-                                  color: "white",
                                   display: "flex",
                                   alignItems: "center",
-                                  justifyContent: "center",
-                                  fontSize: "10px",
-                                  fontWeight: 700,
+                                  gap: "6px",
                                 }}
                               >
-                                {getInitials(task.customer_name)}
-                              </div>
-                              <span
-                                style={{
-                                  fontSize: "13px",
-                                  fontWeight: 500,
-                                  overflow: "hidden",
-                                  textOverflow: "ellipsis",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {task.customer_name}
-                              </span>
-                            </div>
-                          ) : (
-                            <span style={{ color: "#bbb", fontSize: "13px" }}>
-                              —
-                            </span>
-                          )}
-                        </td>
-
-                        <td>
-                          {jobTypeLabel ? (
-                            <div>
-                              <div
-                                style={{
-                                  fontSize: "11px",
-                                  color: "#888",
-                                  textTransform: "uppercase",
-                                  letterSpacing: "0.4px",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {jobTypeLabel}
-                              </div>
-                              {task.job_reference_name && (
                                 <div
                                   style={{
+                                    width: "24px",
+                                    height: "24px",
+                                    borderRadius: "6px",
+                                    flexShrink: 0,
+                                    background: getColor(task.customer_name),
+                                    color: "white",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: "10px",
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  {getInitials(task.customer_name)}
+                                </div>
+                                <span
+                                  style={{
                                     fontSize: "13px",
-                                    color: "#333",
-                                    marginTop: "1px",
+                                    fontWeight: 500,
                                     overflow: "hidden",
                                     textOverflow: "ellipsis",
                                     whiteSpace: "nowrap",
                                   }}
                                 >
-                                  {task.job_reference_name}
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span style={{ color: "#bbb", fontSize: "13px" }}>
-                              —
-                            </span>
-                          )}
-                        </td>
-
-                        <td>
-                          <span
-                            style={{
-                              fontSize: "14px",
-                              fontWeight: isAssignedToMe ? 700 : 400,
-                              color: isAssignedToMe ? "#667eea" : "#333",
-                            }}
-                          >
-                            {task.assigned_member || "—"}
-                            {isAssignedToMe && (
-                              <span
-                                style={{
-                                  fontSize: "11px",
-                                  color: "#888",
-                                  marginLeft: "3px",
-                                }}
-                              >
-                                (you)
+                                  {task.customer_name}
+                                </span>
+                              </div>
+                            ) : (
+                              <span style={{ color: "#bbb", fontSize: "13px" }}>
+                                —
                               </span>
                             )}
-                          </span>
-                        </td>
+                          </td>
 
-                        <td
-                          style={{
-                            fontSize: "14px",
-                            color: "#555",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                            maxWidth: "0",
-                          }}
-                        >
-                          {task.job_description || "—"}
-                        </td>
+                          <td>
+                            {jobTypeLabel ? (
+                              <div>
+                                <div
+                                  style={{
+                                    fontSize: "11px",
+                                    color: "#888",
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.4px",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {jobTypeLabel}
+                                </div>
+                                {task.job_reference_name && (
+                                  <div
+                                    style={{
+                                      fontSize: "13px",
+                                      color: "#333",
+                                      marginTop: "1px",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {task.job_reference_name}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: "#bbb", fontSize: "13px" }}>
+                                —
+                              </span>
+                            )}
+                          </td>
 
-                        <td
-                          style={{
-                            fontSize: "14px",
-                            whiteSpace: "nowrap",
-                            color:
-                              task.due_date &&
-                              new Date(task.due_date) < new Date() &&
-                              task.status !== "done"
-                                ? "#f44336"
-                                : "#555",
-                          }}
-                        >
-                          {fmtDate(task.due_date)}
-                        </td>
-
-                        <td
-                          style={{
-                            fontSize: "14px",
-                            whiteSpace: "nowrap",
-                            color: "#555",
-                          }}
-                        >
-                          {task.finish_date ? fmtDate(task.finish_date) : "—"}
-                        </td>
-
-                        <td>
-                          <span
-                            style={{
-                              padding: "3px 8px",
-                              borderRadius: "10px",
-                              fontSize: "11px",
-                              fontWeight: 700,
-                              background: st.bg,
-                              color: st.color,
-                              whiteSpace: "nowrap",
-                              display: "inline-block",
-                            }}
-                          >
-                            {st.label}
-                          </span>
-                        </td>
-
-                        <td style={{ textAlign: "center" }}>
-                          <span
-                            style={{
-                              display: "inline-block",
-                              color: st.color,
-                              fontSize: "12px",
-                              fontWeight: task.has_third_party ? 700 : 400,
-                              transition: "transform 0.2s",
-                              transform: isExpanded
-                                ? "rotate(90deg)"
-                                : "rotate(0deg)",
-                            }}
-                            title={
-                              task.has_third_party
-                                ? `Assigned to third party: ${task.third_party_names}`
-                                : undefined
-                            }
-                          >
-                            ▶
-                          </span>
-                          {task.is_third_party_assignment && (
+                          <td>
                             <span
                               style={{
-                                fontSize: "10px",
-                                fontWeight: 700,
-                                color: "#7e57c2",
-                                background: "#ede7f6",
-                                padding: "2px 7px",
-                                borderRadius: "8px",
+                                fontSize: "14px",
+                                fontWeight: isAssignedToMe ? 700 : 400,
+                                color: isAssignedToMe ? "#667eea" : "#333",
                               }}
                             >
-                              TAGGED IN
+                              {task.assigned_member || "—"}
+                              {isAssignedToMe && (
+                                <span
+                                  style={{
+                                    fontSize: "11px",
+                                    color: "#888",
+                                    marginLeft: "3px",
+                                  }}
+                                >
+                                  (you)
+                                </span>
+                              )}
                             </span>
-                          )}
-                        </td>
-                      </tr>
+                          </td>
 
-                      {isExpanded && (
-                        <tr>
                           <td
-                            colSpan={11}
-                            style={{ padding: 0, background: "#fafbff" }}
+                            style={{
+                              fontSize: "14px",
+                              color: "#555",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              maxWidth: "0",
+                            }}
                           >
-                            <div
+                            {task.job_description || "—"}
+                          </td>
+
+                          <td
+                            style={{
+                              fontSize: "14px",
+                              whiteSpace: "nowrap",
+                              color:
+                                task.due_date &&
+                                new Date(task.due_date) < new Date() &&
+                                task.status !== "done"
+                                  ? "#f44336"
+                                  : "#555",
+                            }}
+                          >
+                            {fmtDate(task.due_date)}
+                          </td>
+
+                          <td
+                            style={{
+                              fontSize: "14px",
+                              whiteSpace: "nowrap",
+                              color: "#555",
+                            }}
+                          >
+                            {task.finish_date ? fmtDate(task.finish_date) : "—"}
+                          </td>
+
+                          <td>
+                            <span
                               style={{
-                                padding: "20px 24px",
-                                borderTop: "2px solid #667eea20",
-                                borderBottom: "1px solid #e8e8e8",
+                                padding: "3px 8px",
+                                borderRadius: "10px",
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                background: st.bg,
+                                color: st.color,
+                                whiteSpace: "nowrap",
+                                display: "inline-block",
                               }}
+                            >
+                              {st.label}
+                            </span>
+                          </td>
+
+                          <td style={{ textAlign: "center" }}>
+                            <span
+                              style={{
+                                display: "inline-block",
+                                color: st.color,
+                                fontSize: "12px",
+                                fontWeight: task.has_third_party ? 700 : 400,
+                                transition: "transform 0.2s",
+                                transform: isExpanded
+                                  ? "rotate(90deg)"
+                                  : "rotate(0deg)",
+                              }}
+                              title={
+                                task.has_third_party
+                                  ? `Assigned to third party: ${task.third_party_names}`
+                                  : undefined
+                              }
+                            >
+                              ▶
+                            </span>
+                            {task.is_third_party_assignment && (
+                              <span
+                                style={{
+                                  fontSize: "10px",
+                                  fontWeight: 700,
+                                  color: "#7e57c2",
+                                  background: "#ede7f6",
+                                  padding: "2px 7px",
+                                  borderRadius: "8px",
+                                }}
+                              >
+                                TAGGED IN
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+
+                        {isExpanded && (
+                          <tr>
+                            <td
+                              colSpan={11}
+                              style={{ padding: 0, background: "#fafbff" }}
                             >
                               <div
                                 style={{
-                                  display: "grid",
-                                  gridTemplateColumns: "280px 1fr",
-                                  gap: "24px",
+                                  padding: "20px 24px",
+                                  borderTop: "2px solid #667eea20",
+                                  borderBottom: "1px solid #e8e8e8",
                                 }}
                               >
                                 <div
                                   style={{
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    gap: "16px",
+                                    display: "grid",
+                                    gridTemplateColumns:
+                                      "repeat(auto-fit, minmax(min(100%, 280px), 1fr))",
+                                    gap: "24px",
                                   }}
                                 >
-                                  <div>
-                                    <div
-                                      style={{
-                                        fontSize: "11px",
-                                        fontWeight: 700,
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.6px",
-                                        color: "#667eea",
-                                        marginBottom: "8px",
-                                        paddingBottom: "6px",
-                                        borderBottom: "2px solid #e8f0fe",
-                                      }}
-                                    >
-                                      Status
-                                    </div>
-                                    {isDone ? (
-                                      <span
-                                        style={{
-                                          padding: "3px 10px",
-                                          borderRadius: "10px",
-                                          fontSize: "12px",
-                                          fontWeight: 700,
-                                          background: st.bg,
-                                          color: st.color,
-                                        }}
-                                      >
-                                        {st.label}
-                                      </span>
-                                    ) : (
-                                      <select
-                                        value={task.status}
-                                        onChange={(e) => {
-                                          e.stopPropagation();
-                                          handleStatusChange(
-                                            task,
-                                            e.target.value,
-                                          );
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        style={{
-                                          width: "100%",
-                                          padding: "7px 10px",
-                                          fontSize: "13px",
-                                          border: "1.5px solid #ddd",
-                                          borderRadius: "6px",
-                                          background: st.bg,
-                                          color: st.color,
-                                          fontWeight: 700,
-                                          cursor: "pointer",
-                                          boxSizing: "border-box",
-                                        }}
-                                      >
-                                        {STATUS_OPTIONS.filter(
-                                          (s) =>
-                                            task.status === "todo" ||
-                                            s.value !== "todo",
-                                        ).map((s) => (
-                                          <option key={s.value} value={s.value}>
-                                            {s.label}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    )}
-                                    {!isDone && task.status !== "todo" && (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      gap: "16px",
+                                    }}
+                                  >
+                                    <div>
                                       <div
                                         style={{
                                           fontSize: "11px",
-                                          color: "#aaa",
-                                          marginTop: "4px",
+                                          fontWeight: 700,
+                                          textTransform: "uppercase",
+                                          letterSpacing: "0.6px",
+                                          color: "#667eea",
+                                          marginBottom: "8px",
+                                          paddingBottom: "6px",
+                                          borderBottom: "2px solid #e8f0fe",
                                         }}
                                       >
-                                        Can't be moved back to To Do
+                                        Status
                                       </div>
-                                    )}
+                                      {isDone ? (
+                                        <span
+                                          style={{
+                                            padding: "3px 10px",
+                                            borderRadius: "10px",
+                                            fontSize: "12px",
+                                            fontWeight: 700,
+                                            background: st.bg,
+                                            color: st.color,
+                                          }}
+                                        >
+                                          {st.label}
+                                        </span>
+                                      ) : (
+                                        <select
+                                          value={task.status}
+                                          onChange={(e) => {
+                                            e.stopPropagation();
+                                            handleStatusChange(
+                                              task,
+                                              e.target.value,
+                                            );
+                                          }}
+                                          onClick={(e) => e.stopPropagation()}
+                                          style={{
+                                            width: "100%",
+                                            padding: "7px 10px",
+                                            fontSize: "13px",
+                                            border: "1.5px solid #ddd",
+                                            borderRadius: "6px",
+                                            background: st.bg,
+                                            color: st.color,
+                                            fontWeight: 700,
+                                            cursor: "pointer",
+                                            boxSizing: "border-box",
+                                          }}
+                                        >
+                                          {STATUS_OPTIONS.filter(
+                                            (s) =>
+                                              task.status === "todo" ||
+                                              s.value !== "todo",
+                                          ).map((s) => (
+                                            <option
+                                              key={s.value}
+                                              value={s.value}
+                                            >
+                                              {s.label}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      )}
+                                      {!isDone && task.status !== "todo" && (
+                                        <div
+                                          style={{
+                                            fontSize: "11px",
+                                            color: "#aaa",
+                                            marginTop: "4px",
+                                          }}
+                                        >
+                                          Can't be moved back to To Do
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <TaskUpdateLog
+                                      task={task}
+                                      status={task.status}
+                                      refreshKey={logRefreshKeys[task.id] || 0}
+                                      canEdit={canEditUpdate}
+                                      readOnly={isDone}
+                                      systemUsers={systemUsers}
+                                      authHeaders={authHeaders}
+                                      description={task.job_description}
+                                    />
                                   </div>
                                 </div>
 
-                                <div>
-                                  <TaskUpdateLog
-                                    task={task}
-                                    status={task.status}
-                                    refreshKey={logRefreshKeys[task.id] || 0}
-                                    canEdit={canEditUpdate}
-                                    readOnly={isDone}
-                                    systemUsers={systemUsers}
-                                    authHeaders={authHeaders}
-                                    description={task.job_description}
-                                  />
-                                </div>
-                              </div>
-
-                              <div
-                                style={{
-                                  display: "flex",
-                                  justifyContent: "space-between",
-                                  alignItems: "center",
-                                  marginTop: "16px",
-                                  paddingTop: "14px",
-                                  borderTop: "1px solid #f0f0f0",
-                                  flexWrap: "wrap",
-                                  gap: "10px",
-                                }}
-                              >
                                 <div
                                   style={{
                                     display: "flex",
+                                    justifyContent: "space-between",
                                     alignItems: "center",
-                                    gap: "12px",
+                                    marginTop: "16px",
+                                    paddingTop: "14px",
+                                    borderTop: "1px solid #f0f0f0",
+                                    flexWrap: "wrap",
+                                    gap: "10px",
                                   }}
                                 >
-                                  {jobLink && (
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: "12px",
+                                    }}
+                                  >
+                                    {jobLink && (
+                                      <button
+                                        onClick={(e) =>
+                                          handleNavigateToJob(e, task)
+                                        }
+                                        style={{
+                                          padding: "6px 14px",
+                                          background: "#667eea",
+                                          color: "white",
+                                          border: "none",
+                                          borderRadius: "8px",
+                                          cursor: "pointer",
+                                          fontSize: "13px",
+                                          fontWeight: 600,
+                                        }}
+                                      >
+                                        🔗 Open {jobTypeLabel}
+                                        {task.job_reference_name
+                                          ? ` — ${task.job_reference_name}`
+                                          : ""}
+                                      </button>
+                                    )}
+                                  </div>
+                                  {isAdmin && (
                                     <button
-                                      onClick={(e) =>
-                                        handleNavigateToJob(e, task)
-                                      }
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteTarget(task);
+                                      }}
                                       style={{
                                         padding: "6px 14px",
-                                        background: "#667eea",
-                                        color: "white",
-                                        border: "none",
-                                        borderRadius: "8px",
+                                        background: "#fff",
+                                        color: "#c62828",
+                                        border: "1px solid #ef9a9a",
+                                        borderRadius: "7px",
                                         cursor: "pointer",
                                         fontSize: "13px",
                                         fontWeight: 600,
                                       }}
                                     >
-                                      🔗 Open {jobTypeLabel}
-                                      {task.job_reference_name
-                                        ? ` — ${task.job_reference_name}`
-                                        : ""}
+                                      🗑️ Delete Task
                                     </button>
                                   )}
                                 </div>
-                                {isAdmin && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleteTarget(task);
-                                    }}
-                                    style={{
-                                      padding: "6px 14px",
-                                      background: "#fff",
-                                      color: "#c62828",
-                                      border: "1px solid #ef9a9a",
-                                      borderRadius: "7px",
-                                      cursor: "pointer",
-                                      fontSize: "13px",
-                                      fontWeight: 600,
-                                    }}
-                                  >
-                                    🗑️ Delete Task
-                                  </button>
-                                )}
                               </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

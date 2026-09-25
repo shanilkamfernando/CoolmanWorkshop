@@ -421,6 +421,24 @@
   padding: 16px 24px;
   border-top: 1px solid #eee;
 }
+/* Append these rules to client/src/pages/worklist/WorklistTaskDashboard.css.
+   The current Job Assigned page uses a table, not the .task-card-row grid. */
+.worklist-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.worklist-task-table {
+  width: 100%;
+  min-width: 1320px;
+}
+
+.worklist-task-table th,
+.worklist-task-table td {
+  box-sizing: border-box;
+}
 
 /* ── Responsive ── */
 @media (max-width: 768px) {
