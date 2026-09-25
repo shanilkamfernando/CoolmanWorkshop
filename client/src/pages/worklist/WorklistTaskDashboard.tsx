@@ -1691,7 +1691,7 @@ const WorklistTasksDashboard = () => {
                                           }}
                                           onClick={(e) => e.stopPropagation()}
                                           style={{
-                                            width: "100%",
+                                            width: "40%",
                                             padding: "7px 10px",
                                             fontSize: "13px",
                                             border: "1.5px solid #ddd",
