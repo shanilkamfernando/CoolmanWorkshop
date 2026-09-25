@@ -31,6 +31,119 @@ const generateJobCardNumber = async (pool: Pool): Promise<string> => {
   return `CMR.WJC.${String(count).padStart(4, "0")}@${year}`;
 };
 
+// ═══════════════════════════════════════════════════════════════
+// CUSTOMER JOB CARD FILE ATTACHMENTS (DB-stored)
+// ═══════════════════════════════════════════════════════════════
+
+// GET list (metadata only — no file_data)
+router.get(
+  "/:customerId/jobcard-files",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { customerId } = req.params;
+    const pool = getPool(req);
+    try {
+      const result = await pool.query(
+        `SELECT id, customer_id, file_name, file_type, file_size, uploaded_by, created_at
+         FROM customer_job_card_files
+         WHERE customer_id = $1
+         ORDER BY created_at DESC`,
+        [customerId],
+      );
+      res.json({ success: true, files: result.rows });
+    } catch (error) {
+      console.error("List job card files error:", error);
+      res.status(500).json({ success: false, error: "Failed to fetch files" });
+    }
+  },
+);
+
+// POST upload (base64 file_data in body)
+router.post(
+  "/:customerId/jobcard-files",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { customerId } = req.params;
+    const { file_name, file_type, file_size, file_data } = req.body;
+    const pool = getPool(req);
+
+    if (!file_name || !file_data) {
+      res
+        .status(400)
+        .json({ success: false, error: "File name and data are required" });
+      return;
+    }
+
+    try {
+      const result = await pool.query(
+        `INSERT INTO customer_job_card_files
+          (customer_id, file_name, file_type, file_size, file_data, uploaded_by)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, customer_id, file_name, file_type, file_size, uploaded_by, created_at`,
+        [
+          customerId,
+          file_name,
+          file_type || null,
+          file_size || null,
+          file_data,
+          req.user?.username || "Unknown",
+        ],
+      );
+      res.status(201).json({ success: true, file: result.rows[0] });
+    } catch (error) {
+      console.error("Upload job card file error:", error);
+      res.status(500).json({ success: false, error: "Failed to upload file" });
+    }
+  },
+);
+
+// GET single file (returns file_data for download)
+router.get(
+  "/:customerId/jobcard-files/:fileId",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { fileId } = req.params;
+    const pool = getPool(req);
+    try {
+      const result = await pool.query(
+        `SELECT file_name, file_type, file_data FROM customer_job_card_files WHERE id = $1`,
+        [fileId],
+      );
+      if (result.rows.length === 0) {
+        res.status(404).json({ success: false, error: "File not found" });
+        return;
+      }
+      res.json({ success: true, file: result.rows[0] });
+    } catch (error) {
+      res.status(500).json({ success: false, error: "Failed to fetch file" });
+    }
+  },
+);
+
+// DELETE file (admin only)
+router.delete(
+  "/:customerId/jobcard-files/:fileId",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { fileId } = req.params;
+    const pool = getPool(req);
+    if (req.user?.role !== "admin") {
+      res
+        .status(403)
+        .json({ success: false, error: "Only admins can delete files" });
+      return;
+    }
+    try {
+      await pool.query("DELETE FROM customer_job_card_files WHERE id = $1", [
+        fileId,
+      ]);
+      res.json({ success: true, message: "File deleted" });
+    } catch (error) {
+      res.status(500).json({ success: false, error: "Failed to delete file" });
+    }
+  },
+);
+
 // ─── JOB CARDS LIST ───────────────────────────────────────────────
 
 // GET all job cards for a customer

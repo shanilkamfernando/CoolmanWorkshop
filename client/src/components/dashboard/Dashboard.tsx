@@ -9,6 +9,7 @@ type PortalId =
   | "workshop"
   | "documents"
   | "jobAssigned"
+  | "myTasks"
   | "meetings"
   | "followup"
   | "staff";
@@ -52,6 +53,13 @@ const Dashboard = () => {
   };
 
   const portals: Portal[] = [
+    // {
+    //   id: "myTasks",
+    //   label: "My Tasks",
+    //   icon: "☑️",
+    //   path: "/myTasks",
+    //   description: "Specific Users Task management",
+    // },
     {
       id: "jobAssigned",
       label: "Job Assigned",
@@ -109,13 +117,13 @@ const Dashboard = () => {
     //   path: "/followup",
     //   description: "Customer follow-ups",
     // },
-    {
-      id: "staff",
-      label: "Staff",
-      icon: "👤",
-      path: "/staff",
-      description: "Employee management",
-    },
+    // {
+    //   id: "staff",
+    //   label: "Staff",
+    //   icon: "👤",
+    //   path: "/staff",
+    //   description: "Employee management",
+    // },
   ];
 
   const hasPortalAccess = (portalId: PortalId): boolean => {

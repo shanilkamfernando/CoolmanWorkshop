@@ -13,12 +13,14 @@ interface AuthRequest extends Request {
   user?: {
     id: number;
     username: string;
-    role: "admin" | "user";
+    role: string;
     permissions: { portals: string[] };
   };
 }
 
 const getPool = (req: Request): Pool => req.app.locals.pool;
+
+// ─── PURCHASING CUSTOMERS & PROJECTS ──────────────────────────────
 
 // GET all purchasing customers
 router.get(
@@ -26,16 +28,25 @@ router.get(
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
+
     try {
       const result = await pool.query(
-        `SELECT * FROM purchasing_customers ORDER BY name ASC`,
+        `SELECT *
+         FROM purchasing_customers
+         ORDER BY name ASC`,
       );
-      res.json({ success: true, customers: result.rows });
+
+      res.json({
+        success: true,
+        customers: result.rows,
+      });
     } catch (error) {
       console.error("Get purchasing customers error:", error);
-      res
-        .status(500)
-        .json({ success: false, error: "Failed to fetch customers" });
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch customers",
+      });
     }
   },
 );
@@ -47,56 +58,220 @@ router.get(
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
     const pool = getPool(req);
+
     try {
       const result = await pool.query(
-        `SELECT * FROM purchasing_customers WHERE id = $1`,
+        `SELECT *
+         FROM purchasing_customers
+         WHERE id = $1`,
         [customerId],
       );
+
       if (result.rows.length === 0) {
-        res.status(404).json({ success: false, error: "Customer not found" });
+        res.status(404).json({
+          success: false,
+          error: "Customer not found",
+        });
         return;
       }
-      res.json({ success: true, customer: result.rows[0] });
+
+      res.json({
+        success: true,
+        customer: result.rows[0],
+      });
     } catch (error) {
-      res
-        .status(500)
-        .json({ success: false, error: "Failed to fetch customer" });
+      console.error("Get purchasing customer error:", error);
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch customer",
+      });
     }
   },
 );
 
-// POST create purchasing customer (all users)
-router.post(
-  "/purchasing/customers",
+// GET projects for a specific purchasing customer
+router.get(
+  "/purchasing/customers/:customerId/projects",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
-    const { name, contact_number, email, address } = req.body;
+    const { customerId } = req.params;
     const pool = getPool(req);
 
+    try {
+      // First check that the customer exists
+      const customerResult = await pool.query(
+        `SELECT id, name
+         FROM purchasing_customers
+         WHERE id = $1`,
+        [customerId],
+      );
+
+      if (customerResult.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          error: "Customer not found",
+        });
+        return;
+      }
+
+      // Get ONLY projects belonging to this customer
+      const result = await pool.query(
+        `SELECT *
+         FROM purchasing_customer_projects
+         WHERE customer_id = $1
+         ORDER BY name ASC`,
+        [customerId],
+      );
+
+      res.json({
+        success: true,
+        projects: result.rows,
+      });
+    } catch (error) {
+      console.error("Get customer projects error:", error);
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch projects",
+      });
+    }
+  },
+);
+
+// POST create project for a specific purchasing customer
+router.post(
+  "/purchasing/customers/:customerId/projects",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { customerId } = req.params;
+    const { name } = req.body;
+    const pool = getPool(req);
+
+    // Only admins can create projects
+    if (req.user?.role !== "admin") {
+      res.status(403).json({
+        success: false,
+        error: "Only admins can create projects",
+      });
+      return;
+    }
+
     if (!name || !name.trim()) {
-      res
-        .status(400)
-        .json({ success: false, error: "Customer name is required" });
+      res.status(400).json({
+        success: false,
+        error: "Project name is required",
+      });
       return;
     }
 
     try {
+      // Make sure the customer exists
+      const customerResult = await pool.query(
+        `SELECT id, name
+         FROM purchasing_customers
+         WHERE id = $1`,
+        [customerId],
+      );
+
+      if (customerResult.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          error: "Customer not found",
+        });
+        return;
+      }
+
+      // Create ONLY the project
+      // It is linked to the customer using customer_id
       const result = await pool.query(
-        `INSERT INTO purchasing_customers (name, contact_number, email, address, created_by)
-         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        `INSERT INTO purchasing_customer_projects
+          (name, customer_id, created_by)
+         VALUES
+          ($1, $2, $3)
+         RETURNING *`,
+        [name.trim(), customerId, req.user?.username || "Unknown"],
+      );
+
+      res.status(201).json({
+        success: true,
+        project: result.rows[0],
+      });
+    } catch (error) {
+      console.error("Create project error:", error);
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to create project",
+      });
+    }
+  },
+);
+
+// POST create purchasing customer
+router.post(
+  "/purchasing/customers",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { name, contact_number, email, address, workshop_customer_id } =
+      req.body;
+
+    const pool = getPool(req);
+
+    // Only admins can create customers
+    if (req.user?.role !== "admin") {
+      res.status(403).json({
+        success: false,
+        error: "Only admins can create customers",
+      });
+      return;
+    }
+
+    if (!name || !name.trim()) {
+      res.status(400).json({
+        success: false,
+        error: "Customer name is required",
+      });
+      return;
+    }
+
+    try {
+      // Create ONLY the customer
+      // This does NOT create a project
+      const result = await pool.query(
+        `INSERT INTO purchasing_customers
+          (
+            name,
+            contact_number,
+            email,
+            address,
+            created_by,
+            workshop_customer_id
+          )
+         VALUES
+          ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
         [
           name.trim(),
           contact_number || null,
           email || null,
           address || null,
           req.user?.username || "Unknown",
+          workshop_customer_id || null,
         ],
       );
-      res.status(201).json({ success: true, customer: result.rows[0] });
+
+      res.status(201).json({
+        success: true,
+        customer: result.rows[0],
+      });
     } catch (error) {
-      res
-        .status(500)
-        .json({ success: false, error: "Failed to create customer" });
+      console.error("Create purchasing customer error:", error);
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to create customer",
+      });
     }
   },
 );
@@ -110,34 +285,55 @@ router.delete(
     const pool = getPool(req);
 
     if (req.user?.role !== "admin") {
-      res
-        .status(403)
-        .json({ success: false, error: "Only admins can delete customers" });
+      res.status(403).json({
+        success: false,
+        error: "Only admins can delete customers",
+      });
       return;
     }
 
     try {
-      const result = await pool.query(
-        "DELETE FROM purchasing_customers WHERE id = $1 RETURNING id, name",
+      // Get customer first
+      const customerResult = await pool.query(
+        `SELECT id, name
+         FROM purchasing_customers
+         WHERE id = $1`,
         [customerId],
       );
-      if (result.rows.length === 0) {
-        res.status(404).json({ success: false, error: "Customer not found" });
+
+      if (customerResult.rows.length === 0) {
+        res.status(404).json({
+          success: false,
+          error: "Customer not found",
+        });
         return;
       }
+
+      // Because the project table has ON DELETE CASCADE,
+      // projects belonging to this customer will also be deleted.
+      const result = await pool.query(
+        `DELETE FROM purchasing_customers
+         WHERE id = $1
+         RETURNING id, name`,
+        [customerId],
+      );
+
       res.json({
         success: true,
         message: `Customer "${result.rows[0].name}" deleted`,
       });
     } catch (error) {
-      res
-        .status(500)
-        .json({ success: false, error: "Failed to delete customer" });
+      console.error("Delete purchasing customer error:", error);
+
+      res.status(500).json({
+        success: false,
+        error: "Failed to delete customer",
+      });
     }
   },
 );
 
-// ─── PURCHASING ENTRIES ────────────────────────────────────────
+// ─── PURCHASING ENTRIES ───────────────────────────────────────────
 
 // GET all entries for a customer
 router.get(
@@ -145,12 +341,27 @@ router.get(
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
+    const { workshop_customer_id } = req.query;
     const pool = getPool(req);
     try {
-      const result = await pool.query(
-        `SELECT * FROM purchasing_entries WHERE customer_id = $1 ORDER BY created_at ASC`,
-        [customerId],
-      );
+      let result;
+      if (workshop_customer_id) {
+        // Coming from workshop side — fetch by workshop_customer_id
+        result = await pool.query(
+          `SELECT * FROM purchasing_entries 
+           WHERE workshop_customer_id = $1 
+           ORDER BY created_at ASC`,
+          [workshop_customer_id],
+        );
+      } else {
+        // Fetch by customer_id
+        result = await pool.query(
+          `SELECT * FROM purchasing_entries 
+           WHERE customer_id = $1
+           ORDER BY created_at ASC`,
+          [customerId],
+        );
+      }
       res.json({ success: true, entries: result.rows });
     } catch (error) {
       res
@@ -160,22 +371,35 @@ router.get(
   },
 );
 
-// POST create entry (all users)
+// POST create entry — auto creates a workshop job card
 router.post(
   "/purchasing/customers/:customerId/entries",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
-    const { product, quantity, description, due_date } = req.body;
+    const {
+      product,
+      quantity,
+      description,
+      due_date,
+      workshop_customer_id,
+      job_card_id,
+      job_card_number,
+    } = req.body;
     const pool = getPool(req);
+
     if (!product?.trim()) {
       res.status(400).json({ success: false, error: "Product is required" });
       return;
     }
+
     try {
       const result = await pool.query(
-        `INSERT INTO purchasing_entries (customer_id, user_name, product, quantity, description, due_date, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
+        `INSERT INTO purchasing_entries
+          (customer_id, user_name, product, quantity, description, due_date,
+           workshop_customer_id, job_card_id, job_card_number, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         RETURNING *`,
         [
           customerId,
           req.user?.username,
@@ -183,17 +407,25 @@ router.post(
           quantity || null,
           description || null,
           due_date || null,
+          workshop_customer_id || null,
+          job_card_id || null,
+          job_card_number || null,
           req.user?.username,
         ],
       );
+
       res.status(201).json({ success: true, entry: result.rows[0] });
-    } catch (error) {
-      res.status(500).json({ success: false, error: "Failed to create entry" });
+    } catch (error: any) {
+      console.error("Create entry error:", error?.message || error);
+      res.status(500).json({
+        success: false,
+        error: error?.message || "Failed to create entry",
+      });
     }
   },
 );
 
-// PUT update entry — role-based
+// PUT update entry — role-based actions
 router.put(
   "/purchasing/customers/:customerId/entries/:entryId/:action",
   authenticateToken,
@@ -211,10 +443,11 @@ router.put(
         query = `UPDATE purchasing_entries SET order_form_no=$1, notes=$2, office_user_1=$3, office_datetime_1=NOW(), updated_at=NOW() WHERE id=$4 RETURNING *`;
         values = [req.body.order_form_no, req.body.notes, username, entryId];
       } else if (action === "approve") {
-        if (role !== "admin") {
-          res
-            .status(403)
-            .json({ success: false, error: "Only admins can approve" });
+        if (!["admin", "office_admin"].includes(role || "")) {
+          res.status(403).json({
+            success: false,
+            error: "Only admin or office_admin can approve",
+          });
           return;
         }
         query = `UPDATE purchasing_entries SET approved=TRUE, approved_by=$1, approved_at=NOW(), updated_at=NOW() WHERE id=$2 RETURNING *`;
@@ -246,10 +479,12 @@ router.put(
           return;
         }
         const b = req.body;
-        query = `UPDATE purchasing_entries SET user_name=$1, product=$2, quantity=$3, description=$4, due_date=$5,
-          order_form_no=$6, notes=$7, po_no=$8, invoice_no=$9, approved=$10, approved_by=$11,
-          purchase_date=$12, drivers_name=$13, vehicle_no=$14, received=$15, driver_description=$16,
-          remarks=$17, updated_at=NOW() WHERE id=$18 RETURNING *`;
+        query = `UPDATE purchasing_entries SET
+          user_name=$1, product=$2, quantity=$3, description=$4, due_date=$5,
+          order_form_no=$6, notes=$7, po_no=$8, invoice_no=$9, approved=$10,
+          approved_by=$11, purchase_date=$12, drivers_name=$13, vehicle_no=$14,
+          received=$15, driver_description=$16, remarks=$17, updated_at=NOW()
+          WHERE id=$18 RETURNING *`;
         values = [
           b.user_name,
           b.product,
@@ -276,10 +511,222 @@ router.put(
       }
 
       const result = await pool.query(query, values);
-      res.json({ success: true, entry: result.rows[0] });
+      const entry = result.rows[0];
+
+      // Sync product/description back to linked workshop job card
+      if (action === "admin" && entry.job_card_id) {
+        const b = req.body;
+        await pool.query(
+          `UPDATE workshop_job_cards
+           SET item = $1, job_description = $2
+           WHERE id = $3`,
+          [b.product || entry.product, b.description || "", entry.job_card_id],
+        );
+      }
+
+      res.json({ success: true, entry });
+    } catch (error: any) {
+      console.error("Update entry error:", error?.message || error);
+      res.status(500).json({
+        success: false,
+        error: error?.message || "Failed to update entry",
+      });
+    }
+  },
+);
+
+// ─── WORKSHOP CUSTOMER & JOB CARD DROPDOWNS ──────────────────────
+
+// GET workshop customers for dropdown
+router.get(
+  "/purchasing/workshop-customers",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const pool = getPool(req);
+    try {
+      const result = await pool.query(
+        `SELECT id, name FROM workshop_customers ORDER BY name ASC`,
+      );
+      res.json({ success: true, customers: result.rows });
     } catch (error) {
-      console.error("Update entry error:", error);
-      res.status(500).json({ success: false, error: "Failed to update entry" });
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to fetch customers" });
+    }
+  },
+);
+
+// GET job cards for a workshop customer
+router.get(
+  "/purchasing/workshop-customers/:customerId/jobcards",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { customerId } = req.params;
+    const pool = getPool(req);
+    try {
+      const result = await pool.query(
+        `SELECT id, job_card_number, item, item_number, status
+         FROM workshop_job_cards
+         WHERE workshop_customer_id = $1
+         ORDER BY created_at DESC`,
+        [customerId],
+      );
+      res.json({ success: true, jobcards: result.rows });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to fetch job cards" });
+    }
+  },
+);
+
+// GET entries by workshop_customer_id
+router.get(
+  "/purchasing/workshop-customers/:workshopCustomerId/entries",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { workshopCustomerId } = req.params;
+    const pool = getPool(req);
+    try {
+      const result = await pool.query(
+        `SELECT * FROM purchasing_entries 
+         WHERE workshop_customer_id = $1 
+         ORDER BY created_at ASC`,
+        [workshopCustomerId],
+      );
+      res.json({ success: true, entries: result.rows });
+    } catch (error) {
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to fetch entries" });
+    }
+  },
+);
+
+// GET all product rows for a purchasing entry
+router.get(
+  "/purchasing/entries/:entryId/products",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { entryId } = req.params;
+    const pool = getPool(req);
+    try {
+      const result = await pool.query(
+        `SELECT * FROM purchasing_flow_products
+         WHERE purchasing_entry_id = $1
+         ORDER BY job_card_item_id ASC, id ASC`,
+        [entryId],
+      );
+      res.json({ success: true, products: result.rows });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error?.message || "Failed to fetch products",
+      });
+    }
+  },
+);
+
+// PUT batch-update per-product stage fields for an entry
+router.put(
+  "/purchasing/entries/:entryId/products",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { entryId } = req.params;
+    const { stage, products } = req.body;
+    const pool = getPool(req);
+    const username = req.user?.username || "Unknown";
+    const role = req.user?.role || "";
+
+    if (!Array.isArray(products)) {
+      res
+        .status(400)
+        .json({ success: false, error: "products array required" });
+      return;
+    }
+
+    try {
+      for (const p of products) {
+        if (stage === "order") {
+          await pool.query(
+            `UPDATE purchasing_flow_products
+             SET order_form_no = $1, order_notes = $2,
+                 order_saved_at = NOW(), order_saved_by = $3, updated_at = NOW()
+             WHERE id = $4 AND purchasing_entry_id = $5`,
+            [
+              p.order_form_no || null,
+              p.order_notes || null,
+              username,
+              p.id,
+              entryId,
+            ],
+          );
+        } else if (stage === "po") {
+          await pool.query(
+            `UPDATE purchasing_flow_products
+             SET po_no = $1,
+                 po_saved_at = NOW(), po_saved_by = $2, updated_at = NOW()
+             WHERE id = $3 AND purchasing_entry_id = $4`,
+            [p.po_no || null, username, p.id, entryId],
+          );
+        } else if (stage === "invoice") {
+          await pool.query(
+            `UPDATE purchasing_flow_products
+             SET invoice_no = $1,
+                 invoice_saved_at = NOW(), invoice_saved_by = $2, updated_at = NOW()
+             WHERE id = $3 AND purchasing_entry_id = $4`,
+            [p.invoice_no || null, username, p.id, entryId],
+          );
+        } else if (stage === "driver") {
+          await pool.query(
+            `UPDATE purchasing_flow_products
+             SET purchase_date = $1, drivers_name = $2, vehicle_no = $3,
+                 received = $4, delivery_notes = $5,
+                 driver_saved_at = NOW(), driver_saved_by = $6, updated_at = NOW()
+             WHERE id = $7 AND purchasing_entry_id = $8`,
+            [
+              p.purchase_date || null,
+              p.drivers_name || null,
+              p.vehicle_no || null,
+              p.received || null,
+              p.delivery_notes || null,
+              username,
+              p.id,
+              entryId,
+            ],
+          );
+        } else if (stage === "approve") {
+          if (!["admin", "office_admin"].includes(role)) {
+            res.status(403).json({
+              success: false,
+              error: "Only admin/office_admin can approve",
+            });
+            return;
+          }
+          await pool.query(
+            `UPDATE purchasing_flow_products
+             SET approved = TRUE,
+                 approved_by = $1,
+                 approved_at = NOW(),
+                 approved_quantity = $2,
+                 updated_at = NOW()
+             WHERE id = $3 AND purchasing_entry_id = $4`,
+            [username, p.approved_quantity ?? null, p.id, entryId],
+          );
+        }
+      }
+
+      const result = await pool.query(
+        `SELECT * FROM purchasing_flow_products
+         WHERE purchasing_entry_id = $1 ORDER BY job_card_item_id ASC, id ASC`,
+        [entryId],
+      );
+      res.json({ success: true, products: result.rows });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: error?.message || "Failed to update products",
+      });
     }
   },
 );
@@ -291,12 +738,14 @@ router.delete(
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { entryId } = req.params;
     const pool = getPool(req);
+
     if (req.user?.role !== "admin") {
       res
         .status(403)
         .json({ success: false, error: "Only admins can delete entries" });
       return;
     }
+
     try {
       await pool.query("DELETE FROM purchasing_entries WHERE id=$1", [entryId]);
       res.json({ success: true });

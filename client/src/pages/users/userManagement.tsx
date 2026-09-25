@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import "./UserManagement.css";
+import "./userManagement.css";
 
 type PortalId =
   | "customers"
@@ -11,17 +11,19 @@ type PortalId =
   | "jobAssigned"
   | "meetings"
   | "followup"
-  | "staff";
+  | "staff"
+  | "myTasks";
 
 interface User {
   id: number;
   username: string;
   firstName: string;
   lastName: string;
-  role: "admin" | "user";
+  role: "admin" | "user" | "office" | "office_admin" | "stores" | "data_entry";
   permissions: {
     portals: PortalId[];
     canManageUsers?: boolean;
+    jobAssignedScope?: "all" | "own";
   };
   isActive: boolean;
   createdAt: string;
@@ -41,7 +43,11 @@ const UserManagement = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [selectedPortals, setSelectedPortals] = useState<PortalId[]>([]);
+  const [jobAssignedScope, setJobAssignedScope] = useState<"all" | "own">(
+    "own",
+  );
   const [isUserActive, setIsUserActive] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<string>("user");
 
   const portals: Portal[] = [
     { id: "customers", label: "Customers", icon: "👥" },
@@ -49,10 +55,11 @@ const UserManagement = () => {
     { id: "stores", label: "Stores", icon: "🏪" },
     { id: "workshop", label: "Workshop", icon: "🔧" },
     { id: "documents", label: "Documents", icon: "📄" },
-    { id: "jobAssigned", label: "jobAssigned", icon: "⏱️" },
+    { id: "jobAssigned", label: "Job Assigned", icon: "⏱️" },
     { id: "meetings", label: "Meetings", icon: "👨‍💼" },
-    { id: "followup", label: "Follow Up", icon: "🔄" },
+    // { id: "followup", label: "Follow Up", icon: "🔄" },
     { id: "staff", label: "Staff", icon: "👤" },
+    // { id: "myTasks", label: "My Tasks", icon: "☑️" },
   ];
 
   useEffect(() => {
@@ -64,9 +71,12 @@ const UserManagement = () => {
       setLoading(true);
       const token = localStorage.getItem("token");
 
-      const response = await axios.get("http://localhost:5000/api/auth/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await axios.get(
+        "https://coolmanworkshop-production.up.railway.app/api/auth/users",
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       if (response.data.users) {
         setUsers(response.data.users);
@@ -81,14 +91,19 @@ const UserManagement = () => {
 
   const openEditModal = (user: User) => {
     setSelectedUser(user);
-    setSelectedPortals(user.permissions.portals || []);
+    setSelectedPortals(user.permissions?.portals || []);
+    setJobAssignedScope(
+      user.permissions?.jobAssignedScope === "all" ? "all" : "own",
+    );
     setIsUserActive(user.isActive);
+    setSelectedRole(user.role);
     setShowModal(true);
   };
 
   const closeModal = () => {
     setSelectedUser(null);
     setSelectedPortals([]);
+    setJobAssignedScope("own");
     setIsUserActive(false);
     setShowModal(false);
   };
@@ -114,10 +129,15 @@ const UserManagement = () => {
       const token = localStorage.getItem("token");
 
       await axios.put(
-        `http://localhost:5000/api/auth/users/${selectedUser.id}/permissions`,
+        `https://coolmanworkshop-production.up.railway.app/api/auth/users/${selectedUser.id}/permissions`,
         {
-          permissions: { portals: selectedPortals },
+          permissions: {
+            ...selectedUser.permissions,
+            portals: selectedPortals,
+            jobAssignedScope,
+          },
           isActive: isUserActive,
+          role: selectedRole,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -135,9 +155,12 @@ const UserManagement = () => {
 
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`http://localhost:5000/api/auth/users/${userId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.delete(
+        `https://coolmanworkshop-production.up.railway.app/api/auth/users/${userId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       alert("User deleted successfully!");
       fetchUsers();
@@ -150,7 +173,7 @@ const UserManagement = () => {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
-        <p>Loading users...</p>
+        <p>Loading users....</p>
       </div>
     );
   }
@@ -269,6 +292,98 @@ const UserManagement = () => {
                 </label>
               </div>
 
+              {/* Role Section */}
+              <div className="status-section" style={{ marginTop: "16px" }}>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    color: "#555",
+                    marginBottom: "8px",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  User Role
+                </label>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  {[
+                    {
+                      value: "user",
+                      label: "User",
+                      desc: "Creates requests",
+                      color: "#1976D2",
+                    },
+                    {
+                      value: "office",
+                      label: "Office",
+                      desc: "Order Form, PO, Invoice, Delivery",
+                      color: "#C2185B",
+                    },
+                    {
+                      value: "office_admin",
+                      label: "Office Admin",
+                      desc: "Office + Can Approve",
+                      color: "#E65100",
+                    },
+                    {
+                      value: "stores",
+                      label: "Stores",
+                      desc: "Delivery section only",
+                      color: "#7B1FA2",
+                    },
+                    {
+                      value: "admin",
+                      label: "Admin",
+                      desc: "Full access",
+                      color: "#2E7D32",
+                    },
+                    {
+                      value: "data_entry",
+                      label: "Data Entry",
+                      desc: "BOQ data entry only",
+                      color: "#0891b2",
+                    },
+                  ].map((r) => (
+                    <div
+                      key={r.value}
+                      onClick={() => setSelectedRole(r.value as any)}
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: "8px",
+                        cursor: "pointer",
+                        border: "2px solid",
+                        borderColor:
+                          selectedRole === r.value ? r.color : "#e0e0e0",
+                        background:
+                          selectedRole === r.value ? r.color + "15" : "#fff",
+                        transition: "all 0.2s",
+                        minWidth: "120px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: "13px",
+                          color: selectedRole === r.value ? r.color : "#333",
+                        }}
+                      >
+                        {r.label}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "11px",
+                          color: "#888",
+                          marginTop: "2px",
+                        }}
+                      >
+                        {r.desc}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="portal-access-header">
                 <h3>Portal Permissions</h3>
                 <button onClick={selectAllPortals} className="btn-secondary">
@@ -297,6 +412,32 @@ const UserManagement = () => {
                   </div>
                 ))}
               </div>
+              {selectedPortals.includes("jobAssigned") &&
+                selectedRole !== "admin" && (
+                  <fieldset className="job-scope-fieldset">
+                    <legend>Job Assigned visibility</legend>
+                    <label>
+                      <input
+                        type="radio"
+                        name="jobAssignedScope"
+                        value="own"
+                        checked={jobAssignedScope === "own"}
+                        onChange={() => setJobAssignedScope("own")}
+                      />
+                      My tasks only (including third-party assignments)
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name="jobAssignedScope"
+                        value="all"
+                        checked={jobAssignedScope === "all"}
+                        onChange={() => setJobAssignedScope("all")}
+                      />
+                      All tasks, with a My Tasks filter
+                    </label>
+                  </fieldset>
+                )}
             </div>
 
             <div className="modal-footer">
