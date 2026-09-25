@@ -558,7 +558,7 @@ const MEMBER_STATUS_LOOKUP: Record<
   { label: string; bg: string; color: string }
 > = {
   todo: { label: "To Do", bg: "#e3f2fd", color: "#2e7d32" },
-  in_progress: { label: "In Progress", bg: "#fff8e1", color: "#e6db00" },
+  in_progress: { label: "In Progress", bg: "#fff8e1", color: "##e6bc00" },
   on_hold: { label: "On Hold", bg: "#fce4ec", color: "#880e4f" },
   permission: { label: "Permission", bg: "#ede7f6", color: "#5e35b1" },
   done: { label: "Done", bg: "#c0c0c0", color: "#727272" },
@@ -1611,7 +1611,7 @@ const ProjectDashboard = () => {
       value: "in_progress",
       label: "In Progress",
       bg: "#fff8e1",
-      color: "#e6db00",
+      color: "##e6bc00",
     },
     { value: "on_hold", label: "On Hold", bg: "#fce4ec", color: "#880e4f" },
     {

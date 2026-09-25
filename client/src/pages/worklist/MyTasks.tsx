@@ -83,7 +83,7 @@ const STATUS_OPTIONS = [
     value: "in_progress",
     label: "In Progress",
     bg: "#fff8e1",
-    color: "#e6db00",
+    color: "##e6bc00",
   },
   { value: "on_hold", label: "On Hold", bg: "#fce4ec", color: "#880e4f" },
   {

@@ -106,7 +106,7 @@ const STATUS_OPTIONS = [
     value: "in_progress",
     label: "In Progress",
     bg: "#fff8e1",
-    color: "#e6db00",
+    color: "#e6bc00",
   },
   { value: "on_hold", label: "On Hold", bg: "#fce4ec", color: "#880e4f" },
   {
@@ -1083,12 +1083,7 @@ const WorklistTasksDashboard = () => {
   const filtered = searchedTasks
     .filter((t) => !statusFilter || t.status === statusFilter)
     .filter((t) => !jobTypeFilter || t.job_type === jobTypeFilter)
-    .sort((a, b) => {
-      const aDone = a.status === "done" ? 1 : 0;
-      const bDone = b.status === "done" ? 1 : 0;
-      if (aDone !== bDone) return aDone - bDone;
-      return a.task_no - b.task_no;
-    });
+    .sort((a, b) => b.task_no - a.task_no);
 
   const getInitials = (name: string) => {
     const w = name.trim().split(" ");

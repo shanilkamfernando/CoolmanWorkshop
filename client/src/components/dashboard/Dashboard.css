@@ -168,6 +168,29 @@
   color: #666;
 }
 
+/* Append to the existing Dashboard.css */
+.portal-tile.job-assigned-tile {
+  padding: 0;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.job-assigned-tile-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.portal-tile.job-assigned-tile .no-access-badge {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
 /* @media (max-width: 768px) {
   .header-content {
     flex-direction: column;
