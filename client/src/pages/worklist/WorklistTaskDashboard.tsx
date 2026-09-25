@@ -1367,7 +1367,7 @@ const WorklistTasksDashboard = () => {
                     <th style={{ width: "140px", textAlign: "center" }}>
                       Assigned To
                     </th>
-                    <th>Description</th>
+                    {/* <th>Description</th> */}
                     <th style={{ width: "110px" }}>Due Date</th>
                     <th style={{ width: "110px" }}>Finish Date</th>
                     <th style={{ width: "105px" }}>Status</th>
