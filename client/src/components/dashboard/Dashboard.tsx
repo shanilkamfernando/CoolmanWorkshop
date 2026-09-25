@@ -53,13 +53,13 @@ const Dashboard = () => {
   };
 
   const portals: Portal[] = [
-    {
-      id: "myTasks",
-      label: "My Tasks",
-      icon: "☑️",
-      path: "/myTasks",
-      description: "Specific Users Task management",
-    },
+    // {
+    //   id: "myTasks",
+    //   label: "My Tasks",
+    //   icon: "☑️",
+    //   path: "/myTasks",
+    //   description: "Specific Users Task management",
+    // },
     {
       id: "jobAssigned",
       label: "Job Assigned",
