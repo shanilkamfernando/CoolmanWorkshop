@@ -59,7 +59,7 @@ const UserManagement = () => {
     { id: "meetings", label: "Meetings", icon: "👨‍💼" },
     // { id: "followup", label: "Follow Up", icon: "🔄" },
     { id: "staff", label: "Staff", icon: "👤" },
-    { id: "myTasks", label: "My Tasks", icon: "☑️" },
+    // { id: "myTasks", label: "My Tasks", icon: "☑️" },
   ];
 
   useEffect(() => {
