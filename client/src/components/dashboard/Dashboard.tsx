@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import jobAssignedImage from "../assets/jobAssigned.jpeg";
 import "./Dashboard.css";
 
 type PortalId =
@@ -21,7 +20,9 @@ interface User {
   firstName: string;
   lastName: string;
   role: "admin" | "user";
-  permissions: { portals: PortalId[] };
+  permissions: {
+    portals: PortalId[];
+  };
 }
 
 interface Portal {
@@ -39,11 +40,7 @@ const Dashboard = () => {
   useEffect(() => {
     const userData = localStorage.getItem("user");
     if (userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch {
-        navigate("/signin");
-      }
+      setUser(JSON.parse(userData));
     } else {
       navigate("/signin");
     }
@@ -56,6 +53,13 @@ const Dashboard = () => {
   };
 
   const portals: Portal[] = [
+    // {
+    //   id: "myTasks",
+    //   label: "My Tasks",
+    //   icon: "☑️",
+    //   path: "/myTasks",
+    //   description: "Specific Users Task management",
+    // },
     {
       id: "jobAssigned",
       label: "Job Assigned",
@@ -105,18 +109,36 @@ const Dashboard = () => {
       path: "/documents",
       description: "Document management",
     },
+
+    // {
+    //   id: "followup",
+    //   label: "Follow Up",
+    //   icon: "🔄",
+    //   path: "/followup",
+    //   description: "Customer follow-ups",
+    // },
+    // {
+    //   id: "staff",
+    //   label: "Staff",
+    //   icon: "👤",
+    //   path: "/staff",
+    //   description: "Employee management",
+    // },
   ];
 
   const hasPortalAccess = (portalId: PortalId): boolean => {
     if (!user) return false;
     if (user.role === "admin") return true;
-    return user.permissions?.portals?.includes(portalId) ?? false;
+    return user.permissions.portals.includes(portalId);
   };
 
-  if (!user) return <div className="loading">Loading...</div>;
+  if (!user) {
+    return <div className="loading">Loading...</div>;
+  }
 
   return (
     <div className="dashboard">
+      {/* Header */}
       <div className="dashboard-header">
         <div className="header-content">
           <h1>
@@ -138,50 +160,35 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="dashboard-content">
         <div className="welcome-section">
           <h2>Welcome back, {user.firstName}! 👋</h2>
           <p>Select a portal to get started</p>
         </div>
+
+        {/* Portal Grid */}
         <div className="portal-grid">
           {portals.map((portal) => {
             const hasAccess = hasPortalAccess(portal.id);
-            const isJobAssigned = portal.id === "jobAssigned";
+
             return (
               <div
                 key={portal.id}
-                className={`portal-tile ${isJobAssigned ? "job-assigned-tile " : ""}${!hasAccess ? "disabled" : ""}`}
-                role="button"
-                aria-label={portal.label}
-                aria-disabled={!hasAccess}
-                tabIndex={hasAccess ? 0 : -1}
+                className={`portal-tile ${!hasAccess ? "disabled" : ""}`}
                 onClick={() => hasAccess && navigate(portal.path)}
-                onKeyDown={(e) => {
-                  if (hasAccess && (e.key === "Enter" || e.key === " ")) {
-                    e.preventDefault();
-                    navigate(portal.path);
-                  }
-                }}
               >
-                {isJobAssigned ? (
-                  <img
-                    className="job-assigned-tile-image"
-                    src={jobAssignedImage}
-                    alt=""
-                  />
-                ) : (
-                  <>
-                    <div className="portal-icon">{portal.icon}</div>
-                    <h3>{portal.label}</h3>
-                    <p>{portal.description}</p>
-                  </>
-                )}
+                <div className="portal-icon">{portal.icon}</div>
+                <h3>{portal.label}</h3>
+                <p>{portal.description}</p>
                 {!hasAccess && (
                   <div className="no-access-badge">🔒 No Access</div>
                 )}
               </div>
             );
           })}
+
+          {/* Admin Portal */}
           {user.role === "admin" && (
             <div
               className="portal-tile admin-tile"
