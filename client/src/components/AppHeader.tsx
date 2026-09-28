@@ -8,7 +8,7 @@ import iconPurchasing from "../assets/purchasing.jpeg";
 import iconStores from "../assets/stores.jpeg";
 import iconWorkshop from "../assets/workshop.jpeg";
 import iconDocuments from "../assets/documents.jpeg";
-import iconJobAssigned from "../assets/jobassigned.jpeg";
+import iconJobAssigned from "../assets/jobAssigned.png";
 import iconStaff from "../assets/staff.jpeg";
 
 interface AppHeaderProps {
