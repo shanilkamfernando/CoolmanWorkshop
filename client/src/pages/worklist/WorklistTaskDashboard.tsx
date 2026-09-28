@@ -709,6 +709,7 @@ const WorklistTasksDashboard = () => {
   const [manualSaving, setManualSaving] = useState(false);
 
   const isAdmin = user?.role === "admin";
+  const [canCreateTasks, setCanCreateTasks] = useState(false);
   const authHeaders = () => ({
     Authorization: `Bearer ${localStorage.getItem("token")}`,
   });
@@ -758,6 +759,7 @@ const WorklistTasksDashboard = () => {
 
       setTasks(res.data.tasks || []);
       setAccessScope(res.data.accessScope === "all" ? "all" : "own");
+      setCanCreateTasks(res.data.canCreateTasks === true);
     } catch (error: any) {
       console.error(
         `Failed to fetch tasks (attempt ${retryCount + 1}):`,
@@ -1177,7 +1179,7 @@ const WorklistTasksDashboard = () => {
             >
               ← Back to Years
             </button>
-            {isAdmin && (
+            {canCreateTasks && (
               <button
                 className="btn-add-small"
                 onClick={() => setShowAdd(true)}
@@ -1301,7 +1303,7 @@ const WorklistTasksDashboard = () => {
               <h3 style={{ color: "#666", marginBottom: "8px" }}>
                 {search ? "No tasks match your search" : `No tasks for ${year}`}
               </h3>
-              {!search && tasks.length === 0 && isAdmin && (
+              {!search && tasks.length === 0 && canCreateTasks && (
                 <button
                   className="btn-add-meeting"
                   style={{ marginTop: "12px" }}
@@ -1890,7 +1892,7 @@ const WorklistTasksDashboard = () => {
                             <strong>{form.customer_name}</strong>
                           </div>
                         )}
-                        {isAdmin && (
+                        {canCreateTasks && (
                           <button
                             type="button"
                             onClick={() => {
@@ -2010,7 +2012,7 @@ const WorklistTasksDashboard = () => {
                       )}
                       {/* Manual projects are reference-only and must be available even
                         when there are no existing projects for the selected customer. */}
-                      {isAdmin && form.job_type === "project" && (
+                      {canCreateTasks && form.job_type === "project" && (
                         <button
                           type="button"
                           onClick={() => {
