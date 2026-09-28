@@ -569,50 +569,58 @@ const getMemberLogStatus = (val: string) =>
 const MemberUpdateLog = ({
   customerId,
   projectId,
-  memberId,
-  currentStatus,
+  member,
   canEdit,
-  isAdmin,
   readOnly,
   systemUsers,
 }: {
   customerId: string | undefined;
   projectId: string | undefined;
-  memberId: number;
-  currentStatus: string;
+  member: AssignedMember;
   canEdit: boolean;
-  isAdmin: boolean;
   readOnly: boolean;
   systemUsers: SystemUser[];
 }) => {
   const [updates, setUpdates] = useState<any[]>([]);
+  const requestNumber = useRef(0);
   const [newNote, setNewNote] = useState("");
+  const [newThirdParties, setNewThirdParties] = useState<string[]>([]);
+  const [thirdPartySearch, setThirdPartySearch] = useState("");
   const [saving, setSaving] = useState(false);
-  const [assignOpenFor, setAssignOpenFor] = useState<number | null>(null);
-  const [assigning, setAssigning] = useState(false);
-
-  const token = () => localStorage.getItem("token");
-  const hdr = () => ({ Authorization: `Bearer ${token()}` });
-  const BASE = `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/members/${memberId}/updates`;
+  const BASE = `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/members/${member.id}/updates`;
+  const hdr = () => ({
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  });
 
   useEffect(() => {
     fetchUpdates();
-  }, [memberId]);
+  }, [member.id, member.status]);
 
   const fetchUpdates = async () => {
+    const request = ++requestNumber.current;
     try {
-      const r = await axios.get(BASE, { headers: hdr() });
-      setUpdates(r.data.updates || []);
+      const response = await axios.get(BASE, { headers: hdr() });
+      if (request === requestNumber.current)
+        setUpdates(response.data.updates || []);
     } catch {}
   };
 
   const handleAdd = async () => {
-    if (!newNote.trim()) return;
+    if (!newNote.trim() || saving) return;
     setSaving(true);
     try {
-      await axios.post(BASE, { update_note: newNote }, { headers: hdr() });
+      await axios.post(
+        BASE,
+        {
+          update_note: newNote,
+          third_parties: newThirdParties,
+        },
+        { headers: hdr() },
+      );
       setNewNote("");
-      fetchUpdates();
+      setNewThirdParties([]);
+      setThirdPartySearch("");
+      await fetchUpdates();
     } catch (err: any) {
       alert(err.response?.data?.error || "Failed to add update");
     } finally {
@@ -620,278 +628,193 @@ const MemberUpdateLog = ({
     }
   };
 
-  const handleDelete = async (updateId: number) => {
-    if (!confirm("Delete this update?")) return;
-    try {
-      await axios.delete(`${BASE}/${updateId}`, { headers: hdr() });
-      fetchUpdates();
-    } catch {}
-  };
-
-  const handleAssignThirdParty = async (updateId: number, username: string) => {
-    setAssigning(true);
-    try {
-      await axios.put(
-        `${BASE}/${updateId}/third-party`,
-        { third_party: username },
-        { headers: hdr() },
-      );
-      setAssignOpenFor(null);
-      fetchUpdates();
-    } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to assign");
-    } finally {
-      setAssigning(false);
-    }
-  };
+  const assignedAt = fmtCreatedDateTime(
+    member.assigned_date,
+    member.assigned_time,
+  );
+  const completedEntry = [...updates]
+    .reverse()
+    .find(
+      (entry) =>
+        entry.status === "done" && entry.update_note === "Task Completed",
+    );
+  const finishedAt = completedEntry
+    ? fmtLogDateTime(completedEntry.created_at)
+    : null;
+  const summaryGroups = [
+    [
+      ["Assigned By", member.created_by || "—"],
+      ["Assigned To", member.assigned_member || "—"],
+    ],
+    [
+      ["Assigned Date", assignedAt.date],
+      ["Assigned Time", assignedAt.time],
+    ],
+    [
+      ["Finished Date", fmtDateDDMMYYYY(member.finish_date)],
+      [
+        "Finished Time",
+        member.status === "done" ? finishedAt?.time || "—" : "—",
+      ],
+    ],
+  ];
+  const thirdParties = (raw: string | null | undefined) =>
+    raw
+      ? raw
+          .split(",")
+          .map((name) => name.trim())
+          .filter(Boolean)
+      : [];
 
   return (
-    <div>
-      <div
-        style={{
-          fontSize: "11px",
-          fontWeight: 700,
-          textTransform: "uppercase" as const,
-          letterSpacing: "0.6px",
-          color: "#667eea",
-          marginBottom: "8px",
-          paddingBottom: "6px",
-          borderBottom: "2px solid #e8f0fe",
-        }}
-      >
-        Update Log
+    <div className="project-member-log">
+      <div className="project-member-summary">
+        {summaryGroups.map((group, index) => (
+          <div key={index} className="project-member-summary-group">
+            {group.map(([label, value]) => (
+              <div key={label}>
+                <strong>{label}: </strong>
+                <span>{value}</span>
+              </div>
+            ))}
+          </div>
+        ))}
       </div>
-
-      <table
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          fontSize: "12px",
-          marginBottom: "8px",
-        }}
-      >
-        <thead>
-          <tr style={{ background: "#f8f9ff" }}>
-            <th style={mThStyle("90px")}>Date</th>
-            <th style={mThStyle("65px")}>Time</th>
-            <th style={mThStyle("70px")}>By</th>
-            <th style={mThStyle()}>Update</th>
-            <th style={mThStyle("100px")}>Status</th>
-            <th style={mThStyle("120px")}>Third Party</th>
-            {isAdmin && (
-              <th style={{ ...mThStyle("30px"), padding: "5px 8px" }}></th>
-            )}
-          </tr>
-        </thead>
-        <tbody>
-          {updates.length === 0 ? (
+      <div className="project-member-log-title">Update Log</div>
+      <div className="project-member-update-scroll">
+        <table className="project-member-update-table">
+          <thead>
             <tr>
-              <td
-                colSpan={isAdmin ? 7 : 6}
-                style={{
-                  padding: "10px 8px",
-                  textAlign: "center" as const,
-                  color: "#bbb",
-                  fontStyle: "italic",
-                  fontSize: "12px",
-                }}
-              >
-                No updates yet
-              </td>
+              <th style={mThStyle("90px")}>Date</th>
+              <th style={mThStyle("70px")}>Time</th>
+              <th style={mThStyle("80px")}>By</th>
+              <th style={mThStyle()}>Update</th>
+              <th style={mThStyle("100px")}>Status</th>
+              <th style={mThStyle("120px")}>Third Party</th>
             </tr>
-          ) : (
-            updates.map((u, idx) => {
-              const { date: logDate, time: logTime } = fmtLogDateTime(
-                u.created_at,
-              );
-              const rowStatus = getMemberLogStatus(u.status || "todo");
-              return (
-                <tr
-                  key={u.id}
-                  style={{ background: idx % 2 === 0 ? "#fff" : "#fafbff" }}
-                >
-                  <td style={mTdStyle}>{logDate}</td>
-                  <td style={mTdStyle}>{logTime}</td>
-                  <td style={{ ...mTdStyle, fontSize: "11px" }}>
-                    {u.created_by || "—"}
-                  </td>
-                  <td style={{ ...mTdStyle, color: "#333" }}>
-                    {u.update_note}
-                  </td>
-                  <td style={mTdStyle}>
-                    <span
-                      style={{
-                        padding: "2px 8px",
-                        borderRadius: "9px",
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        background: rowStatus.bg,
-                        color: rowStatus.color,
-                        whiteSpace: "nowrap" as const,
-                      }}
-                    >
-                      {rowStatus.label}
-                    </span>
-                  </td>
-                  <td style={{ ...mTdStyle, position: "relative" as const }}>
-                    {u.third_party ? (
+          </thead>
+          <tbody>
+            {updates.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="project-member-empty">
+                  No updates yet
+                </td>
+              </tr>
+            ) : (
+              updates.map((entry, index) => {
+                const loggedAt = fmtLogDateTime(entry.created_at);
+                const status = getMemberLogStatus(entry.status || "todo");
+                return (
+                  <tr
+                    key={entry.id}
+                    style={{ background: index % 2 ? "#fafbff" : "#fff" }}
+                  >
+                    <td style={mTdStyle}>{loggedAt.date}</td>
+                    <td style={mTdStyle}>{loggedAt.time}</td>
+                    <td style={mTdStyle}>{entry.created_by || "—"}</td>
+                    <td style={mTdStyle}>{entry.update_note}</td>
+                    <td style={mTdStyle}>
                       <span
                         style={{
-                          fontSize: "12px",
-                          fontWeight: 600,
-                          color: "#c62828",
-                        }}
-                      >
-                        @{u.third_party}
-                      </span>
-                    ) : !readOnly ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAssignOpenFor(
-                            assignOpenFor === u.id ? null : u.id,
-                          );
-                        }}
-                        style={{
-                          background: "none",
-                          border: "1px dashed #bbb",
-                          borderRadius: "5px",
-                          color: "#888",
-                          fontSize: "12px",
                           padding: "2px 8px",
-                          cursor: "pointer",
+                          borderRadius: "9px",
+                          fontSize: "10px",
+                          fontWeight: 700,
+                          background: status.bg,
+                          color: status.color,
+                          whiteSpace: "nowrap",
                         }}
                       >
-                        @ Assign
-                      </button>
-                    ) : (
-                      <span style={{ color: "#ccc", fontSize: "12px" }}>—</span>
-                    )}
-
-                    {assignOpenFor === u.id && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          position: "absolute" as const,
-                          top: "100%",
-                          left: 0,
-                          zIndex: 20,
-                          background: "#fff",
-                          border: "1px solid #ddd",
-                          borderRadius: "8px",
-                          boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
-                          minWidth: "180px",
-                          maxHeight: "220px",
-                          overflowY: "auto" as const,
-                          marginTop: "4px",
-                        }}
-                      >
-                        {systemUsers.length === 0 ? (
-                          <div
-                            style={{
-                              padding: "10px",
-                              fontSize: "12px",
-                              color: "#999",
-                            }}
-                          >
-                            No members found
-                          </div>
-                        ) : (
-                          systemUsers.map((su) => (
-                            <div
-                              key={su.username}
-                              onClick={() =>
-                                !assigning &&
-                                handleAssignThirdParty(u.id, su.username)
-                              }
-                              style={{
-                                padding: "8px 12px",
-                                fontSize: "13px",
-                                cursor: "pointer",
-                                borderBottom: "1px solid #f2f2f2",
-                              }}
-                              onMouseEnter={(e) =>
-                                (e.currentTarget.style.background = "#f8f9ff")
-                              }
-                              onMouseLeave={(e) =>
-                                (e.currentTarget.style.background = "")
-                              }
+                        {status.label}
+                      </span>
+                    </td>
+                    <td style={mTdStyle}>
+                      <div className="project-member-third-parties">
+                        {thirdParties(entry.third_party).length ? (
+                          thirdParties(entry.third_party).map((username) => (
+                            <span
+                              className="project-member-third-party"
+                              key={username}
                             >
-                              {su.first_name} {su.last_name}{" "}
-                              <span style={{ color: "#aaa" }}>
-                                ({su.username})
-                              </span>
-                            </div>
+                              @{username}
+                            </span>
                           ))
+                        ) : (
+                          <span style={{ color: "#ccc" }}>—</span>
                         )}
                       </div>
-                    )}
-                  </td>
-                  {isAdmin && (
-                    <td style={{ ...mTdStyle, textAlign: "center" as const }}>
-                      {!readOnly && (
-                        <button
-                          onClick={() => handleDelete(u.id)}
-                          style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: "#ddd",
-                            fontSize: "13px",
-                          }}
-                          onMouseEnter={(e) =>
-                            (e.currentTarget.style.color = "#ef4444")
-                          }
-                          onMouseLeave={(e) =>
-                            (e.currentTarget.style.color = "#ddd")
-                          }
-                        >
-                          🗑️
-                        </button>
-                      )}
                     </td>
-                  )}
-                </tr>
-              );
-            })
-          )}
-        </tbody>
-      </table>
-
-      {canEdit && !readOnly && (
-        <div style={{ display: "flex", gap: "6px" }}>
-          <input
-            type="text"
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+      {canEdit && !readOnly ? (
+        <div className="project-member-update-form">
+          <textarea
+            className="form-input"
+            rows={2}
             value={newNote}
             onChange={(e) => setNewNote(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-            placeholder="Add update..."
-            style={{
-              flex: 1,
-              padding: "5px 8px",
-              fontSize: "12px",
-              border: "1.5px solid #ddd",
-              borderRadius: "5px",
-            }}
+            placeholder="Add update note..."
+            onClick={(e) => e.stopPropagation()}
           />
+          <div className="project-member-third-party-label">
+            Third-party assignees (optional)
+          </div>
+          <input
+            className="form-input"
+            value={thirdPartySearch}
+            onChange={(e) => setThirdPartySearch(e.target.value)}
+            placeholder="Search members..."
+          />
+          <div className="project-member-assignees">
+            {systemUsers
+              .filter((person) =>
+                `${person.first_name} ${person.last_name} ${person.username}`
+                  .toLowerCase()
+                  .includes(thirdPartySearch.toLowerCase()),
+              )
+              .map((person) => (
+                <label key={person.username}>
+                  <input
+                    type="checkbox"
+                    checked={newThirdParties.includes(person.username)}
+                    disabled={saving}
+                    onChange={(e) =>
+                      setNewThirdParties((previous) =>
+                        e.target.checked
+                          ? [...previous, person.username]
+                          : previous.filter(
+                              (username) => username !== person.username,
+                            ),
+                      )
+                    }
+                  />
+                  {person.first_name} {person.last_name} ({person.username})
+                </label>
+              ))}
+          </div>
           <button
+            type="button"
+            className="btn-save"
             onClick={handleAdd}
             disabled={saving || !newNote.trim()}
-            style={{
-              padding: "5px 12px",
-              background: "#667eea",
-              color: "#fff",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
-              fontSize: "12px",
-              fontWeight: 600,
-              opacity: !newNote.trim() ? 0.5 : 1,
-            }}
           >
-            {saving ? "..." : "+ Add"}
+            {saving ? "Adding..." : "+ Add"}
           </button>
+          <div className="project-member-immutable-note">
+            The update and its assignees cannot be changed after you add it.
+          </div>
         </div>
+      ) : (
+        !readOnly && (
+          <div className="project-member-immutable-note">
+            Move this task to In Progress to start adding updates.
+          </div>
+        )
       )}
     </div>
   );
@@ -1828,7 +1751,7 @@ const ProjectDashboard = () => {
                 const isAssignedToMe =
                   member.assigned_member === user?.username;
                 const isDone = member.status === "done";
-                const canEditUpdate = !isDone;
+                const canEditUpdate = !isDone && member.status !== "todo";
                 const st = getStatusStyle(member.status);
                 const isExpanded = expandedMemberId === member.id;
                 const { date: memberDate, time: memberTime } =
@@ -1998,13 +1921,7 @@ const ProjectDashboard = () => {
                               borderBottom: "1px solid #e8e8e8",
                             }}
                           >
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "280px 1fr",
-                                gap: "24px",
-                              }}
-                            >
+                            <div className="project-member-detail-grid">
                               {/* Left: Job Description edit, Due Date edit, Finish Date, Status */}
                               <div
                                 style={{
@@ -2135,10 +2052,8 @@ const ProjectDashboard = () => {
                                 <MemberUpdateLog
                                   customerId={customerId}
                                   projectId={projectId}
-                                  memberId={member.id}
-                                  currentStatus={member.status}
+                                  member={member}
                                   canEdit={canEditUpdate}
-                                  isAdmin={isAdmin}
                                   readOnly={isDone}
                                   systemUsers={systemUsers}
                                 />
