@@ -162,7 +162,6 @@ const TaskUpdateLog = ({
   task,
   status,
   refreshKey,
-  description,
   canEdit,
   readOnly,
   systemUsers,
@@ -171,7 +170,6 @@ const TaskUpdateLog = ({
   task: WorklistTask;
   status: string;
   refreshKey: number;
-  description: string;
   canEdit: boolean;
   readOnly: boolean;
   systemUsers: SystemUser[];
@@ -319,35 +317,6 @@ const TaskUpdateLog = ({
             </div>
           ))}
         </div>
-        {description && (
-          <div
-            style={{
-              fontSize: "13px",
-              color: "#555",
-              background: "#f8f9ff",
-              border: "1px solid #e8f0fe",
-              borderRadius: "6px",
-              padding: "8px 12px",
-              marginBottom: "12px",
-              lineHeight: 1.5,
-            }}
-          >
-            <span
-              style={{
-                fontSize: "10px",
-                fontWeight: 700,
-                color: "#667eea",
-                textTransform: "uppercase",
-                letterSpacing: "0.5px",
-                display: "block",
-                marginBottom: "3px",
-              }}
-            >
-              Description
-            </span>
-            {description}
-          </div>
-        )}
       </div>
       <div className="worklist-detail-updates">
         <div
@@ -1083,7 +1052,12 @@ const WorklistTasksDashboard = () => {
   const filtered = searchedTasks
     .filter((t) => !statusFilter || t.status === statusFilter)
     .filter((t) => !jobTypeFilter || t.job_type === jobTypeFilter)
-    .sort((a, b) => b.task_no - a.task_no);
+    .sort((a, b) => {
+      const aDone = a.status === "done" ? 1 : 0;
+      const bDone = b.status === "done" ? 1 : 0;
+      if (aDone !== bDone) return aDone - bDone;
+      return b.task_no - a.task_no;
+    });
 
   const getInitials = (name: string) => {
     const w = name.trim().split(" ");
@@ -1729,6 +1703,34 @@ const WorklistTasksDashboard = () => {
                                         </div>
                                       )}
                                     </div>
+                                    {task.job_description && (
+                                      <div
+                                        style={{
+                                          fontSize: "13px",
+                                          color: "#555",
+                                          background: "#f8f9ff",
+                                          border: "1px solid #e8f0fe",
+                                          borderRadius: "6px",
+                                          padding: "8px 12px",
+                                          lineHeight: 1.5,
+                                        }}
+                                      >
+                                        <span
+                                          style={{
+                                            fontSize: "10px",
+                                            fontWeight: 700,
+                                            color: "#667eea",
+                                            textTransform: "uppercase",
+                                            letterSpacing: "0.5px",
+                                            display: "block",
+                                            marginBottom: "3px",
+                                          }}
+                                        >
+                                          Description
+                                        </span>
+                                        {task.job_description}
+                                      </div>
+                                    )}
                                   </div>
 
                                   <TaskUpdateLog
@@ -1739,7 +1741,6 @@ const WorklistTasksDashboard = () => {
                                     readOnly={isDone}
                                     systemUsers={systemUsers}
                                     authHeaders={authHeaders}
-                                    description={task.job_description}
                                   />
                                 </div>
 
