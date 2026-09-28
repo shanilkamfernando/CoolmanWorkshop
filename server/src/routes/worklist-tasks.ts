@@ -1,5 +1,5 @@
 // ============================================
-// Worklist Tasks Routes
+// Worklist asks Routes
 // Save as: server/src/routes/worklist-tasks.ts
 // ============================================
 
@@ -12,31 +12,54 @@ const router = Router();
 interface AuthRequest extends Request {
   user?: {
     id: number;
+
     username: string;
+
     role: string;
+
     permissions: { portals: string[] };
   };
 }
 
 const getPool = (req: Request): Pool => req.app.locals.pool;
 
+// An admin's task assigned to their own account is visible only to that admin.
+// The creator's current role is checked against users; no schema change is needed.
+const isAdminSelfAssignedSql = `(
+  t.created_by = t.assigned_member
+  AND EXISTS (
+    SELECT 1 FROM users task_creator
+    WHERE task_creator.username = t.created_by
+      AND task_creator.role = 'admin'
+  )
+)`;
+
 type JobAccess = { scope: "all" | "own" | "none"; username: string };
 
 // Fetch the current permission for each request so admin changes apply immediately.
+
 const getJobAccess = async (
   req: AuthRequest,
+
   pool: Pool,
 ): Promise<JobAccess> => {
   if (!req.user?.id) return { scope: "none", username: "" };
+
   const result = await pool.query(
     "SELECT username, role, permissions, is_active FROM users WHERE id = $1",
+
     [req.user.id],
   );
+
   const account = result.rows[0];
+
   if (!account || !account.is_active) return { scope: "none", username: "" };
+
   if (account.role === "admin")
     return { scope: "all", username: account.username };
+
   let permissions = account.permissions;
+
   if (typeof permissions === "string") {
     try {
       permissions = JSON.parse(permissions);
@@ -44,18 +67,21 @@ const getJobAccess = async (
       permissions = {};
     }
   }
+
   if (
     !permissions?.portals?.includes("jobAssigned") &&
     !permissions?.portals?.includes("myTasks")
   ) {
     return { scope: "none", username: account.username };
   }
+
   return {
     scope:
       permissions?.jobAssignedScope === "all" &&
       permissions?.portals?.includes("jobAssigned")
         ? "all"
         : "own",
+
     username: account.username,
   };
 };
@@ -65,19 +91,22 @@ const canAccessTask = async (
   access: JobAccess,
   taskId: string,
 ): Promise<boolean> => {
-  if (access.scope === "all") return true;
   if (access.scope === "none") return false;
+
   const result = await pool.query(
     `SELECT EXISTS (
       SELECT 1 FROM worklist_tasks_v2 t
-      WHERE t.id = $1 AND (
-        t.assigned_member = $2 OR EXISTS (
-          SELECT 1 FROM worklist_task_updates u WHERE u.task_id = t.id
-            AND $2 = ANY(string_to_array(replace(COALESCE(u.third_party, ''), ' ', ''), ','))
+      WHERE t.id = $1
+        AND (t.assigned_member = $2 OR NOT ${isAdminSelfAssignedSql})
+        AND (
+          $3 = 'all' OR t.assigned_member = $2 OR EXISTS (
+            SELECT 1 FROM worklist_task_updates u
+            WHERE u.task_id = t.id
+              AND $2 = ANY(string_to_array(replace(COALESCE(u.third_party, ''), ' ', ''), ','))
+          )
         )
-      )
     ) AS allowed`,
-    [taskId, access.username],
+    [taskId, access.username, access.scope],
   );
   return result.rows[0]?.allowed === true;
 };
@@ -89,17 +118,23 @@ const VALID_STATUSES = ["todo", "in_progress", "on_hold", "permission", "done"];
 
 router.get(
   "/worklist/dropdown/customers",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
+
     try {
       const result = await pool.query(
         "SELECT id, name FROM customers ORDER BY name ASC",
       );
+
       res.json({ success: true, customers: result.rows });
     } catch (error) {
       res
+
         .status(500)
+
         .json({ success: false, error: "Failed to fetch customers" });
     }
   },
@@ -107,19 +142,27 @@ router.get(
 
 router.get(
   "/worklist/dropdown/customers/:customerId/projects",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
+
     const pool = getPool(req);
+
     try {
       const result = await pool.query(
         "SELECT id, name FROM projects WHERE customer_id = $1 ORDER BY name ASC",
+
         [customerId],
       );
+
       res.json({ success: true, projects: result.rows });
     } catch (error) {
       res
+
         .status(500)
+
         .json({ success: false, error: "Failed to fetch projects" });
     }
   },
@@ -127,15 +170,21 @@ router.get(
 
 router.get(
   "/worklist/dropdown/customers/:customerId/compressor-service",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
+
     const pool = getPool(req);
+
     try {
       const result = await pool.query(
         "SELECT id, name FROM compressor_service_companies WHERE customer_id = $1 ORDER BY name ASC",
+
         [customerId],
       );
+
       res.json({ success: true, items: result.rows });
     } catch (error) {
       res.json({ success: true, items: [] });
@@ -145,15 +194,21 @@ router.get(
 
 router.get(
   "/worklist/dropdown/customers/:customerId/compressor-repair",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
+
     const pool = getPool(req);
+
     try {
       const result = await pool.query(
         "SELECT id, name FROM compressor_repair_companies WHERE customer_id = $1 ORDER BY name ASC",
+
         [customerId],
       );
+
       res.json({ success: true, items: result.rows });
     } catch (error) {
       res.json({ success: true, items: [] });
@@ -163,15 +218,21 @@ router.get(
 
 router.get(
   "/worklist/dropdown/customers/:customerId/system-repair",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
+
     const pool = getPool(req);
+
     try {
       const result = await pool.query(
         "SELECT id, CONCAT('System Repair #', id) as name FROM system_repair_records WHERE customer_id = $1 ORDER BY id DESC",
+
         [customerId],
       );
+
       res.json({ success: true, items: result.rows });
     } catch (error) {
       res.json({ success: true, items: [] });
@@ -181,15 +242,21 @@ router.get(
 
 router.get(
   "/worklist/dropdown/customers/:customerId/system-inspection",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
+
     const pool = getPool(req);
+
     try {
       const result = await pool.query(
         "SELECT id, CONCAT('System Inspection #', id) as name FROM system_inspection_records WHERE customer_id = $1 ORDER BY id DESC",
+
         [customerId],
       );
+
       res.json({ success: true, items: result.rows });
     } catch (error) {
       res.json({ success: true, items: [] });
@@ -199,13 +266,17 @@ router.get(
 
 router.get(
   "/worklist/dropdown/users",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
+
     try {
       const result = await pool.query(
         "SELECT username, first_name, last_name FROM users WHERE is_active = true ORDER BY username ASC",
       );
+
       res.json({ success: true, users: result.rows });
     } catch (error) {
       res.status(500).json({ success: false, error: "Failed to fetch users" });
@@ -216,56 +287,101 @@ router.get(
 // ─── TASKS CRUD ───────────────────────────────────────────────────
 
 // GET tasks for specific year
+
 // Also computes has_third_party (for the red-arrow indicator) and
+
 // third_party_names (so search can match a third-party assignee's name)
+
 // by aggregating across that task's update log rows.
+
 router.get(
   "/jobAssigned/tasks/:year",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { year } = req.params;
+
     const pool = getPool(req);
+
     try {
       const access = await getJobAccess(req, pool);
+
       if (access.scope === "none") {
         res
+
           .status(403)
+
           .json({ success: false, error: "Job Assigned access required" });
+
         return;
       }
+
       const result = await pool.query(
         `SELECT t.*,
+
           EXISTS (
+
             SELECT 1 FROM worklist_task_updates u
+
             WHERE u.task_id = t.id
+
               AND u.third_party IS NOT NULL
+
               AND u.third_party <> ''
+
           ) AS has_third_party,
+
           (
+
             SELECT STRING_AGG(DISTINCT u.third_party, ', ')
+
             FROM worklist_task_updates u
+
             WHERE u.task_id = t.id
+
               AND u.third_party IS NOT NULL
+
               AND u.third_party <> ''
+
           ) AS third_party_names,
+
           (t.assigned_member = $2 OR EXISTS (
+
             SELECT 1 FROM worklist_task_updates own_update
+
             WHERE own_update.task_id = t.id
+
               AND $2 = ANY(string_to_array(replace(COALESCE(own_update.third_party, ''), ' ', ''), ','))
+
           )) AS is_my_task
+
         FROM worklist_tasks_v2 t
+
         WHERE t.year = $1
+
+          AND (t.assigned_member = $2 OR NOT ${isAdminSelfAssignedSql})
+
           AND ($3 = 'all' OR t.assigned_member = $2 OR EXISTS (
+
             SELECT 1 FROM worklist_task_updates own_update
+
             WHERE own_update.task_id = t.id
+
               AND $2 = ANY(string_to_array(replace(COALESCE(own_update.third_party, ''), ' ', ''), ','))
+
           ))
+
         ORDER BY t.task_no ASC`,
+
         [year, access.username, access.scope],
       );
+
       res.json({
         success: true,
+
         tasks: result.rows,
+
         accessScope: access.scope,
       });
     } catch (error) {
@@ -275,60 +391,103 @@ router.get(
 );
 
 //get tasks assigned to a the currently logged-in user for a specific year
+
 router.get(
   "/myTasks/tasks/:year",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { year } = req.params;
+
     const pool = getPool(req);
 
     try {
       const access = await getJobAccess(req, pool);
+
       if (access.scope === "none") {
         res
+
           .status(403)
+
           .json({ success: false, error: "My Tasks access required" });
+
         return;
       }
+
       const username = access.username;
+
       const result = await pool.query(
         `SELECT t.*,
+
           EXISTS (
+
             SELECT 1
+
             FROM worklist_task_updates u
+
             WHERE u.task_id = t.id
+
               AND u.third_party IS NOT NULL
+
               AND u.third_party <> ''
+
           ) AS has_third_party,
+
           (
+
             SELECT STRING_AGG(DISTINCT u.third_party, ', ')
+
             FROM worklist_task_updates u
+
             WHERE u.task_id = t.id
+
               AND u.third_party IS NOT NULL
+
               AND u.third_party <> ''
+
           ) AS third_party_names,
+
           -- true when this task is only in the list because I was
+
           -- tagged as a third party on an update row, not directly assigned
+
           (t.assigned_member IS DISTINCT FROM $2) AS is_third_party_assignment
+
         FROM worklist_tasks_v2 t
+
         WHERE t.year = $1
+
+          AND (t.assigned_member = $2 OR NOT ${isAdminSelfAssignedSql})
+
           AND (
+
             t.assigned_member = $2
+
             OR EXISTS (
+
               SELECT 1 FROM worklist_task_updates u
+
               WHERE u.task_id = t.id
+
                 AND $2 = ANY(string_to_array(replace(COALESCE(u.third_party, ''), ' ', ''), ','))
+
             )
+
           )
+
         ORDER BY t.task_no ASC`,
+
         [year, username],
       );
 
       res.json({ success: true, tasks: result.rows });
     } catch (error) {
       console.error("Fetch my tasks error:", error);
+
       res.status(500).json({
         success: false,
+
         error: "Failed to fetch my tasks",
       });
     }
@@ -336,66 +495,104 @@ router.get(
 );
 
 // POST create new task — syncs to project_assigned_members if job_type = "project"
+
 router.post(
   "/jobAssigned/tasks",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     if (req.user?.role !== "admin") {
       res.status(403).json({
         success: false,
+
         error: "Only admins can add tasks",
       });
+
       return;
     }
 
     const {
       year,
+
       customer_id,
+
       customer_name,
+
       job_type,
+
       job_reference_id,
+
       job_reference_name,
+
       assigned_member,
+
       job_description,
+
       due_date,
+
       status,
     } = req.body;
+
     const pool = getPool(req);
 
     if (!year) {
       res.status(400).json({ success: false, error: "Year is required" });
+
       return;
     }
 
     try {
       // Auto-increment task_no per year
+
       const maxNoResult = await pool.query(
         "SELECT COALESCE(MAX(task_no), 0) as max_no FROM worklist_tasks_v2 WHERE year = $1",
+
         [year],
       );
+
       const nextTaskNo = maxNoResult.rows[0].max_no + 1;
 
       // customer_name and job_reference_name may contain manually entered
+
       // reference text. When entered manually, their IDs remain NULL.
+
       // No customer/project master record is created here.
+
       const result = await pool.query(
         `INSERT INTO worklist_tasks_v2
+
         (year, task_no, customer_id, customer_name, job_type, job_reference_id,
+
          job_reference_name, assigned_member, job_description, due_date, status, created_by)
+
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+
        RETURNING *`,
+
         [
           year,
+
           nextTaskNo,
+
           customer_id || null,
+
           customer_name || null,
+
           job_type || null,
+
           job_reference_id || null,
+
           job_reference_name || null,
+
           assigned_member || null,
+
           job_description || null,
+
           due_date || null,
+
           status || "todo",
+
           req.user?.username || "Unknown",
         ],
       );
@@ -403,42 +600,63 @@ router.post(
       const newTask = result.rows[0];
 
       // ── Sync to project_assigned_members if job_type is "project" ──
+
       if (job_type === "project" && job_reference_id && customer_id) {
         try {
           const pmMaxResult = await pool.query(
             `SELECT COALESCE(MAX(assignment_no), 0) as max_no 
+
            FROM project_assigned_members WHERE project_id = $1`,
+
             [job_reference_id],
           );
+
           const pmNextNo = pmMaxResult.rows[0].max_no + 1;
 
           const pmResult = await pool.query(
             `INSERT INTO project_assigned_members
+
             (project_id, assignment_no, assigned_date, assigned_time,
+
              assigned_member, job_description, due_date, status, created_by, linked_task_id)
+
            VALUES ($1, $2, CURRENT_DATE, CURRENT_TIME, $3, $4, $5, $6, $7, $8)
+
            RETURNING id`,
+
             [
               job_reference_id,
+
               pmNextNo,
+
               assigned_member || null,
+
               job_description || null,
+
               due_date || null,
+
               status || "todo",
+
               req.user?.username,
+
               newTask.id,
             ],
           );
 
           // Link the task back to the member row just created — this
+
           // direct link is what every future sync follows, instead of
+
           // re-matching by project_id + assigned_member each time.
+
           await pool.query(
             `UPDATE worklist_tasks_v2 SET linked_member_id = $1 WHERE id = $2`,
+
             [pmResult.rows[0].id, newTask.id],
           );
         } catch (syncErr) {
           console.error("Sync to project_assigned_members failed:", syncErr);
+
           // Non-blocking — don't fail the main request
         }
       }
@@ -446,148 +664,201 @@ router.post(
       res.status(201).json({ success: true, task: newTask });
     } catch (error) {
       console.error("Create task error:", error);
+
       res.status(500).json({ success: false, error: "Failed to create task" });
     }
   },
 );
 
 // PUT update task — syncs status/note back to project_assigned_members
+
 router.put(
   "/jobAssigned/tasks/:taskId",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { taskId } = req.params;
+
     const pool = getPool(req);
+
     const isAdmin = req.user?.role === "admin";
 
     try {
       const access = await getJobAccess(req, pool);
+
       if (!(await canAccessTask(pool, access, taskId))) {
         res
+
           .status(403)
+
           .json({ success: false, error: "You cannot update this task" });
+
         return;
       }
+
       const existing = await pool.query(
         "SELECT * FROM worklist_tasks_v2 WHERE id = $1",
+
         [taskId],
       );
 
       if (existing.rows.length === 0) {
         res.status(404).json({ success: false, error: "Task not found" });
+
         return;
       }
 
       const record = existing.rows[0];
 
       // ── Once a task is done, it's locked — no further edits by anyone ──
+
       if (record.status === "done") {
         res.status(403).json({
           success: false,
+
           error: "This task is marked done and can no longer be edited",
         });
+
         return;
       }
 
       const updates: Record<string, any> = { ...req.body };
 
       // ── finish_date is never client-settable — only the server sets it,
+
       //    automatically, the moment status transitions to "done" ──
+
       delete updates.finish_date;
 
       // ── Block reverting back to "todo" once a task has moved past it ──
+
       if (updates.status === "todo" && record.status !== "todo") {
         res.status(400).json({
           success: false,
+
           error: "A task cannot be moved back to To Do once it has started",
         });
+
         return;
       }
 
       if (updates.status && !VALID_STATUSES.includes(updates.status)) {
         res.status(400).json({ success: false, error: "Invalid status value" });
+
         return;
       }
 
       const USER_ALLOWED = ["update_note", "status"];
+
       const fields = Object.keys(updates);
 
       if (!isAdmin) {
         const disallowed = fields.filter((f) => !USER_ALLOWED.includes(f));
+
         if (disallowed.length > 0) {
           res.status(403).json({
             success: false,
+
             error: `Not allowed to update: ${disallowed.join(", ")}`,
           });
+
           return;
         }
       }
 
       // ── Auto-stamp finish_date the moment status is set to done ──
+
       if (updates.status === "done") {
         updates.finish_date = new Date().toISOString().split("T")[0];
       }
 
       if (Object.keys(updates).length === 0) {
         res.status(400).json({ success: false, error: "No fields to update" });
+
         return;
       }
 
       const updatedFields = Object.keys(updates);
+
       const setClause = updatedFields
+
         .map((f, i) => `${f} = $${i + 2}`)
+
         .join(", ");
 
       const result = await pool.query(
         `UPDATE worklist_tasks_v2 SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *`,
+
         [taskId, ...Object.values(updates)],
       );
 
       const updatedTask = result.rows[0];
 
       // ── Automatically log who completed the task ──
+
       if (record.status !== "done" && updatedTask.status === "done") {
         await pool.query(
           `INSERT INTO worklist_task_updates
+
       (task_id, update_note, status, created_by)
+
      VALUES ($1, $2, $3, $4)`,
+
           [taskId, "Task Completed", "done", req.user?.username || "Unknown"],
         );
       }
 
       // ── Sync status/finish_date back to project_assigned_members (non-blocking) ──
+
       if (updatedTask.job_type === "project" && updatedTask.job_reference_id) {
         (async () => {
           try {
             if (updatedTask.linked_member_id) {
               await pool.query(
                 `UPDATE project_assigned_members
+
                  SET status = $1, finish_date = $2, updated_at = CURRENT_TIMESTAMP
+
                  WHERE id = $3`,
+
                 [
                   updatedTask.status,
+
                   updatedTask.finish_date || null,
+
                   updatedTask.linked_member_id,
                 ],
               );
             } else {
               // Legacy row with no direct link yet — match the old way,
+
               // then self-heal the link so this only happens once.
+
               const matched = await pool.query(
                 `UPDATE project_assigned_members
+
                  SET status = $1, finish_date = $2, updated_at = CURRENT_TIMESTAMP
+
                  WHERE project_id = $3 AND assigned_member = $4
+
                  RETURNING id`,
+
                 [
                   updatedTask.status,
+
                   updatedTask.finish_date || null,
+
                   updatedTask.job_reference_id,
+
                   updatedTask.assigned_member,
                 ],
               );
+
               if (matched.rows.length > 0) {
                 await pool.query(
                   `UPDATE worklist_tasks_v2 SET linked_member_id = $1 WHERE id = $2`,
+
                   [matched.rows[0].id, updatedTask.id],
                 );
               }
@@ -601,8 +872,10 @@ router.put(
       res.json({ success: true, task: updatedTask });
     } catch (error: any) {
       console.error("Update task error:", error?.message || error);
+
       res.status(500).json({
         success: false,
+
         error: error?.message || "Failed to update task",
       });
     }
@@ -610,24 +883,36 @@ router.put(
 );
 
 // GET update logs for a task
+
 router.get(
   "/jobAssigned/tasks/:taskId/updates",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { taskId } = req.params;
+
     const pool = getPool(req);
+
     try {
       const access = await getJobAccess(req, pool);
+
       if (!(await canAccessTask(pool, access, taskId))) {
         res
+
           .status(403)
+
           .json({ success: false, error: "You cannot view this task" });
+
         return;
       }
+
       const result = await pool.query(
         `SELECT * FROM worklist_task_updates WHERE task_id = $1 ORDER BY created_at ASC`,
+
         [taskId],
       );
+
       res.json({ success: true, updates: result.rows });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error?.message });
@@ -636,21 +921,32 @@ router.get(
 );
 
 // POST add update log row
+
 // Any authenticated user may add a note, as long as the task has moved
+
 // past "todo" and isn't yet "done". The row's `status` column is
+
 // auto-stamped with whatever stage the task is at right now.
+
 router.post(
   "/jobAssigned/tasks/:taskId/updates",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { taskId } = req.params;
+
     const { update_note, third_parties } = req.body;
+
     const pool = getPool(req);
 
     if (!update_note?.trim()) {
       res
+
         .status(400)
+
         .json({ success: false, error: "Update note is required" });
+
       return;
     }
 
@@ -663,10 +959,13 @@ router.post(
     ) {
       res.status(400).json({
         success: false,
+
         error: "Third-party assignees must be usernames",
       });
+
       return;
     }
+
     const assignees: string[] = [
       ...new Set(
         ((third_parties || []) as string[]).map((name) => name.trim()),
@@ -675,19 +974,26 @@ router.post(
 
     try {
       const access = await getJobAccess(req, pool);
+
       if (!(await canAccessTask(pool, access, taskId))) {
         res
+
           .status(403)
+
           .json({ success: false, error: "You cannot update this task" });
+
         return;
       }
+
       const taskResult = await pool.query(
         `SELECT * FROM worklist_tasks_v2 WHERE id = $1`,
+
         [taskId],
       );
 
       if (taskResult.rows.length === 0) {
         res.status(404).json({ success: false, error: "Task not found" });
+
         return;
       }
 
@@ -696,32 +1002,43 @@ router.post(
       if (task.status === "done") {
         res.status(403).json({
           success: false,
+
           error: "This task is marked done and can no longer be edited",
         });
+
         return;
       }
 
       if (task.status === "todo") {
         res.status(403).json({
           success: false,
+
           error: "Move the task to In Progress before adding an update",
         });
+
         return;
       }
 
       const result = await pool.query(
         `INSERT INTO worklist_task_updates (task_id, update_note, status, created_by, third_party)
+
    VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+
         [
           taskId,
+
           update_note.trim(),
+
           task.status,
+
           req.user?.username,
+
           assignees.length ? assignees.join(",") : null,
         ],
       );
 
       // Sync to project_member_updates if task is linked to a project
+
       try {
         if (task?.job_type === "project" && task?.job_reference_id) {
           let memberId: number | null = task.linked_member_id || null;
@@ -729,15 +1046,22 @@ router.post(
           if (!memberId && task.assigned_member) {
             const memberResult = await pool.query(
               `SELECT id FROM project_assigned_members
+
          WHERE project_id = $1 AND assigned_member = $2
+
          LIMIT 1`,
+
               [task.job_reference_id, task.assigned_member],
             );
+
             if (memberResult.rows.length > 0) {
               memberId = memberResult.rows[0].id;
+
               // Self-heal the link so this lookup only happens once
+
               await pool.query(
                 `UPDATE worklist_tasks_v2 SET linked_member_id = $1 WHERE id = $2`,
+
                 [memberId, taskId],
               );
             }
@@ -746,7 +1070,9 @@ router.post(
           if (memberId) {
             await pool.query(
               `INSERT INTO project_member_updates (member_id, update_note, status, created_by)
+
          VALUES ($1, $2, $3, $4)`,
+
               [memberId, update_note.trim(), task.status, req.user?.username],
             );
           }
@@ -763,78 +1089,128 @@ router.post(
 );
 
 // Update-log rows are immutable once created, including third-party assignments.
+
 // Keep the old routes explicitly denied so older clients cannot change existing rows.
+
 router.put(
   "/jobAssigned/tasks/:taskId/updates/:updateId/third-party",
+
   authenticateToken,
+
   async (_req: AuthRequest, res: Response): Promise<void> => {
     res
+
       .status(403)
+
       .json({ success: false, error: "Saved update rows cannot be changed" });
   },
 );
 
 router.delete(
   "/jobAssigned/tasks/:taskId/updates/:updateId",
+
   authenticateToken,
+
   async (_req: AuthRequest, res: Response): Promise<void> => {
     res
+
       .status(403)
+
       .json({ success: false, error: "Saved update rows cannot be deleted" });
   },
 );
 
 // DELETE task (admin only)
+
 router.delete(
   "/jobAssigned/tasks/:taskId",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { taskId } = req.params;
+
     const pool = getPool(req);
 
     if (req.user?.role !== "admin") {
       res
+
         .status(403)
+
         .json({ success: false, error: "Only admins can delete tasks" });
+
+      return;
+    }
+
+    try {
+      const access = await getJobAccess(req, pool);
+      if (!(await canAccessTask(pool, access, taskId))) {
+        res
+          .status(403)
+          .json({ success: false, error: "You cannot delete this task" });
+        return;
+      }
+    } catch (error) {
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to check task access" });
       return;
     }
 
     const client = await pool.connect();
+
     try {
       await client.query("BEGIN");
+
       const taskResult = await client.query(
         `SELECT id, job_type, job_reference_id, linked_member_id
+
          FROM worklist_tasks_v2 WHERE id = $1 FOR UPDATE`,
+
         [taskId],
       );
 
       if (taskResult.rows.length === 0) {
         await client.query("ROLLBACK");
+
         res.status(404).json({ success: false, error: "Task not found" });
+
         return;
       }
 
       const task = taskResult.rows[0];
+
       if (task.job_type === "project" && task.job_reference_id) {
         // Match the actual linked project assignment, never another row
+
         // belonging to the same member or project.
+
         const memberResult = await client.query(
           `SELECT id FROM project_assigned_members
+
            WHERE project_id = $1
+
              AND (linked_task_id = $2
+
                OR (id = $3 AND (linked_task_id IS NULL OR linked_task_id = $2)))
+
            FOR UPDATE`,
+
           [task.job_reference_id, taskId, task.linked_member_id],
         );
 
         // Break the task -> assignment link before removing the assignment.
+
         await client.query(
           `UPDATE worklist_tasks_v2 SET linked_member_id = NULL WHERE id = $1`,
+
           [taskId],
         );
+
         for (const member of memberResult.rows) {
           await client.query(
             `DELETE FROM project_assigned_members WHERE id = $1`,
+
             [member.id],
           );
         }
@@ -843,14 +1219,19 @@ router.delete(
       await client.query("DELETE FROM worklist_tasks_v2 WHERE id = $1", [
         taskId,
       ]);
+
       await client.query("COMMIT");
+
       res.json({
         success: true,
+
         message: "Task and linked project assignment deleted",
       });
     } catch (error) {
       await client.query("ROLLBACK");
+
       console.error("Delete task error:", error);
+
       res.status(500).json({ success: false, error: "Failed to delete task" });
     } finally {
       client.release();
