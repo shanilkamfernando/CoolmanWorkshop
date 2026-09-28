@@ -628,20 +628,6 @@ const MemberUpdateLog = ({
     }
   };
 
-  const assignedAt = fmtCreatedDateTime(
-    member.assigned_date,
-    member.assigned_time,
-  );
-  const summaryGroups = [
-    [
-      ["Assigned By", member.created_by || "—"],
-      ["Assigned To", member.assigned_member || "—"],
-    ],
-    [
-      ["Assigned Date", assignedAt.date],
-      ["Assigned Time", assignedAt.time],
-    ],
-  ];
   const thirdParties = (raw: string | null | undefined) =>
     raw
       ? raw
@@ -652,18 +638,6 @@ const MemberUpdateLog = ({
 
   return (
     <div className="project-member-log">
-      <div className="project-member-summary">
-        {summaryGroups.map((group, index) => (
-          <div key={index} className="project-member-summary-group">
-            {group.map(([label, value]) => (
-              <div key={label}>
-                <strong>{label}: </strong>
-                <span>{value}</span>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
       <div className="project-member-log-title">Update Log</div>
       <div className="project-member-update-scroll">
         <table className="project-member-update-table">
@@ -1953,6 +1927,28 @@ const ProjectDashboard = () => {
                                       ))}
                                     </select>
                                   )}
+                                </div>
+                              </div>
+                              <div className="project-member-summary">
+                                <div className="project-member-summary-group">
+                                  <div>
+                                    <strong>Assigned By: </strong>
+                                    <span>{member.created_by || "—"}</span>
+                                  </div>
+                                  <div>
+                                    <strong>Assigned To: </strong>
+                                    <span>{member.assigned_member || "—"}</span>
+                                  </div>
+                                </div>
+                                <div className="project-member-summary-group">
+                                  <div>
+                                    <strong>Assigned Date: </strong>
+                                    <span>{memberDate}</span>
+                                  </div>
+                                  <div>
+                                    <strong>Assigned Time: </strong>
+                                    <span>{memberTime}</span>
+                                  </div>
                                 </div>
                               </div>
                               <div className="project-member-description">

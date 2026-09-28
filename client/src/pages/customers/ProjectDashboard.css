@@ -960,7 +960,7 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px 16px;
   padding: 10px 12px;
-  margin-bottom: 12px;
+  margin: 0;
   background: #f8f9ff;
   border: 1px solid #e8f0fe;
   border-radius: 6px;
@@ -1054,13 +1054,23 @@
 
 .project-member-detail-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: minmax(0, 280px) minmax(0, 1fr);
+  gap: 16px 24px;
   min-width: 0;
+  align-items: start;
 }
 .project-member-status {
   width: 100%;
   min-width: 0;
+}
+.project-member-description,
+.project-member-log {
+  grid-column: 1 / -1;
+}
+@media (max-width: 720px) {
+  .project-member-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .project-member-status select {
   max-width: 320px;
