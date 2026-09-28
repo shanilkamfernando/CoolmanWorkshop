@@ -1667,7 +1667,8 @@ const WorklistTasksDashboard = () => {
                                           }}
                                           onClick={(e) => e.stopPropagation()}
                                           style={{
-                                            width: "40%",
+                                            width: "100%",
+                                            maxWidth: "320px",
                                             padding: "7px 10px",
                                             fontSize: "13px",
                                             border: "1.5px solid #ddd",
@@ -1705,36 +1706,37 @@ const WorklistTasksDashboard = () => {
                                         </div>
                                       )}
                                     </div>
-                                    {task.job_description && (
-                                      <div
-                                        style={{
-                                          fontSize: "13px",
-                                          color: "#555",
-                                          background: "#f8f9ff",
-                                          border: "1px solid #e8f0fe",
-                                          borderRadius: "6px",
-                                          padding: "8px 12px",
-                                          lineHeight: 1.5,
-                                        }}
-                                      >
-                                        <span
-                                          style={{
-                                            fontSize: "10px",
-                                            fontWeight: 700,
-                                            color: "#667eea",
-                                            textTransform: "uppercase",
-                                            letterSpacing: "0.5px",
-                                            display: "block",
-                                            marginBottom: "3px",
-                                          }}
-                                        >
-                                          Description
-                                        </span>
-                                        {task.job_description}
-                                      </div>
-                                    )}
                                   </div>
 
+                                  {task.job_description && (
+                                    <div
+                                      className="worklist-detail-description"
+                                      style={{
+                                        fontSize: "13px",
+                                        color: "#555",
+                                        background: "#f8f9ff",
+                                        border: "1px solid #e8f0fe",
+                                        borderRadius: "6px",
+                                        padding: "8px 12px",
+                                        lineHeight: 1.5,
+                                      }}
+                                    >
+                                      <span
+                                        style={{
+                                          fontSize: "10px",
+                                          fontWeight: 700,
+                                          color: "#667eea",
+                                          textTransform: "uppercase",
+                                          letterSpacing: "0.5px",
+                                          display: "block",
+                                          marginBottom: "3px",
+                                        }}
+                                      >
+                                        Description
+                                      </span>
+                                      {task.job_description}
+                                    </div>
+                                  )}
                                   <TaskUpdateLog
                                     task={task}
                                     status={task.status}
