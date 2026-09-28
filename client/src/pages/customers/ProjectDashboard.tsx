@@ -73,6 +73,7 @@ interface AssignedMember {
   update_note: string;
   status: string;
   finish_date: string;
+  updated_at?: string;
   created_by: string;
 }
 
@@ -628,6 +629,21 @@ const MemberUpdateLog = ({
     }
   };
 
+  const assignedAt = fmtCreatedDateTime(
+    member.assigned_date,
+    member.assigned_time,
+  );
+  const completedEntry = [...updates]
+    .reverse()
+    .find(
+      (entry) =>
+        entry.status === "done" && entry.update_note === "Task Completed",
+    );
+  const completedTime = completedEntry
+    ? fmtLogDateTime(completedEntry.created_at).time
+    : member.updated_at
+      ? fmtLogDateTime(member.updated_at).time
+      : "—";
   const thirdParties = (raw: string | null | undefined) =>
     raw
       ? raw
@@ -638,142 +654,176 @@ const MemberUpdateLog = ({
 
   return (
     <div className="project-member-log">
-      <div className="project-member-log-title">Update Log</div>
-      <div className="project-member-update-scroll">
-        <table className="project-member-update-table">
-          <thead>
-            <tr>
-              <th style={mThStyle("90px")}>Date</th>
-              <th style={mThStyle("70px")}>Time</th>
-              <th style={mThStyle("80px")}>By</th>
-              <th style={mThStyle()}>Update</th>
-              <th style={mThStyle("100px")}>Status</th>
-              <th style={mThStyle("120px")}>Third Party</th>
-            </tr>
-          </thead>
-          <tbody>
-            {updates.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="project-member-empty">
-                  No updates yet
-                </td>
-              </tr>
-            ) : (
-              updates.map((entry, index) => {
-                const loggedAt = fmtLogDateTime(entry.created_at);
-                const status = getMemberLogStatus(entry.status || "todo");
-                return (
-                  <tr
-                    key={entry.id}
-                    style={{ background: index % 2 ? "#fafbff" : "#fff" }}
-                  >
-                    <td style={mTdStyle}>{loggedAt.date}</td>
-                    <td style={mTdStyle}>{loggedAt.time}</td>
-                    <td style={mTdStyle}>{entry.created_by || "—"}</td>
-                    <td style={mTdStyle}>{entry.update_note}</td>
-                    <td style={mTdStyle}>
-                      <span
-                        style={{
-                          padding: "2px 8px",
-                          borderRadius: "9px",
-                          fontSize: "10px",
-                          fontWeight: 700,
-                          background: status.bg,
-                          color: status.color,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {status.label}
-                      </span>
-                    </td>
-                    <td style={mTdStyle}>
-                      <div className="project-member-third-parties">
-                        {thirdParties(entry.third_party).length ? (
-                          thirdParties(entry.third_party).map((username) => (
-                            <span
-                              className="project-member-third-party"
-                              key={username}
-                            >
-                              @{username}
-                            </span>
-                          ))
-                        ) : (
-                          <span style={{ color: "#ccc" }}>—</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-      {canEdit && !readOnly ? (
-        <div className="project-member-update-form">
-          <textarea
-            className="form-input"
-            rows={2}
-            value={newNote}
-            onChange={(e) => setNewNote(e.target.value)}
-            placeholder="Add update note..."
-            onClick={(e) => e.stopPropagation()}
-          />
-          <div className="project-member-third-party-label">
-            Third-party assignees (optional)
+      <div className="project-member-summary">
+        <div className="project-member-summary-group">
+          <div>
+            <strong>Assigned By: </strong>
+            <span>{member.created_by || "—"}</span>
           </div>
-          <input
-            className="form-input"
-            value={thirdPartySearch}
-            onChange={(e) => setThirdPartySearch(e.target.value)}
-            placeholder="Search members..."
-          />
-          <div className="project-member-assignees">
-            {systemUsers
-              .filter((person) =>
-                `${person.first_name} ${person.last_name} ${person.username}`
-                  .toLowerCase()
-                  .includes(thirdPartySearch.toLowerCase()),
-              )
-              .map((person) => (
-                <label key={person.username}>
-                  <input
-                    type="checkbox"
-                    checked={newThirdParties.includes(person.username)}
-                    disabled={saving}
-                    onChange={(e) =>
-                      setNewThirdParties((previous) =>
-                        e.target.checked
-                          ? [...previous, person.username]
-                          : previous.filter(
-                              (username) => username !== person.username,
-                            ),
-                      )
-                    }
-                  />
-                  {person.first_name} {person.last_name} ({person.username})
-                </label>
-              ))}
-          </div>
-          <button
-            type="button"
-            className="btn-save"
-            onClick={handleAdd}
-            disabled={saving || !newNote.trim()}
-          >
-            {saving ? "Adding..." : "+ Add"}
-          </button>
-          <div className="project-member-immutable-note">
-            The update and its assignees cannot be changed after you add it.
+          <div>
+            <strong>Assigned To: </strong>
+            <span>{member.assigned_member || "—"}</span>
           </div>
         </div>
-      ) : (
-        !readOnly && (
-          <div className="project-member-immutable-note">
-            Move this task to In Progress to start adding updates.
+        <div className="project-member-summary-group">
+          <div>
+            <strong>Assigned Date: </strong>
+            <span>{assignedAt.date}</span>
           </div>
-        )
-      )}
+          <div>
+            <strong>Assigned Time: </strong>
+            <span>{assignedAt.time}</span>
+          </div>
+        </div>
+        <div className="project-member-summary-group">
+          <div>
+            <strong>Finished Date: </strong>
+            <span>{fmtDateDDMMYYYY(member.finish_date)}</span>
+          </div>
+          <div>
+            <strong>Finished Time: </strong>
+            <span>{member.status === "done" ? completedTime : "—"}</span>
+          </div>
+        </div>
+      </div>
+      <div className="project-member-log-body">
+        <div className="project-member-log-title">Update Log</div>
+        <div className="project-member-update-scroll">
+          <table className="project-member-update-table">
+            <thead>
+              <tr>
+                <th style={mThStyle("90px")}>Date</th>
+                <th style={mThStyle("70px")}>Time</th>
+                <th style={mThStyle("80px")}>By</th>
+                <th style={mThStyle()}>Update</th>
+                <th style={mThStyle("100px")}>Status</th>
+                <th style={mThStyle("120px")}>Third Party</th>
+              </tr>
+            </thead>
+            <tbody>
+              {updates.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="project-member-empty">
+                    No updates yet
+                  </td>
+                </tr>
+              ) : (
+                updates.map((entry, index) => {
+                  const loggedAt = fmtLogDateTime(entry.created_at);
+                  const status = getMemberLogStatus(entry.status || "todo");
+                  return (
+                    <tr
+                      key={entry.id}
+                      style={{ background: index % 2 ? "#fafbff" : "#fff" }}
+                    >
+                      <td style={mTdStyle}>{loggedAt.date}</td>
+                      <td style={mTdStyle}>{loggedAt.time}</td>
+                      <td style={mTdStyle}>{entry.created_by || "—"}</td>
+                      <td style={mTdStyle}>{entry.update_note}</td>
+                      <td style={mTdStyle}>
+                        <span
+                          style={{
+                            padding: "2px 8px",
+                            borderRadius: "9px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            background: status.bg,
+                            color: status.color,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {status.label}
+                        </span>
+                      </td>
+                      <td style={mTdStyle}>
+                        <div className="project-member-third-parties">
+                          {thirdParties(entry.third_party).length ? (
+                            thirdParties(entry.third_party).map((username) => (
+                              <span
+                                className="project-member-third-party"
+                                key={username}
+                              >
+                                @{username}
+                              </span>
+                            ))
+                          ) : (
+                            <span style={{ color: "#ccc" }}>—</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        {canEdit && !readOnly ? (
+          <div className="project-member-update-form">
+            <textarea
+              className="form-input"
+              rows={2}
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              placeholder="Add update note..."
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className="project-member-third-party-label">
+              Third-party assignees (optional)
+            </div>
+            <input
+              className="form-input"
+              value={thirdPartySearch}
+              onChange={(e) => setThirdPartySearch(e.target.value)}
+              placeholder="Search members..."
+            />
+            <div className="project-member-assignees">
+              {systemUsers
+                .filter((person) =>
+                  `${person.first_name} ${person.last_name} ${person.username}`
+                    .toLowerCase()
+                    .includes(thirdPartySearch.toLowerCase()),
+                )
+                .map((person) => (
+                  <label key={person.username}>
+                    <input
+                      type="checkbox"
+                      checked={newThirdParties.includes(person.username)}
+                      disabled={saving}
+                      onChange={(e) =>
+                        setNewThirdParties((previous) =>
+                          e.target.checked
+                            ? [...previous, person.username]
+                            : previous.filter(
+                                (username) => username !== person.username,
+                              ),
+                        )
+                      }
+                    />
+                    {person.first_name} {person.last_name} ({person.username})
+                  </label>
+                ))}
+            </div>
+            <button
+              type="button"
+              className="btn-save"
+              onClick={handleAdd}
+              disabled={saving || !newNote.trim()}
+            >
+              {saving ? "Adding..." : "+ Add"}
+            </button>
+            <div className="project-member-immutable-note">
+              The update and its assignees cannot be changed after you add it.
+            </div>
+          </div>
+        ) : (
+          !readOnly && (
+            <div className="project-member-immutable-note">
+              Move this task to In Progress to start adding updates.
+            </div>
+          )
+        )}
+      </div>
     </div>
   );
 };
@@ -1929,28 +1979,14 @@ const ProjectDashboard = () => {
                                   )}
                                 </div>
                               </div>
-                              <div className="project-member-summary">
-                                <div className="project-member-summary-group">
-                                  <div>
-                                    <strong>Assigned By: </strong>
-                                    <span>{member.created_by || "—"}</span>
-                                  </div>
-                                  <div>
-                                    <strong>Assigned To: </strong>
-                                    <span>{member.assigned_member || "—"}</span>
-                                  </div>
-                                </div>
-                                <div className="project-member-summary-group">
-                                  <div>
-                                    <strong>Assigned Date: </strong>
-                                    <span>{memberDate}</span>
-                                  </div>
-                                  <div>
-                                    <strong>Assigned Time: </strong>
-                                    <span>{memberTime}</span>
-                                  </div>
-                                </div>
-                              </div>
+                              <MemberUpdateLog
+                                customerId={customerId}
+                                projectId={projectId}
+                                member={member}
+                                canEdit={canEditUpdate}
+                                readOnly={isDone}
+                                systemUsers={systemUsers}
+                              />
                               <div className="project-member-description">
                                 <div className="project-member-description-label">
                                   Description
@@ -1985,14 +2021,6 @@ const ProjectDashboard = () => {
                                   </div>
                                 )}
                               </div>
-                              <MemberUpdateLog
-                                customerId={customerId}
-                                projectId={projectId}
-                                member={member}
-                                canEdit={canEditUpdate}
-                                readOnly={isDone}
-                                systemUsers={systemUsers}
-                              />
                             </div>
 
                             {isAdmin && (

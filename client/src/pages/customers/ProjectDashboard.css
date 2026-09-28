@@ -957,7 +957,7 @@
 }
 .project-member-summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px 16px;
   padding: 10px 12px;
   margin: 0;
@@ -1063,12 +1063,19 @@
   width: 100%;
   min-width: 0;
 }
-.project-member-description,
 .project-member-log {
+  display: contents;
+}
+.project-member-description,
+.project-member-log-body {
   grid-column: 1 / -1;
+  min-width: 0;
 }
 @media (max-width: 720px) {
   .project-member-detail-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .project-member-summary {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -1098,4 +1105,10 @@
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.project-member-description {
+  order: 1;
+}
+.project-member-log-body {
+  order: 2;
 }
