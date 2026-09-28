@@ -7,7 +7,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./Customers.css";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -24,6 +25,9 @@ interface Customer {
 interface ServiceCompany {
   id: number;
   name: string;
+  model?: string;
+  serial_number?: string;
+  unit?: string;
   customerId: number;
   created_at: string;
 }
@@ -39,7 +43,12 @@ const CompressorServicePortal = () => {
   );
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newCompanyName, setNewCompanyName] = useState("");
+  const [newCompany, setNewCompany] = useState({
+    name: "",
+    model: "",
+    serial_number: "",
+    unit: "",
+  });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<ServiceCompany | null>(
     null,
@@ -64,7 +73,7 @@ const CompressorServicePortal = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
@@ -122,7 +131,7 @@ const CompressorServicePortal = () => {
       setLoading(true);
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setServiceCompanies(response.data.companies || []);
@@ -133,18 +142,27 @@ const CompressorServicePortal = () => {
         {
           id: 1,
           name: "Carrier Service Center",
+          model: "30XA-502",
+          serial_number: "CR-2024-1188",
+          unit: "Unit 1",
           customerId: Number(customerId),
           created_at: "2024-01-15",
         },
         {
           id: 2,
           name: "Trane Compressor Service",
+          model: "RTAC-140",
+          serial_number: "TR-2024-0345",
+          unit: "Unit 2",
           customerId: Number(customerId),
           created_at: "2024-02-01",
         },
         {
           id: 3,
           name: "Copeland Service Hub",
+          model: "ZR144KC",
+          serial_number: "CP-2024-0912",
+          unit: "Unit 3",
           customerId: Number(customerId),
           created_at: "2024-02-10",
         },
@@ -168,38 +186,44 @@ const CompressorServicePortal = () => {
     });
   };
 
+  const resetNewCompanyForm = () =>
+    setNewCompany({ name: "", model: "", serial_number: "", unit: "" });
+
   const handleAddCompany = async () => {
-    if (!newCompanyName.trim()) {
-      alert("Service company name is required");
+    if (!newCompany.name.trim()) {
+      alert("Name is required");
       return;
     }
 
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service`,
-        { name: newCompanyName },
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service`,
+        newCompany,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
       if (response.data.success) {
-        alert("Service company added successfully!");
+        alert("Added successfully!");
         setShowAddModal(false);
-        setNewCompanyName("");
+        resetNewCompanyForm();
         fetchServiceCompanies();
       }
     } catch (error) {
       console.error("Error adding service company:", error);
       const mockCompany: ServiceCompany = {
         id: Date.now(),
-        name: newCompanyName,
+        name: newCompany.name,
+        model: newCompany.model,
+        serial_number: newCompany.serial_number,
+        unit: newCompany.unit,
         customerId: Number(customerId),
         created_at: new Date().toISOString(),
       };
       setServiceCompanies([...serviceCompanies, mockCompany]);
       setShowAddModal(false);
-      setNewCompanyName("");
-      alert("Service company added successfully!");
+      resetNewCompanyForm();
+      alert("Added successfully!");
     }
   };
 
@@ -219,7 +243,7 @@ const CompressorServicePortal = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyToDelete.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("Service company deleted successfully!");
@@ -250,7 +274,7 @@ const CompressorServicePortal = () => {
   return (
     <div className="customer-portal">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div className="logo-container" onClick={handleBackToDashboard}>
             <img
@@ -277,7 +301,9 @@ const CompressorServicePortal = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+
+      <AppHeader />
 
       {/* Main Content */}
       <div className="main-content-full">
@@ -330,6 +356,22 @@ const CompressorServicePortal = () => {
                   🔧
                 </div>
                 <h3 className="customer-name">{company.name}</h3>
+                {(company.model || company.serial_number || company.unit) && (
+                  <div
+                    style={{
+                      marginTop: "8px",
+                      fontSize: "0.8rem",
+                      color: "#777",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {company.model && <div>Model: {company.model}</div>}
+                    {company.serial_number && (
+                      <div>Serial No: {company.serial_number}</div>
+                    )}
+                    {company.unit && <div>Unit: {company.unit}</div>}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -352,7 +394,13 @@ const CompressorServicePortal = () => {
 
       {/* Add Service Company Modal */}
       {showAddModal && (
-        <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            setShowAddModal(false);
+            resetNewCompanyForm();
+          }}
+        >
           <div
             className="modal-content-simple"
             onClick={(e) => e.stopPropagation()}
@@ -361,7 +409,10 @@ const CompressorServicePortal = () => {
               <h2>Add Service Company</h2>
               <button
                 className="close-button"
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false);
+                  resetNewCompanyForm();
+                }}
               >
                 ×
               </button>
@@ -370,12 +421,14 @@ const CompressorServicePortal = () => {
             <div className="modal-body">
               <div className="form-group">
                 <label>
-                  Service Company Name <span className="required">*</span>
+                  Name <span className="required">*</span>
                 </label>
                 <input
                   type="text"
-                  value={newCompanyName}
-                  onChange={(e) => setNewCompanyName(e.target.value)}
+                  value={newCompany.name}
+                  onChange={(e) =>
+                    setNewCompany({ ...newCompany, name: e.target.value })
+                  }
                   placeholder="Carrier Service Center"
                   autoFocus
                   onKeyPress={(e) => {
@@ -385,12 +438,71 @@ const CompressorServicePortal = () => {
                   }}
                 />
               </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "14px",
+                  marginTop: "14px",
+                }}
+              >
+                <div className="form-group">
+                  <label>Compressor Model</label>
+                  <input
+                    type="text"
+                    value={newCompany.model}
+                    onChange={(e) =>
+                      setNewCompany({ ...newCompany, model: e.target.value })
+                    }
+                    placeholder="e.g. 30XA-502"
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter") handleAddCompany();
+                    }}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Serial Number</label>
+                  <input
+                    type="text"
+                    value={newCompany.serial_number}
+                    onChange={(e) =>
+                      setNewCompany({
+                        ...newCompany,
+                        serial_number: e.target.value,
+                      })
+                    }
+                    placeholder="e.g. CR-2024-1188"
+                    onKeyPress={(e) => {
+                      if (e.key === "Enter") handleAddCompany();
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginTop: "14px" }}>
+                <label>Unit</label>
+                <input
+                  type="text"
+                  value={newCompany.unit}
+                  onChange={(e) =>
+                    setNewCompany({ ...newCompany, unit: e.target.value })
+                  }
+                  placeholder="e.g. Unit 1"
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") handleAddCompany();
+                  }}
+                />
+              </div>
             </div>
 
             <div className="modal-footer">
               <button
                 className="btn-cancel"
-                onClick={() => setShowAddModal(false)}
+                onClick={() => {
+                  setShowAddModal(false);
+                  resetNewCompanyForm();
+                }}
               >
                 Cancel
               </button>

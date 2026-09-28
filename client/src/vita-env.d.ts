@@ -26,4 +26,4 @@ declare module "*.svg" {
 
 Make sure your logo file is actually at:
 ```;
-client / src / assets / mainlogo.jpeg;
+client / src / assets / mainlogo.png;

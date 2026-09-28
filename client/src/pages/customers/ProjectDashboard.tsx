@@ -7,7 +7,8 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./ProjectDashboard.css";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -72,6 +73,7 @@ interface AssignedMember {
   update_note: string;
   status: string;
   finish_date: string;
+  updated_at?: string;
   created_by: string;
 }
 
@@ -81,6 +83,765 @@ interface SystemUser {
   last_name: string;
   role: string;
 }
+
+// Shared date formatter — dd/mm/yyyy, parsed manually from the date
+// components so a plain "YYYY-MM-DD" never gets reinterpreted as UTC
+// midnight and shifted a day by the browser's local timezone.
+const fmtDateDDMMYYYY = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return "—";
+  const datePart = dateStr.split("T")[0];
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return "—";
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+};
+
+// created_at from Postgres may come back with no timezone marker even
+// though it's a UTC instant. Force UTC interpretation before converting
+// to the browser's local time, otherwise JS treats a marker-less string
+// as already-local and applies no conversion at all.
+const fmtLogDateTime = (raw: string) => {
+  if (!raw) return { date: "—", time: "—" };
+  const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(raw);
+  const isoString = hasTimezone ? raw : `${raw.replace(" ", "T")}Z`;
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return { date: "—", time: "—" };
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return {
+    date: `${day}/${month}/${year}`,
+    time: d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }),
+  };
+};
+
+const todayISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+};
+
+// assigned_date/assigned_time and activity_date/activity_time are
+// auto-stamped at creation via CURRENT_DATE / CURRENT_TIME, stored in
+// UTC exactly like created_at — but as two separate columns with no
+// timezone marker. Combine them into one instant, force UTC
+// interpretation, then convert to real local time — same fix as the
+// Update Log and as Job Assigned's main table.
+const fmtCreatedDateTime = (dateStr: string, timeStr: string) => {
+  if (!dateStr) return { date: "—", time: "—" };
+  const datePart = dateStr.split("T")[0];
+  const timePart = (timeStr || "00:00:00").split(".")[0];
+  const d = new Date(`${datePart}T${timePart}Z`);
+  if (isNaN(d.getTime()))
+    return {
+      date: fmtDateDDMMYYYY(dateStr),
+      time: timeStr ? timeStr.substring(0, 5) : "—",
+    };
+  return {
+    date: fmtDateDDMMYYYY(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+        d.getDate(),
+      ).padStart(2, "0")}`,
+    ),
+    time: d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }),
+  };
+};
+
+const MeetingDetailPanel = ({
+  meeting,
+  customerId,
+  projectId,
+  isAdmin,
+  onUpdate,
+}: {
+  meeting: any;
+  customerId: string | undefined;
+  projectId: string | undefined;
+  isAdmin: boolean;
+  onUpdate: (id: number, field: string, value: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [updates, setUpdates] = useState<any[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const token = () => localStorage.getItem("token");
+  const hdr = () => ({ Authorization: `Bearer ${token()}` });
+  const BASE = `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/meetings/${meeting.id}/updates`;
+
+  useEffect(() => {
+    if (open) fetchUpdates();
+  }, [open, meeting.id]);
+
+  const fetchUpdates = async () => {
+    try {
+      const r = await axios.get(BASE, { headers: hdr() });
+      setUpdates(r.data.updates || []);
+    } catch {}
+  };
+
+  const handleAdd = async () => {
+    if (!newNote.trim()) return;
+    setSaving(true);
+    try {
+      await axios.post(
+        BASE,
+        { update_note: newNote, status: "todo" },
+        { headers: hdr() },
+      );
+      setNewNote("");
+      fetchUpdates();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to add update");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteUpdate = async (updateId: number) => {
+    if (!confirm("Delete this update?")) return;
+    try {
+      await axios.delete(`${BASE}/${updateId}`, { headers: hdr() });
+      fetchUpdates();
+    } catch {}
+  };
+
+  const hasContent =
+    meeting.customer_side || meeting.cm_side || updates.length > 0;
+
+  return (
+    <div>
+      {/* Toggle button */}
+      <button
+        onClick={() => setOpen(!open)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+          padding: "4px 12px",
+          borderRadius: "20px",
+          border: "none",
+          cursor: "pointer",
+          fontSize: "12px",
+          fontWeight: 600,
+          background: open ? "#667eea" : hasContent ? "#e8f0fe" : "#f0f0f0",
+          color: open ? "#fff" : hasContent ? "#667eea" : "#888",
+          transition: "all 0.2s",
+        }}
+      >
+        {hasContent ? "📋" : "+"} Details {open ? "▲" : "▼"}
+      </button>
+
+      {open && (
+        <div
+          style={{
+            position: "absolute" as const,
+            zIndex: 100,
+            marginTop: "6px",
+            background: "#fff",
+            border: "1px solid #e0e0e0",
+            borderRadius: "12px",
+            padding: "16px",
+            width: "340px",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "14px",
+            }}
+          >
+            <span style={{ fontSize: "13px", fontWeight: 700, color: "#333" }}>
+              Meeting Details
+            </span>
+            <button
+              onClick={() => setOpen(false)}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#999",
+                fontSize: "18px",
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          </div>
+
+          {/* Customer Side */}
+          <div style={{ marginBottom: "12px" }}>
+            <div
+              style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                color: "#667eea",
+                textTransform: "uppercase" as const,
+                letterSpacing: "0.6px",
+                marginBottom: "5px",
+              }}
+            >
+              Customer Side
+            </div>
+            {isAdmin ? (
+              <textarea
+                defaultValue={meeting.customer_side || ""}
+                onBlur={(e) => {
+                  if (e.target.value !== (meeting.customer_side || ""))
+                    onUpdate(meeting.id, "customer_side", e.target.value);
+                }}
+                rows={2}
+                placeholder="Notes from customer side..."
+                style={{
+                  width: "100%",
+                  padding: "7px 10px",
+                  fontSize: "13px",
+                  border: "1px solid #e0e0e0",
+                  borderRadius: "6px",
+                  resize: "none" as const,
+                  fontFamily: "inherit",
+                  boxSizing: "border-box" as const,
+                  background: "#fff",
+                }}
+              />
+            ) : meeting.customer_side ? (
+              <div
+                style={{
+                  padding: "8px 10px",
+                  background: "#f8f9ff",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  color: "#333",
+                  lineHeight: 1.5,
+                }}
+              >
+                {meeting.customer_side}
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: "8px 10px",
+                  background: "#f9f9f9",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  color: "#bbb",
+                  fontStyle: "italic",
+                }}
+              >
+                No notes added
+              </div>
+            )}
+          </div>
+
+          {/* CM Side */}
+          <div style={{ marginBottom: "14px" }}>
+            <div
+              style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                color: "#667eea",
+                textTransform: "uppercase" as const,
+                letterSpacing: "0.6px",
+                marginBottom: "5px",
+              }}
+            >
+              CM Side
+            </div>
+            {isAdmin ? (
+              <textarea
+                defaultValue={meeting.cm_side || ""}
+                onBlur={(e) => {
+                  if (e.target.value !== (meeting.cm_side || ""))
+                    onUpdate(meeting.id, "cm_side", e.target.value);
+                }}
+                rows={2}
+                placeholder="Notes from CM side..."
+                style={{
+                  width: "100%",
+                  padding: "7px 10px",
+                  fontSize: "13px",
+                  border: "1px solid #e0e0e0",
+                  borderRadius: "6px",
+                  resize: "none" as const,
+                  fontFamily: "inherit",
+                  boxSizing: "border-box" as const,
+                  background: "#fff",
+                }}
+              />
+            ) : meeting.cm_side ? (
+              <div
+                style={{
+                  padding: "8px 10px",
+                  background: "#f8f9ff",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  color: "#333",
+                  lineHeight: 1.5,
+                }}
+              >
+                {meeting.cm_side}
+              </div>
+            ) : (
+              <div
+                style={{
+                  padding: "8px 10px",
+                  background: "#f9f9f9",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  color: "#bbb",
+                  fontStyle: "italic",
+                }}
+              >
+                No notes added
+              </div>
+            )}
+          </div>
+
+          {/* Divider */}
+          <div
+            style={{ borderTop: "1px solid #f0f0f0", marginBottom: "12px" }}
+          />
+
+          {/* Update Log */}
+          <div>
+            <div
+              style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                color: "#667eea",
+                textTransform: "uppercase" as const,
+                letterSpacing: "0.6px",
+                marginBottom: "8px",
+              }}
+            >
+              Update Log
+            </div>
+
+            {/* Updates list */}
+            <div
+              style={{
+                maxHeight: "160px",
+                overflowY: "auto" as const,
+                marginBottom: "8px",
+              }}
+            >
+              {updates.length === 0 ? (
+                <div
+                  style={{
+                    padding: "10px",
+                    textAlign: "center" as const,
+                    color: "#bbb",
+                    fontSize: "12px",
+                    fontStyle: "italic",
+                  }}
+                >
+                  No updates yet
+                </div>
+              ) : (
+                updates.map((u, idx) => {
+                  const { date: logDate, time: logTime } = fmtLogDateTime(
+                    u.created_at,
+                  );
+                  return (
+                    <div
+                      key={u.id}
+                      style={{
+                        padding: "8px 10px",
+                        borderRadius: "6px",
+                        marginBottom: "4px",
+                        background: idx % 2 === 0 ? "#f8f9ff" : "#fff",
+                        border: "1px solid #eef0ff",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start",
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            color: "#333",
+                            marginBottom: "3px",
+                          }}
+                        >
+                          {u.update_note}
+                        </div>
+                        <div style={{ fontSize: "10px", color: "#aaa" }}>
+                          {logDate} · {logTime} · {u.created_by || "—"}
+                        </div>
+                      </div>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDeleteUpdate(u.id)}
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "#ddd",
+                            fontSize: "13px",
+                            marginLeft: "6px",
+                            flexShrink: 0,
+                          }}
+                          onMouseEnter={(e) =>
+                            (e.currentTarget.style.color = "#ef4444")
+                          }
+                          onMouseLeave={(e) =>
+                            (e.currentTarget.style.color = "#ddd")
+                          }
+                        >
+                          🗑️
+                        </button>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Add update */}
+            <div style={{ display: "flex", gap: "6px" }}>
+              <input
+                type="text"
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                placeholder="Add update..."
+                style={{
+                  flex: 1,
+                  padding: "6px 10px",
+                  fontSize: "12px",
+                  border: "1px solid #d0d5ff",
+                  borderRadius: "6px",
+                  outline: "none",
+                }}
+              />
+              <button
+                onClick={handleAdd}
+                disabled={saving || !newNote.trim()}
+                style={{
+                  padding: "6px 12px",
+                  background: "#667eea",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  opacity: !newNote.trim() ? 0.5 : 1,
+                }}
+              >
+                {saving ? "..." : "+ Add"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Member Update Log (only mounted once its row is expanded) ──────
+const MEMBER_STATUS_LOOKUP: Record<
+  string,
+  { label: string; bg: string; color: string }
+> = {
+  todo: { label: "To Do", bg: "#e3f2fd", color: "#2e7d32" },
+  in_progress: { label: "In Progress", bg: "#fff8e1", color: "##e6bc00" },
+  on_hold: { label: "On Hold", bg: "#fce4ec", color: "#880e4f" },
+  permission: { label: "Permission", bg: "#ede7f6", color: "#5e35b1" },
+  done: { label: "Done", bg: "#c0c0c0", color: "#727272" },
+};
+const getMemberLogStatus = (val: string) =>
+  MEMBER_STATUS_LOOKUP[val] || MEMBER_STATUS_LOOKUP.todo;
+
+const MemberUpdateLog = ({
+  customerId,
+  projectId,
+  member,
+  canEdit,
+  readOnly,
+  systemUsers,
+}: {
+  customerId: string | undefined;
+  projectId: string | undefined;
+  member: AssignedMember;
+  canEdit: boolean;
+  readOnly: boolean;
+  systemUsers: SystemUser[];
+}) => {
+  const [updates, setUpdates] = useState<any[]>([]);
+  const requestNumber = useRef(0);
+  const [newNote, setNewNote] = useState("");
+  const [newThirdParties, setNewThirdParties] = useState<string[]>([]);
+  const [thirdPartySearch, setThirdPartySearch] = useState("");
+  const [saving, setSaving] = useState(false);
+  const BASE = `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/members/${member.id}/updates`;
+  const hdr = () => ({
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  });
+
+  useEffect(() => {
+    fetchUpdates();
+  }, [member.id, member.status]);
+
+  const fetchUpdates = async () => {
+    const request = ++requestNumber.current;
+    try {
+      const response = await axios.get(BASE, { headers: hdr() });
+      if (request === requestNumber.current)
+        setUpdates(response.data.updates || []);
+    } catch {}
+  };
+
+  const handleAdd = async () => {
+    if (!newNote.trim() || saving) return;
+    setSaving(true);
+    try {
+      await axios.post(
+        BASE,
+        {
+          update_note: newNote,
+          third_parties: newThirdParties,
+        },
+        { headers: hdr() },
+      );
+      setNewNote("");
+      setNewThirdParties([]);
+      setThirdPartySearch("");
+      await fetchUpdates();
+    } catch (err: any) {
+      alert(err.response?.data?.error || "Failed to add update");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const assignedAt = fmtCreatedDateTime(
+    member.assigned_date,
+    member.assigned_time,
+  );
+  const completedEntry = [...updates]
+    .reverse()
+    .find(
+      (entry) =>
+        entry.status === "done" && entry.update_note === "Task Completed",
+    );
+  const completedTime = completedEntry
+    ? fmtLogDateTime(completedEntry.created_at).time
+    : member.updated_at
+      ? fmtLogDateTime(member.updated_at).time
+      : "—";
+  const thirdParties = (raw: string | null | undefined) =>
+    raw
+      ? raw
+          .split(",")
+          .map((name) => name.trim())
+          .filter(Boolean)
+      : [];
+
+  return (
+    <div className="project-member-log">
+      <div className="project-member-summary">
+        <div className="project-member-summary-group">
+          <div>
+            <strong>Assigned By: </strong>
+            <span>{member.created_by || "—"}</span>
+          </div>
+          <div>
+            <strong>Assigned To: </strong>
+            <span>{member.assigned_member || "—"}</span>
+          </div>
+        </div>
+        <div className="project-member-summary-group">
+          <div>
+            <strong>Assigned Date: </strong>
+            <span>{assignedAt.date}</span>
+          </div>
+          <div>
+            <strong>Assigned Time: </strong>
+            <span>{assignedAt.time}</span>
+          </div>
+        </div>
+        <div className="project-member-summary-group">
+          <div>
+            <strong>Finished Date: </strong>
+            <span>{fmtDateDDMMYYYY(member.finish_date)}</span>
+          </div>
+          <div>
+            <strong>Finished Time: </strong>
+            <span>{member.status === "done" ? completedTime : "—"}</span>
+          </div>
+        </div>
+      </div>
+      <div className="project-member-log-body">
+        <div className="project-member-log-title">Update Log</div>
+        <div className="project-member-update-scroll">
+          <table className="project-member-update-table">
+            <thead>
+              <tr>
+                <th style={mThStyle("90px")}>Date</th>
+                <th style={mThStyle("70px")}>Time</th>
+                <th style={mThStyle("80px")}>By</th>
+                <th style={mThStyle()}>Update</th>
+                <th style={mThStyle("100px")}>Status</th>
+                <th style={mThStyle("120px")}>Third Party</th>
+              </tr>
+            </thead>
+            <tbody>
+              {updates.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="project-member-empty">
+                    No updates yet
+                  </td>
+                </tr>
+              ) : (
+                updates.map((entry, index) => {
+                  const loggedAt = fmtLogDateTime(entry.created_at);
+                  const status = getMemberLogStatus(entry.status || "todo");
+                  return (
+                    <tr
+                      key={entry.id}
+                      style={{ background: index % 2 ? "#fafbff" : "#fff" }}
+                    >
+                      <td style={mTdStyle}>{loggedAt.date}</td>
+                      <td style={mTdStyle}>{loggedAt.time}</td>
+                      <td style={mTdStyle}>{entry.created_by || "—"}</td>
+                      <td style={mTdStyle}>{entry.update_note}</td>
+                      <td style={mTdStyle}>
+                        <span
+                          style={{
+                            padding: "2px 8px",
+                            borderRadius: "9px",
+                            fontSize: "10px",
+                            fontWeight: 700,
+                            background: status.bg,
+                            color: status.color,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {status.label}
+                        </span>
+                      </td>
+                      <td style={mTdStyle}>
+                        <div className="project-member-third-parties">
+                          {thirdParties(entry.third_party).length ? (
+                            thirdParties(entry.third_party).map((username) => (
+                              <span
+                                className="project-member-third-party"
+                                key={username}
+                              >
+                                @{username}
+                              </span>
+                            ))
+                          ) : (
+                            <span style={{ color: "#ccc" }}>—</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+        {canEdit && !readOnly ? (
+          <div className="project-member-update-form">
+            <textarea
+              className="form-input"
+              rows={2}
+              value={newNote}
+              onChange={(e) => setNewNote(e.target.value)}
+              placeholder="Add update note..."
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className="project-member-third-party-label">
+              Third-party assignees (optional)
+            </div>
+            <input
+              className="form-input"
+              value={thirdPartySearch}
+              onChange={(e) => setThirdPartySearch(e.target.value)}
+              placeholder="Search members..."
+            />
+            <div className="project-member-assignees">
+              {systemUsers
+                .filter((person) =>
+                  `${person.first_name} ${person.last_name} ${person.username}`
+                    .toLowerCase()
+                    .includes(thirdPartySearch.toLowerCase()),
+                )
+                .map((person) => (
+                  <label key={person.username}>
+                    <input
+                      type="checkbox"
+                      checked={newThirdParties.includes(person.username)}
+                      disabled={saving}
+                      onChange={(e) =>
+                        setNewThirdParties((previous) =>
+                          e.target.checked
+                            ? [...previous, person.username]
+                            : previous.filter(
+                                (username) => username !== person.username,
+                              ),
+                        )
+                      }
+                    />
+                    {person.first_name} {person.last_name} ({person.username})
+                  </label>
+                ))}
+            </div>
+            <button
+              type="button"
+              className="btn-save"
+              onClick={handleAdd}
+              disabled={saving || !newNote.trim()}
+            >
+              {saving ? "Adding..." : "+ Add"}
+            </button>
+            <div className="project-member-immutable-note">
+              The update and its assignees cannot be changed after you add it.
+            </div>
+          </div>
+        ) : (
+          !readOnly && (
+            <div className="project-member-immutable-note">
+              Move this task to In Progress to start adding updates.
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+};
+
+const mThStyle = (width?: string) => ({
+  padding: "5px 8px",
+  textAlign: "left" as const,
+  color: "#888",
+  fontWeight: 600,
+  borderBottom: "1px solid #e8e8e8",
+  ...(width ? { width } : {}),
+});
+
+const mTdStyle = {
+  padding: "5px 8px",
+  color: "#555",
+  borderBottom: "1px solid #f0f0f0",
+};
 
 const ProjectDashboard = () => {
   const navigate = useNavigate();
@@ -97,6 +858,7 @@ const ProjectDashboard = () => {
   const [uploadingFile, setUploadingFile] = useState(false);
 
   const [assignedMembers, setAssignedMembers] = useState<AssignedMember[]>([]);
+  const [expandedMemberId, setExpandedMemberId] = useState<number | null>(null);
   const [systemUsers, setSystemUsers] = useState<SystemUser[]>([]);
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberUsername, setNewMemberUsername] = useState("");
@@ -111,9 +873,10 @@ const ProjectDashboard = () => {
   const [newMeetingDesc, setNewMeetingDesc] = useState("");
   const [newMeetingTime, setNewMeetingTime] = useState("");
   const [newMeetingLocation, setNewMeetingLocation] = useState("");
+  const [newMeetingCustomerSide, setNewMeetingCustomerSide] = useState("");
+  const [newMeetingCMSide, setNewMeetingCMSide] = useState("");
 
   const [showAddEntry, setShowAddEntry] = useState(false);
-  const [newEntryName, setNewEntryName] = useState("");
   const [newEntryDate, setNewEntryDate] = useState("");
   const [newEntryTime, setNewEntryTime] = useState("");
   const [newEntryDesc, setNewEntryDesc] = useState("");
@@ -161,7 +924,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/attachments`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/attachments`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setAttachments(response.data.attachments || []);
@@ -175,7 +938,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/members`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/members`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setAssignedMembers(response.data.members || []);
@@ -188,7 +951,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/users`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/users`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setSystemUsers(response.data.users || []);
@@ -201,7 +964,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/activities`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/activities`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setTableEntries(response.data.activities || []);
@@ -215,7 +978,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/boq/${category}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/boq/${category}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
@@ -243,7 +1006,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/members`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/members`,
         {
           assigned_member: newMemberUsername,
           job_description: newMemberJobDesc,
@@ -272,7 +1035,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.put(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/members/${memberId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/members/${memberId}`,
         { [field]: value },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -287,12 +1050,26 @@ const ProjectDashboard = () => {
     }
   };
 
+  // Status changes go through here so "done" can be followed by an
+  // auto-stamped finish_date in a second call, matching what the
+  // server now does server-side too.
+  const handleMemberStatusChange = async (
+    member: AssignedMember,
+    newStatus: string,
+  ) => {
+    await handleUpdateMember(member.id, "status", newStatus);
+    if (newStatus === "done" && !member.finish_date) {
+      await handleUpdateMember(member.id, "finish_date", todayISO());
+    }
+    fetchAssignedMembers();
+  };
+
   const handleDeleteMember = async (memberId: number) => {
     if (!confirm("Remove this assignment?")) return;
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/members/${memberId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/members/${memberId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       fetchAssignedMembers();
@@ -320,7 +1097,7 @@ const ProjectDashboard = () => {
       formData.append("file", file);
 
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/attachments`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/attachments`,
         formData,
         {
           headers: {
@@ -349,7 +1126,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/attachments/${attachment.id}/download`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/attachments/${attachment.id}/download`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",
@@ -383,7 +1160,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/attachments/${id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/attachments/${id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("File deleted successfully!");
@@ -425,7 +1202,7 @@ const ProjectDashboard = () => {
       formData.append("category", category);
 
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/boq`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/boq`,
         formData,
         {
           headers: {
@@ -454,7 +1231,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/boq/${doc.id}/download`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/boq/${doc.id}/download`,
         {
           headers: { Authorization: `Bearer ${token}` },
           responseType: "blob",
@@ -488,7 +1265,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/boq/${docId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/boq/${docId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("Document deleted successfully!");
@@ -558,7 +1335,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.put(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}`,
         { name: projectName, description: projectDescription },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -577,12 +1354,14 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/meetings`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/meetings`,
         {
           date: newMeetingDate,
           meeting_time: newMeetingTime || null,
           location: newMeetingLocation || null,
           description: newMeetingDesc,
+          customer_side: newMeetingCustomerSide || null,
+          cm_side: newMeetingCMSide || null,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -591,6 +1370,8 @@ const ProjectDashboard = () => {
         setNewMeetingTime("");
         setNewMeetingLocation("");
         setNewMeetingDesc("");
+        setNewMeetingCustomerSide("");
+        setNewMeetingCMSide("");
         setShowAddMeeting(false);
         fetchMeetings();
       }
@@ -604,7 +1385,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/meetings`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/meetings`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setMeetings(response.data.meetings || []);
@@ -613,15 +1394,39 @@ const ProjectDashboard = () => {
     }
   };
 
-  // ADMIN ONLY can edit meetings
-  const handleUpdateMeeting = (id: number, field: string, value: string) => {
-    if (!isAdmin) {
-      alert("Only admins can edit meetings");
-      return;
-    }
+  const handleUpdateMeeting = async (
+    id: number,
+    field: string,
+    value: string,
+  ) => {
+    const meeting = meetings.find((m) => m.id === id);
+    if (!meeting) return;
+
+    // Update local state immediately
     setMeetings(
       meetings.map((m) => (m.id === id ? { ...m, [field]: value } : m)),
     );
+
+    try {
+      const token = localStorage.getItem("token");
+      await axios.put(
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/meetings/${id}`,
+        {
+          date: field === "date" ? value : meeting.date,
+          meeting_time: field === "meeting_time" ? value : meeting.meeting_time,
+          location: field === "location" ? value : meeting.location,
+          description: field === "description" ? value : meeting.description,
+          customer_side:
+            field === "customer_side" ? value : meeting.customer_side,
+          cm_side: field === "cm_side" ? value : meeting.cm_side,
+        },
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+    } catch (error: any) {
+      console.error("Error updating meeting:", error);
+      alert(error.response?.data?.error || "Failed to save meeting");
+      fetchMeetings(); // revert on error
+    }
   };
 
   const handleDeleteMeeting = (id: number) => {
@@ -635,18 +1440,18 @@ const ProjectDashboard = () => {
   };
 
   const handleAddEntry = async () => {
-    if (!newEntryDate || !newEntryDesc) {
-      alert("Date and Description are required");
+    if (!newEntryDesc.trim()) {
+      alert("Description is required");
       return;
     }
 
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/activities`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/activities`,
         {
-          activity_date: newEntryDate,
-          activity_time: newEntryTime || null,
+          // activity_date: newEntryDate,
+          // activity_time: newEntryTime || null,
           description: newEntryDesc,
         },
         { headers: { Authorization: `Bearer ${token}` } },
@@ -655,8 +1460,6 @@ const ProjectDashboard = () => {
       if (response.data.success) {
         alert("Activity added successfully!");
         setShowAddEntry(false);
-        setNewEntryDate("");
-        setNewEntryTime("");
         setNewEntryDesc("");
         fetchActivities();
       }
@@ -680,7 +1483,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.put(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/activities/${activityId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/activities/${activityId}`,
         { [field]: value },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -710,7 +1513,7 @@ const ProjectDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/projects/${projectId}/activities/${activityId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/projects/${projectId}/activities/${activityId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("Activity deleted successfully!");
@@ -728,11 +1531,27 @@ const ProjectDashboard = () => {
   const initials = getInitials(customer.name);
   const color = getColorFromName(customer.name);
 
+  // Must match Worklist dashboard's STATUS_OPTIONS exactly — both sides
+  // share the same status column via sync, so a value either side doesn't
+  // recognize silently falls back to "To Do" on display. This previously
+  // used "pending" here instead of "in_progress", which was the direct
+  // cause of statuses appearing wrong across the two dashboards.
   const STATUS_OPTIONS = [
-    { value: "todo", label: "To Do", bg: "#e3f2fd", color: "#1565c0" },
-    { value: "pending", label: "Pending", bg: "#fff8e1", color: "#e65100" },
+    { value: "todo", label: "To Do", bg: "#e3f2fd", color: "#2e7d32" },
+    {
+      value: "in_progress",
+      label: "In Progress",
+      bg: "#fff8e1",
+      color: "##e6bc00",
+    },
     { value: "on_hold", label: "On Hold", bg: "#fce4ec", color: "#880e4f" },
-    { value: "done", label: "Done", bg: "#e8f5e9", color: "#2e7d32" },
+    {
+      value: "permission",
+      label: "Permission",
+      bg: "#ede7f6",
+      color: "#5e35b1",
+    },
+    { value: "done", label: "Done", bg: "#c0c0c0", color: "#727272" },
   ];
 
   const getStatusStyle = (status: string) => {
@@ -744,37 +1563,17 @@ const ProjectDashboard = () => {
     return dateStr.split("T")[0];
   };
 
+  // Done assignments sink to the bottom; assignment_no is never touched.
+  const sortedMembers = [...assignedMembers].sort((a, b) => {
+    const aDone = a.status === "done" ? 1 : 0;
+    const bDone = b.status === "done" ? 1 : 0;
+    if (aDone !== bDone) return aDone - bDone;
+    return a.assignment_no - b.assignment_no;
+  });
+
   return (
     <div className="project-dashboard">
-      {/* Header */}
-      <div className="portal-header">
-        <div className="header-left">
-          <div className="logo-container" onClick={handleBackToDashboard}>
-            <img
-              src={companyLogo}
-              alt="Company Logo"
-              className="company-logo"
-            />
-          </div>
-          <h1 className="portal-title" onClick={handleBackToDashboard}>
-            <span className="brand-cool">COOL</span>
-            <span className="brand-man">Man</span> Refrigeration
-          </h1>
-        </div>
-        <div className="header-right">
-          <div className="customer-logo-badge-with-icon">
-            <div
-              className="customer-badge-logo"
-              style={{ backgroundColor: color }}
-            >
-              {initials}
-            </div>
-            <span className="customer-logo-text">{customer.name}</span>
-          </div>
-          <span className="user-icon">👤</span>
-          <span className="username">{user?.username || "User"}</span>
-        </div>
-      </div>
+      <AppHeader />
 
       {/* Main Content */}
       <div className="project-main-content">
@@ -820,7 +1619,7 @@ const ProjectDashboard = () => {
           </>
         )}
 
-        {/* Assigned Members */}
+        {/* Assigned Members — restructured to expand-on-arrow, like Job Assigned */}
         <div className="project-section">
           <div className="section-header">
             <h3 className="section-title-text">Assigned Members</h3>
@@ -942,154 +1741,134 @@ const ProjectDashboard = () => {
             </div>
           )}
 
-          <table className="meetings-table">
+          <table className="meetings-table" style={{ tableLayout: "fixed" }}>
             <thead>
               <tr>
                 <th style={{ width: "50px" }}>No</th>
-                <th style={{ width: "110px" }}>Date</th>
-                <th style={{ width: "90px" }}>Time</th>
+                <th style={{ width: "100px" }}>Date</th>
+                <th style={{ width: "80px" }}>Time</th>
                 <th style={{ width: "140px" }}>Assigned To</th>
                 <th>Job Description</th>
-                <th style={{ width: "110px" }}>Due Date</th>
-                <th style={{ width: "200px" }}>Update</th>
-                <th style={{ width: "110px" }}>Status</th>
-                <th style={{ width: "110px" }}>Finish Date</th>
-                {isAdmin && <th style={{ width: "70px" }}>Actions</th>}
+                <th style={{ width: "100px" }}>Due Date</th>
+                <th style={{ width: "100px" }}>Status</th>
+                <th style={{ width: "36px" }}></th>
               </tr>
             </thead>
             <tbody>
-              {assignedMembers.map((member) => {
+              {sortedMembers.map((member) => {
                 const isAssignedToMe =
                   member.assigned_member === user?.username;
-                const canEditUpdate = isAdmin || isAssignedToMe;
+                const isDone = member.status === "done";
+                const canEditUpdate = !isDone && member.status !== "todo";
                 const st = getStatusStyle(member.status);
+                const isExpanded = expandedMemberId === member.id;
+                const { date: memberDate, time: memberTime } =
+                  fmtCreatedDateTime(
+                    member.assigned_date,
+                    member.assigned_time,
+                  );
 
                 return (
-                  <tr key={member.id}>
-                    {/* No */}
-                    <td
+                  <>
+                    <tr
+                      key={member.id}
                       style={{
-                        textAlign: "center",
-                        fontWeight: 600,
-                        color: "#666",
-                        fontSize: "15px",
+                        cursor: "pointer",
+                        background: isExpanded ? "#f8f9ff" : "",
+                        opacity: isDone ? 0.55 : 1,
                       }}
+                      onClick={() =>
+                        setExpandedMemberId(isExpanded ? null : member.id)
+                      }
                     >
-                      {member.assignment_no}
-                    </td>
+                      {/* No */}
+                      <td
+                        style={{
+                          textAlign: "center",
+                          fontWeight: 600,
+                          color: "#666",
+                          fontSize: "15px",
+                        }}
+                      >
+                        {member.assignment_no}
+                      </td>
 
-                    {/* Date - auto generated, read only */}
-                    <td>
-                      <span style={{ fontSize: "15px" }}>
-                        {member.assigned_date
-                          ? new Date(member.assigned_date).toLocaleDateString(
-                              "en-GB",
-                              {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              },
-                            )
-                          : "—"}
-                      </span>
-                    </td>
+                      {/* Date */}
+                      <td>
+                        <span style={{ fontSize: "14px" }}>{memberDate}</span>
+                      </td>
 
-                    {/* Time - auto generated, read only */}
-                    <td>
-                      <span style={{ fontSize: "15px" }}>
-                        {member.assigned_time
-                          ? member.assigned_time.substring(0, 5)
-                          : "—"}
-                      </span>
-                    </td>
+                      {/* Time */}
+                      <td>
+                        <span style={{ fontSize: "14px" }}>{memberTime}</span>
+                      </td>
 
-                    {/* Assigned Member - admin editable */}
-                    <td>
-                      {isAdmin ? (
-                        <select
-                          value={member.assigned_member}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "assigned_member",
-                              e.target.value,
-                            )
-                          }
-                          className="table-input"
-                          style={{ fontSize: "14px" }}
-                        >
-                          {systemUsers.map((u) => (
-                            <option key={u.username} value={u.username}>
-                              {u.username}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
+                      {/* Assigned Member */}
+                      <td>
+                        {isAdmin && !isDone ? (
+                          <select
+                            value={member.assigned_member}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleUpdateMember(
+                                member.id,
+                                "assigned_member",
+                                e.target.value,
+                              );
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="table-input"
+                            style={{ fontSize: "14px" }}
+                          >
+                            {systemUsers.map((u) => (
+                              <option key={u.username} value={u.username}>
+                                {u.username}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span
+                            style={{
+                              fontSize: "14px",
+                              fontWeight: isAssignedToMe ? 700 : 400,
+                              color: isAssignedToMe ? "#667eea" : "#333",
+                            }}
+                          >
+                            {member.assigned_member}
+                            {isAssignedToMe && (
+                              <span
+                                style={{
+                                  fontSize: "11px",
+                                  marginLeft: "4px",
+                                  color: "#888",
+                                }}
+                              >
+                                (you)
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Job Description — truncated preview, edited in expanded panel */}
+                      <td
+                        style={{
+                          fontSize: "14px",
+                          color: "#555",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                          maxWidth: "0",
+                        }}
+                      >
+                        {member.job_description || "—"}
+                      </td>
+
+                      {/* Due Date */}
+                      <td>
                         <span
                           style={{
-                            fontSize: "15px",
-                            fontWeight: isAssignedToMe ? 700 : 400,
-                            color: isAssignedToMe ? "#667eea" : "#333",
-                          }}
-                        >
-                          {member.assigned_member}
-                          {isAssignedToMe && (
-                            <span
-                              style={{
-                                fontSize: "11px",
-                                marginLeft: "4px",
-                                color: "#888",
-                              }}
-                            >
-                              (you)
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Job Description - admin editable */}
-                    <td>
-                      {isAdmin ? (
-                        <textarea
-                          value={member.job_description || ""}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "job_description",
-                              e.target.value,
-                            )
-                          }
-                          className="table-textarea"
-                          rows={2}
-                          placeholder="Job description..."
-                        />
-                      ) : (
-                        <span style={{ fontSize: "15px" }}>
-                          {member.job_description || "—"}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Due Date - admin editable */}
-                    <td>
-                      {isAdmin ? (
-                        <input
-                          type="date"
-                          value={toDateInput(member.due_date)}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "due_date",
-                              e.target.value,
-                            )
-                          }
-                          className="table-input"
-                        />
-                      ) : (
-                        <span
-                          style={{
-                            fontSize: "15px",
+                            fontSize: "14px",
                             color:
                               member.due_date &&
                               new Date(member.due_date) < new Date() &&
@@ -1098,89 +1877,17 @@ const ProjectDashboard = () => {
                                 : "#333",
                           }}
                         >
-                          {member.due_date
-                            ? new Date(member.due_date).toLocaleDateString(
-                                "en-GB",
-                                {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                },
-                              )
-                            : "—"}
+                          {fmtDateDDMMYYYY(member.due_date)}
                         </span>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* Update - only assigned user or admin can edit */}
-                    <td>
-                      {canEditUpdate ? (
-                        <textarea
-                          value={member.update_note || ""}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "update_note",
-                              e.target.value,
-                            )
-                          }
-                          className="table-textarea"
-                          rows={2}
-                          placeholder={
-                            isAssignedToMe
-                              ? "Add your update..."
-                              : "Update notes..."
-                          }
-                        />
-                      ) : (
-                        <span
-                          style={{
-                            fontSize: "15px",
-                            color: member.update_note ? "#333" : "#bbb",
-                            fontStyle: member.update_note ? "normal" : "italic",
-                          }}
-                        >
-                          {member.update_note || "—"}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Status - assigned user or admin can change */}
-                    <td>
-                      {canEditUpdate ? (
-                        <select
-                          value={member.status}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "status",
-                              e.target.value,
-                            )
-                          }
-                          style={{
-                            width: "100%",
-                            padding: "6px 8px",
-                            fontSize: "13px",
-                            border: "1px solid #ddd",
-                            borderRadius: "6px",
-                            background: st.bg,
-                            color: st.color,
-                            fontWeight: 600,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {STATUS_OPTIONS.map((s) => (
-                            <option key={s.value} value={s.value}>
-                              {s.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
+                      {/* Status */}
+                      <td>
                         <span
                           style={{
                             padding: "3px 10px",
                             borderRadius: "12px",
-                            fontSize: "12px",
+                            fontSize: "11px",
                             fontWeight: 600,
                             background: st.bg,
                             color: st.color,
@@ -1189,60 +1896,175 @@ const ProjectDashboard = () => {
                         >
                           {st.label}
                         </span>
-                      )}
-                    </td>
-
-                    {/* Finish Date - assigned user or admin can set */}
-                    <td>
-                      {canEditUpdate ? (
-                        <input
-                          type="date"
-                          value={toDateInput(member.finish_date)}
-                          onChange={(e) =>
-                            handleUpdateMember(
-                              member.id,
-                              "finish_date",
-                              e.target.value,
-                            )
-                          }
-                          className="table-input"
-                        />
-                      ) : (
-                        <span style={{ fontSize: "15px" }}>
-                          {member.finish_date
-                            ? new Date(member.finish_date).toLocaleDateString(
-                                "en-GB",
-                                {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                },
-                              )
-                            : "—"}
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Actions - admin only */}
-                    {isAdmin && (
-                      <td>
-                        <button
-                          className="btn-delete"
-                          onClick={() => handleDeleteMember(member.id)}
-                          title="Remove assignment"
-                        >
-                          🗑️
-                        </button>
                       </td>
+
+                      {/* Expand toggle */}
+                      <td style={{ textAlign: "center" }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            color: "#999",
+                            fontSize: "12px",
+                            transition: "transform 0.2s",
+                            transform: isExpanded
+                              ? "rotate(90deg)"
+                              : "rotate(0deg)",
+                          }}
+                        >
+                          ▶
+                        </span>
+                      </td>
+                    </tr>
+
+                    {isExpanded && (
+                      <tr key={`${member.id}-detail`}>
+                        <td
+                          colSpan={8}
+                          style={{ padding: 0, background: "#fafbff" }}
+                        >
+                          <div
+                            style={{
+                              padding: "20px 24px",
+                              borderTop: "2px solid #667eea20",
+                              borderBottom: "1px solid #e8e8e8",
+                            }}
+                          >
+                            <div className="project-member-detail-grid">
+                              <div className="project-member-status">
+                                <div>
+                                  <div style={detailLabelStyle}>Status</div>
+                                  {isDone ? (
+                                    <span
+                                      style={{
+                                        padding: "3px 10px",
+                                        borderRadius: "10px",
+                                        fontSize: "12px",
+                                        fontWeight: 700,
+                                        background: st.bg,
+                                        color: st.color,
+                                      }}
+                                    >
+                                      {st.label}
+                                    </span>
+                                  ) : (
+                                    <select
+                                      value={member.status}
+                                      onChange={(e) => {
+                                        e.stopPropagation();
+                                        handleMemberStatusChange(
+                                          member,
+                                          e.target.value,
+                                        );
+                                      }}
+                                      onClick={(e) => e.stopPropagation()}
+                                      style={{
+                                        width: "100%",
+                                        padding: "7px 10px",
+                                        fontSize: "13px",
+                                        border: "1.5px solid #ddd",
+                                        borderRadius: "6px",
+                                        background: st.bg,
+                                        color: st.color,
+                                        fontWeight: 700,
+                                        cursor: "pointer",
+                                        boxSizing: "border-box" as const,
+                                      }}
+                                    >
+                                      {STATUS_OPTIONS.map((s) => (
+                                        <option key={s.value} value={s.value}>
+                                          {s.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  )}
+                                </div>
+                              </div>
+                              <MemberUpdateLog
+                                customerId={customerId}
+                                projectId={projectId}
+                                member={member}
+                                canEdit={canEditUpdate}
+                                readOnly={isDone}
+                                systemUsers={systemUsers}
+                              />
+                              <div className="project-member-description">
+                                <div className="project-member-description-label">
+                                  Description
+                                </div>
+                                {isAdmin && !isDone ? (
+                                  <textarea
+                                    key={`${member.id}-${member.job_description || ""}`}
+                                    defaultValue={member.job_description || ""}
+                                    onBlur={(e) => {
+                                      if (
+                                        e.target.value !==
+                                        (member.job_description || "")
+                                      )
+                                        handleUpdateMember(
+                                          member.id,
+                                          "job_description",
+                                          e.target.value,
+                                        );
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    rows={2}
+                                    placeholder="Job description..."
+                                    style={{
+                                      ...detailTextareaStyle,
+                                      width: "100%",
+                                      boxSizing: "border-box",
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="project-member-description-text">
+                                    {member.job_description || "—"}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {isAdmin && (
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "flex-end",
+                                  marginTop: "16px",
+                                  paddingTop: "14px",
+                                  borderTop: "1px solid #f0f0f0",
+                                }}
+                              >
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteMember(member.id);
+                                  }}
+                                  style={{
+                                    padding: "6px 14px",
+                                    background: "#fff",
+                                    color: "#c62828",
+                                    border: "1px solid #ef9a9a",
+                                    borderRadius: "7px",
+                                    cursor: "pointer",
+                                    fontSize: "13px",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  🗑️ Remove Assignment
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                  </tr>
+                  </>
                 );
               })}
 
               {assignedMembers.length === 0 && (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 10 : 9}
+                    colSpan={8}
                     style={{
                       textAlign: "center",
                       color: "#999",
@@ -1273,26 +2095,13 @@ const ProjectDashboard = () => {
           {showAddEntry && (
             <div className="add-meeting-form">
               <input
-                type="date"
-                value={newEntryDate}
-                onChange={(e) => setNewEntryDate(e.target.value)}
-                placeholder="Date"
-                className="meeting-input"
-              />
-              <input
-                type="time"
-                value={newEntryTime}
-                onChange={(e) => setNewEntryTime(e.target.value)}
-                placeholder="Time (optional)"
-                className="meeting-input"
-              />
-              <input
                 type="text"
                 value={newEntryDesc}
                 onChange={(e) => setNewEntryDesc(e.target.value)}
                 placeholder="Description"
                 className="meeting-input"
                 style={{ flex: 2 }}
+                onKeyDown={(e) => e.key === "Enter" && handleAddEntry()}
               />
               <button className="btn-add-meeting" onClick={handleAddEntry}>
                 Add
@@ -1305,7 +2114,6 @@ const ProjectDashboard = () => {
               </button>
             </div>
           )}
-
           <table className="meetings-table">
             <thead>
               <tr>
@@ -1340,7 +2148,7 @@ const ProjectDashboard = () => {
                       />
                     ) : (
                       <p style={{ fontSize: "16px" }}>
-                        {new Date(entry.activity_date).toLocaleDateString()}
+                        {fmtDateDDMMYYYY(entry.activity_date)}
                       </p>
                     )}
                   </td>
@@ -1360,7 +2168,9 @@ const ProjectDashboard = () => {
                       />
                     ) : (
                       <p style={{ fontSize: "16px" }}>
-                        {entry.activity_time || "—"}
+                        {entry.activity_time
+                          ? entry.activity_time.substring(0, 5)
+                          : "—"}
                       </p>
                     )}
                   </td>
@@ -1372,14 +2182,16 @@ const ProjectDashboard = () => {
                   <td>
                     {isAdmin ? (
                       <textarea
-                        value={entry.description}
-                        onChange={(e) =>
-                          handleUpdateEntry(
-                            entry.id,
-                            "description",
-                            e.target.value,
-                          )
-                        }
+                        defaultValue={entry.description}
+                        onBlur={(e) => {
+                          if (e.target.value !== entry.description) {
+                            handleUpdateEntry(
+                              entry.id,
+                              "description",
+                              e.target.value,
+                            );
+                          }
+                        }}
                         className="table-textarea"
                         rows={2}
                       />
@@ -1387,16 +2199,23 @@ const ProjectDashboard = () => {
                       <p style={{ fontSize: "16px" }}>{entry.description}</p>
                     )}
                   </td>
+
                   <td>
                     {isAdmin ? (
                       <textarea
-                        value={entry.remarks || ""}
-                        onChange={(e) =>
-                          handleUpdateEntry(entry.id, "remarks", e.target.value)
-                        }
+                        defaultValue={entry.remarks || ""}
+                        onBlur={(e) => {
+                          if (e.target.value !== (entry.remarks || "")) {
+                            handleUpdateEntry(
+                              entry.id,
+                              "remarks",
+                              e.target.value,
+                            );
+                          }
+                        }}
                         className="table-textarea"
                         rows={2}
-                        placeholder="Add remarks..."
+                        placeholder="Add remarks then click away to save..."
                       />
                     ) : (
                       <p
@@ -1410,6 +2229,7 @@ const ProjectDashboard = () => {
                       </p>
                     )}
                   </td>
+
                   {isAdmin && (
                     <td>
                       <button
@@ -1466,15 +2286,15 @@ const ProjectDashboard = () => {
                 <span className="btn-indicator"> ▼</span>
               )}
             </button>
-            {/* <button
-              className={`boq-btn ${activeBOQCategory === "mechanical" ? "active" : ""}`}
-              onClick={() => handleBOQCategoryClick("mechanical")}
+            <button
+              className={`boq-btn ${activeBOQCategory === "invoice" ? "active" : ""}`}
+              onClick={() => handleBOQCategoryClick("invoice")}
             >
-              Mechanical BOQ
-              {activeBOQCategory === "mechanical" && (
+              Invoice
+              {activeBOQCategory === "invoice" && (
                 <span className="btn-indicator"> ▼</span>
               )}
-            </button> */}
+            </button>
             <button
               className={`boq-btn ${activeBOQCategory === "quotation" ? "active" : ""}`}
               onClick={() => handleBOQCategoryClick("quotation")}
@@ -1493,8 +2313,7 @@ const ProjectDashboard = () => {
                 <h4>
                   {activeBOQCategory === "electrical" &&
                     "Electrical BOQ Documents"}
-                  {activeBOQCategory === "mechanical" &&
-                    "Mechanical BOQ Documents"}
+                  {activeBOQCategory === "invoice" && "Invoice BOQ Documents"}
                   {activeBOQCategory === "quotation" && "Quotation Documents"}
                 </h4>
                 <button
@@ -1542,7 +2361,7 @@ const ProjectDashboard = () => {
                           {formatFileSize(doc.file_size)}
                         </td>
                         <td style={{ fontSize: "16px" }}>
-                          {new Date(doc.created_at).toLocaleDateString()}
+                          {fmtDateDDMMYYYY(doc.created_at)}
                         </td>
                         <td>
                           <div
@@ -1619,7 +2438,6 @@ const ProjectDashboard = () => {
             <table className="meetings-table attachments-table">
               <thead>
                 <tr>
-                  <th style={{ width: "50px" }}>Type</th>
                   <th>File Name</th>
                   <th style={{ width: "120px" }}>Size</th>
                   <th style={{ width: "140px" }}>Date</th>
@@ -1629,9 +2447,6 @@ const ProjectDashboard = () => {
               <tbody>
                 {attachments.map((attachment) => (
                   <tr key={attachment.id}>
-                    <td style={{ fontSize: "1rem", textAlign: "center" }}>
-                      {getFileIcon(attachment.file_type)}
-                    </td>
                     <td>
                       <div style={{ fontWeight: 500, fontSize: "16px" }}>
                         {attachment.original_filename}
@@ -1641,7 +2456,7 @@ const ProjectDashboard = () => {
                       {formatFileSize(attachment.file_size)}
                     </td>
                     <td style={{ fontSize: "16px" }}>
-                      {new Date(attachment.created_at).toLocaleDateString()}
+                      {fmtDateDDMMYYYY(attachment.created_at)}
                     </td>
                     <td style={{ fontSize: "16px" }}>
                       <div
@@ -1691,76 +2506,189 @@ const ProjectDashboard = () => {
           </div>
 
           {showAddMeeting && (
-            <div className="add-meeting-form">
-              <input
-                type="date"
-                value={newMeetingDate}
-                onChange={(e) => setNewMeetingDate(e.target.value)}
-                className="meeting-input"
-              />
-              <input
-                type="time"
-                value={newMeetingTime}
-                onChange={(e) => setNewMeetingTime(e.target.value)}
-                className="meeting-input"
-                placeholder="Time (optional)"
-              />
-              <input
-                type="text"
-                value={newMeetingLocation}
-                onChange={(e) => setNewMeetingLocation(e.target.value)}
-                className="meeting-input"
-                placeholder="Location (optional)"
-              />
-              <input
-                type="text"
-                value={newMeetingDesc}
-                onChange={(e) => setNewMeetingDesc(e.target.value)}
-                placeholder="Description"
-                className="meeting-input"
-                style={{ flex: 2 }}
-              />
-              <button className="btn-add-meeting" onClick={handleAddMeeting}>
-                Add
-              </button>
-              <button
-                className="btn-cancel-meeting"
-                onClick={() => setShowAddMeeting(false)}
+            <div
+              style={{
+                background: "#f8f9ff",
+                border: "1px solid #e0e0e0",
+                borderRadius: "10px",
+                padding: "16px 20px",
+                marginBottom: "16px",
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                  gap: "12px",
+                  marginBottom: "12px",
+                }}
               >
-                Cancel
-              </button>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={newMeetingDate}
+                    onChange={(e) => setNewMeetingDate(e.target.value)}
+                    className="meeting-input"
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    Time
+                  </label>
+                  <input
+                    type="time"
+                    value={newMeetingTime}
+                    onChange={(e) => setNewMeetingTime(e.target.value)}
+                    className="meeting-input"
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    Location
+                  </label>
+                  <input
+                    type="text"
+                    value={newMeetingLocation}
+                    onChange={(e) => setNewMeetingLocation(e.target.value)}
+                    placeholder="Location (optional)"
+                    className="meeting-input"
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div style={{ gridColumn: "span 2" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    Description *
+                  </label>
+                  <input
+                    type="text"
+                    value={newMeetingDesc}
+                    onChange={(e) => setNewMeetingDesc(e.target.value)}
+                    placeholder="Meeting description"
+                    className="meeting-input"
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div style={{ gridColumn: "span 2" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    Customer Side
+                  </label>
+                  <input
+                    value={newMeetingCustomerSide}
+                    onChange={(e) => setNewMeetingCustomerSide(e.target.value)}
+                    placeholder="Customer Side..."
+                    className="meeting-input"
+                    style={{ width: "100%", resize: "vertical" as const }}
+                  />
+                </div>
+                <div style={{ gridColumn: "span 2" }}>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: "11px",
+                      fontWeight: 600,
+                      color: "#555",
+                      marginBottom: "4px",
+                      textTransform: "uppercase" as const,
+                    }}
+                  >
+                    CM Side
+                  </label>
+                  <input
+                    value={newMeetingCMSide}
+                    onChange={(e) => setNewMeetingCMSide(e.target.value)}
+                    placeholder=" CM Side"
+                    className="meeting-input"
+                    style={{ width: "100%", resize: "vertical" as const }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button className="btn-add-meeting" onClick={handleAddMeeting}>
+                  Add Meeting
+                </button>
+                <button
+                  className="btn-cancel-meeting"
+                  onClick={() => {
+                    setShowAddMeeting(false);
+                    setNewMeetingDate("");
+                    setNewMeetingTime("");
+                    setNewMeetingLocation("");
+                    setNewMeetingDesc("");
+                    setNewMeetingCustomerSide("");
+                    setNewMeetingCMSide("");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
 
           <table className="meetings-table">
             <thead>
               <tr>
-                <th style={{ width: "55px" }}>No</th>
                 <th style={{ width: "120px" }}>Date</th>
                 <th style={{ width: "100px" }}>Time</th>
                 <th style={{ width: "140px" }}>Location</th>
                 <th style={{ width: "120px" }}>User</th>
                 <th>Description</th>
-                <th style={{ width: "180px" }}>Customer Side</th>
-                <th style={{ width: "180px" }}>CM Side</th>
-                {isAdmin && <th style={{ width: "80px" }}>Actions</th>}
+                <th style={{ width: "120px" }}>Details</th>
+                {isAdmin && <th style={{ width: "60px" }}>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {meetings.map((meeting) => (
                 <tr key={meeting.id}>
-                  {/* No */}
-                  <td
-                    style={{
-                      textAlign: "center",
-                      fontWeight: 600,
-                      color: "#666",
-                      fontSize: "15px",
-                    }}
-                  >
-                    {meeting.meeting_no}
-                  </td>
-
                   {/* Date */}
                   <td>
                     {isAdmin ? (
@@ -1778,11 +2706,7 @@ const ProjectDashboard = () => {
                       />
                     ) : (
                       <span style={{ fontSize: "16px" }}>
-                        {new Date(meeting.date).toLocaleDateString("en-GB", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {fmtDateDDMMYYYY(meeting.date)}
                       </span>
                     )}
                   </td>
@@ -1861,64 +2785,14 @@ const ProjectDashboard = () => {
                     )}
                   </td>
 
-                  {/* Customer Side - admin only editable */}
-                  <td>
-                    {isAdmin ? (
-                      <textarea
-                        value={meeting.customer_side || ""}
-                        onChange={(e) =>
-                          handleUpdateMeeting(
-                            meeting.id,
-                            "customer_side",
-                            e.target.value,
-                          )
-                        }
-                        className="table-textarea"
-                        rows={2}
-                        placeholder="Customer side notes..."
-                      />
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: "16px",
-                          color: meeting.customer_side ? "#333" : "#bbb",
-                          fontStyle: meeting.customer_side
-                            ? "normal"
-                            : "italic",
-                        }}
-                      >
-                        {meeting.customer_side || "—"}
-                      </span>
-                    )}
-                  </td>
-
-                  {/* CM Side - admin only editable */}
-                  <td>
-                    {isAdmin ? (
-                      <textarea
-                        value={meeting.cm_side || ""}
-                        onChange={(e) =>
-                          handleUpdateMeeting(
-                            meeting.id,
-                            "cm_side",
-                            e.target.value,
-                          )
-                        }
-                        className="table-textarea"
-                        rows={2}
-                        placeholder="CM side notes..."
-                      />
-                    ) : (
-                      <span
-                        style={{
-                          fontSize: "16px",
-                          color: meeting.cm_side ? "#333" : "#bbb",
-                          fontStyle: meeting.cm_side ? "normal" : "italic",
-                        }}
-                      >
-                        {meeting.cm_side || "—"}
-                      </span>
-                    )}
+                  <td style={{ padding: "8px", position: "relative" as const }}>
+                    <MeetingDetailPanel
+                      meeting={meeting}
+                      customerId={customerId}
+                      projectId={projectId}
+                      isAdmin={isAdmin}
+                      onUpdate={handleUpdateMeeting}
+                    />
                   </td>
 
                   {isAdmin && (
@@ -1936,7 +2810,7 @@ const ProjectDashboard = () => {
               {meetings.length === 0 && (
                 <tr>
                   <td
-                    colSpan={isAdmin ? 9 : 8}
+                    colSpan={isAdmin ? 7 : 6}
                     style={{ textAlign: "center", color: "#999" }}
                   >
                     No meetings yet. Click "+ Add" to create one.
@@ -1949,6 +2823,37 @@ const ProjectDashboard = () => {
       </div>
     </div>
   );
+};
+
+const detailLabelStyle = {
+  fontSize: "11px",
+  fontWeight: 700,
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.6px",
+  color: "#667eea",
+  marginBottom: "8px",
+  paddingBottom: "6px",
+  borderBottom: "2px solid #e8f0fe",
+};
+
+const detailTextareaStyle = {
+  width: "100%",
+  padding: "7px 10px",
+  fontSize: "13px",
+  border: "1.5px solid #ddd",
+  borderRadius: "6px",
+  resize: "vertical" as const,
+  fontFamily: "inherit",
+  boxSizing: "border-box" as const,
+};
+
+const detailInputStyle = {
+  width: "100%",
+  padding: "7px 10px",
+  fontSize: "13px",
+  border: "1.5px solid #ddd",
+  borderRadius: "6px",
+  boxSizing: "border-box" as const,
 };
 
 export default ProjectDashboard;

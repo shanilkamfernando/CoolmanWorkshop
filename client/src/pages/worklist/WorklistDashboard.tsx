@@ -7,7 +7,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import "./WorklistDashboard.css";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -44,7 +45,7 @@ const WorklistDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        "http://localhost:5000/api/jobAssigned/years",
+        "https://coolmanworkshop-production.up.railway.app/api/jobAssigned/years",
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setYears(response.data.years || []);
@@ -75,7 +76,7 @@ const WorklistDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        "http://localhost:5000/api/jobAssigned/years",
+        "https://coolmanworkshop-production.up.railway.app/api/jobAssigned/years",
         { year: yearNum },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -114,7 +115,7 @@ const WorklistDashboard = () => {
   return (
     <div className="worklist-dashboard">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div className="logo-container" onClick={handleBackToDashboard}>
             <img
@@ -132,7 +133,8 @@ const WorklistDashboard = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       {/* Main Content */}
       <div className="main-content">

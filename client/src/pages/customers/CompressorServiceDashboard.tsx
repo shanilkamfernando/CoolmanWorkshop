@@ -8,7 +8,8 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./CompressorServiceDashboard.css";
 import "./ProjectDashboard.css";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import AppHeader from "../../components/AppHeader";
+import companyLogo from "../../assets/mainlogo.png";
 
 interface User {
   username: string;
@@ -94,7 +95,7 @@ const MasterPasswordModal = ({
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        "http://localhost:5000/api/attachments/master-password",
+        "https://coolmanworkshop-production.up.railway.app/api/attachments/master-password",
         { password },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -112,7 +113,8 @@ const MasterPasswordModal = ({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="att-modal" onClick={(e) => e.stopPropagation()}>
+      {/* password model */}
+      {/* <div className="att-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>🔐 Set Master Download Password</h2>
           <button className="close-btn" onClick={onClose}>
@@ -162,7 +164,7 @@ const MasterPasswordModal = ({
             </button>
           </div>
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };
@@ -207,7 +209,7 @@ const UploadModal = ({
 
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/service-records/${recordId}/attachments`,
+        `https://coolmanworkshop-production.up.railway.app/api/service-records/${recordId}/attachments`,
         {
           attachment_type: type,
           original_name: file.name,
@@ -313,7 +315,7 @@ const DownloadModal = ({
     try {
       const token = localStorage.getItem("token");
       const res = await axios.post(
-        `http://localhost:5000/api/attachments/${attachment.id}/download`,
+        `https://coolmanworkshop-production.up.railway.app/api/attachments/${attachment.id}/download`,
         { password },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -513,7 +515,7 @@ const NameTagCell = ({
 
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/compressors/${compressor.id}/nametag`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/compressors/${compressor.id}/nametag`,
         { file_data: base64, filename: file.name, mime_type: file.type },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -546,7 +548,7 @@ const NameTagCell = ({
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/compressors/${compressor.id}/nametag`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/compressors/${compressor.id}/nametag`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       onRefresh();
@@ -635,7 +637,7 @@ const JobCardCell = ({
 
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/records/${record.id}/jobcard`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/records/${record.id}/jobcard`,
         { file_data: base64, filename: file.name, mime_type: file.type },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -668,7 +670,7 @@ const JobCardCell = ({
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/records/${record.id}/jobcard`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/records/${record.id}/jobcard`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       onRefresh();
@@ -782,7 +784,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        "http://localhost:5000/api/attachments/master-password/status",
+        "https://coolmanworkshop-production.up.railway.app/api/attachments/master-password/status",
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setHasMasterPwd(res.data.hasPassword);
@@ -795,7 +797,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/compressors`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/compressors`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setCompressors(res.data.compressors || []);
@@ -808,7 +810,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/records`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/records`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setServiceRecords(res.data.records || []);
@@ -825,7 +827,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/compressors`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/compressors`,
         newCompressor,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -849,7 +851,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/compressors/${id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/compressors/${id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       fetchCompressors();
@@ -866,7 +868,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/records`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/records`,
         { ...newService, service_instructor: user?.username || "Unknown" },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -892,7 +894,7 @@ const CompressorServiceDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/compressor-service/${companyId}/records/${id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-service/${companyId}/records/${id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       fetchServiceRecords();
@@ -905,9 +907,12 @@ const CompressorServiceDashboard = () => {
     if (!confirm("Delete this attachment permanently?")) return;
     try {
       const token = localStorage.getItem("token");
-      await axios.delete(`http://localhost:5000/api/attachments/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.delete(
+        `https://coolmanworkshop-production.up.railway.app/api/attachments/${id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       fetchServiceRecords();
     } catch {
       alert("Failed to delete attachment");
@@ -954,45 +959,7 @@ const CompressorServiceDashboard = () => {
 
   return (
     <div className="project-dashboard">
-      {/* Header */}
-      <div className="portal-header">
-        <div className="header-left" onClick={() => navigate("/dashboard")}>
-          <img src={companyLogo} alt="Logo" className="company-logo" />
-          <h1 className="portal-title">
-            <span className="brand-cool">COOL</span>
-            <span className="brand-man">Man</span> Refrigeration
-          </h1>
-        </div>
-        <div className="header-right">
-          <div className="customer-logo-badge-with-icon">
-            <div
-              className="customer-badge-logo"
-              style={{ backgroundColor: getColor(customer.name) }}
-            >
-              {getInitials(customer.name)}
-            </div>
-            <span className="customer-logo-text">{customer.name}</span>
-          </div>
-          {isAdmin && (
-            <button
-              className={`btn-master-pwd ${hasMasterPwd ? "pwd-set" : "pwd-unset"}`}
-              onClick={() => setShowMasterPwd(true)}
-              title={
-                hasMasterPwd
-                  ? "Master download password is set — click to change"
-                  : "No master password set — click to set one"
-              }
-            >
-              {hasMasterPwd ? "🔐 Password Set" : "⚠️ Set Password"}
-            </button>
-          )}
-          <span className="user-icon">👤</span>
-          <span className="username">{user?.username || "User"}</span>
-          <button className="btn-logout" onClick={handleLogout}>
-            Logout
-          </button>
-        </div>
-      </div>
+      <AppHeader />
 
       {/* Main */}
       <div className="project-main-content">
@@ -1011,7 +978,7 @@ const CompressorServiceDashboard = () => {
         </div>
 
         {/* No password warning */}
-        {isAdmin && !hasMasterPwd && (
+        {/* {isAdmin && !hasMasterPwd && (
           <div className="no-pwd-warning">
             ⚠️ No master download password has been set. Users won't be able to
             upload attachments until you set one.
@@ -1022,18 +989,18 @@ const CompressorServiceDashboard = () => {
               Set Password Now
             </button>
           </div>
-        )}
+        )} */}
 
         {/* ── Compressors ── */}
         <div className="project-section">
           <div className="section-header">
             <h3 className="section-title-text">Compressor Details</h3>
-            {/* <button
+            <button
               className="btn-add-small"
               onClick={() => setShowAddCompressor(!showAddCompressor)}
             >
               + Add Compressor
-            </button> */}
+            </button>
           </div>
 
           {showAddCompressor && (
@@ -1143,16 +1110,16 @@ const CompressorServiceDashboard = () => {
                       />
                     </td>
                     {/* <td>{fmtDate(c.created_at)}</td> */}
-                    {isAdmin && (
-                      <td>
-                        <button
-                          className="btn-delete"
-                          onClick={() => handleDeleteCompressor(c.id)}
-                        >
-                          🗑️
-                        </button>
-                      </td>
-                    )}
+                    {isAdmin && <th>Actions</th>} (
+                    <td>
+                      <button
+                        className="btn-delete"
+                        onClick={() => handleDeleteCompressor(c.id)}
+                      >
+                        🗑️
+                      </button>
+                    </td>
+                    )
                   </tr>
                 ))
               )}
@@ -1324,16 +1291,16 @@ const CompressorServiceDashboard = () => {
                           onDeleteAttachment={handleDeleteAttachment}
                         />
                       </td>
-                      {isAdmin && (
-                        <td>
-                          <button
-                            className="btn-delete"
-                            onClick={() => handleDeleteService(rec.id)}
-                          >
-                            🗑️
-                          </button>
-                        </td>
-                      )}
+                      {isAdmin && <th>Actions</th>} (
+                      <td>
+                        <button
+                          className="btn-delete"
+                          onClick={() => handleDeleteService(rec.id)}
+                        >
+                          🗑️
+                        </button>
+                      </td>
+                      )
                     </tr>
                   ))
                 )}
