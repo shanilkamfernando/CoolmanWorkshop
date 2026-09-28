@@ -632,15 +632,6 @@ const MemberUpdateLog = ({
     member.assigned_date,
     member.assigned_time,
   );
-  const completedEntry = [...updates]
-    .reverse()
-    .find(
-      (entry) =>
-        entry.status === "done" && entry.update_note === "Task Completed",
-    );
-  const finishedAt = completedEntry
-    ? fmtLogDateTime(completedEntry.created_at)
-    : null;
   const summaryGroups = [
     [
       ["Assigned By", member.created_by || "—"],
@@ -649,13 +640,6 @@ const MemberUpdateLog = ({
     [
       ["Assigned Date", assignedAt.date],
       ["Assigned Time", assignedAt.time],
-    ],
-    [
-      ["Finished Date", fmtDateDDMMYYYY(member.finish_date)],
-      [
-        "Finished Time",
-        member.status === "done" ? finishedAt?.time || "—" : "—",
-      ],
     ],
   ];
   const thirdParties = (raw: string | null | undefined) =>
@@ -1922,82 +1906,7 @@ const ProjectDashboard = () => {
                             }}
                           >
                             <div className="project-member-detail-grid">
-                              {/* Left: Job Description edit, Due Date edit, Finish Date, Status */}
-                              <div
-                                style={{
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  gap: "16px",
-                                }}
-                              >
-                                {isAdmin && (
-                                  <div>
-                                    <div style={detailLabelStyle}>
-                                      Job Description
-                                    </div>
-                                    {isDone ? (
-                                      <span style={{ fontSize: "14px" }}>
-                                        {member.job_description || "—"}
-                                      </span>
-                                    ) : (
-                                      <textarea
-                                        defaultValue={
-                                          member.job_description || ""
-                                        }
-                                        onBlur={(e) => {
-                                          if (
-                                            e.target.value !==
-                                            (member.job_description || "")
-                                          )
-                                            handleUpdateMember(
-                                              member.id,
-                                              "job_description",
-                                              e.target.value,
-                                            );
-                                        }}
-                                        onClick={(e) => e.stopPropagation()}
-                                        rows={2}
-                                        placeholder="Job description..."
-                                        style={detailTextareaStyle}
-                                      />
-                                    )}
-                                  </div>
-                                )}
-
-                                {isAdmin && (
-                                  <div>
-                                    <div style={detailLabelStyle}>Due Date</div>
-                                    {isDone ? (
-                                      <span style={{ fontSize: "14px" }}>
-                                        {fmtDateDDMMYYYY(member.due_date)}
-                                      </span>
-                                    ) : (
-                                      <input
-                                        type="date"
-                                        value={toDateInput(member.due_date)}
-                                        onChange={(e) =>
-                                          handleUpdateMember(
-                                            member.id,
-                                            "due_date",
-                                            e.target.value,
-                                          )
-                                        }
-                                        onClick={(e) => e.stopPropagation()}
-                                        style={detailInputStyle}
-                                      />
-                                    )}
-                                  </div>
-                                )}
-
-                                <div>
-                                  <div style={detailLabelStyle}>
-                                    Finish Date
-                                  </div>
-                                  <span style={{ fontSize: "14px" }}>
-                                    {fmtDateDDMMYYYY(member.finish_date)}
-                                  </span>
-                                </div>
-
+                              <div className="project-member-status">
                                 <div>
                                   <div style={detailLabelStyle}>Status</div>
                                   {isDone ? (
@@ -2046,18 +1955,48 @@ const ProjectDashboard = () => {
                                   )}
                                 </div>
                               </div>
-
-                              {/* Right: Update Log */}
-                              <div>
-                                <MemberUpdateLog
-                                  customerId={customerId}
-                                  projectId={projectId}
-                                  member={member}
-                                  canEdit={canEditUpdate}
-                                  readOnly={isDone}
-                                  systemUsers={systemUsers}
-                                />
+                              <div className="project-member-description">
+                                <div className="project-member-description-label">
+                                  Description
+                                </div>
+                                {isAdmin && !isDone ? (
+                                  <textarea
+                                    key={`${member.id}-${member.job_description || ""}`}
+                                    defaultValue={member.job_description || ""}
+                                    onBlur={(e) => {
+                                      if (
+                                        e.target.value !==
+                                        (member.job_description || "")
+                                      )
+                                        handleUpdateMember(
+                                          member.id,
+                                          "job_description",
+                                          e.target.value,
+                                        );
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    rows={2}
+                                    placeholder="Job description..."
+                                    style={{
+                                      ...detailTextareaStyle,
+                                      width: "100%",
+                                      boxSizing: "border-box",
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="project-member-description-text">
+                                    {member.job_description || "—"}
+                                  </div>
+                                )}
                               </div>
+                              <MemberUpdateLog
+                                customerId={customerId}
+                                projectId={projectId}
+                                member={member}
+                                canEdit={canEditUpdate}
+                                readOnly={isDone}
+                                systemUsers={systemUsers}
+                              />
                             </div>
 
                             {isAdmin && (
