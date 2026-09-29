@@ -1,15 +1,10 @@
 // ============================================
-
 // Purchasing Routes
-
 // Save as: server/src/routes/purchasing.ts
-
 // ============================================
 
 import { Router, Request, Response } from "express";
-
 import { Pool } from "pg";
-
 import { authenticateToken } from "./auth";
 
 const router = Router();
@@ -17,11 +12,8 @@ const router = Router();
 interface AuthRequest extends Request {
   user?: {
     id: number;
-
     username: string;
-
     role: string;
-
     permissions: { portals: string[] };
   };
 }
@@ -29,17 +21,13 @@ interface AuthRequest extends Request {
 const getPool = (req: Request): Pool => req.app.locals.pool;
 
 // ─── PURCHASING CUSTOMERS & PROJECTS ──────────────────────────────
-
 // GET all purchasing customers
 
 router.get(
   "/purchasing/customers",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
-
     try {
       const result = await pool.query(
         `SELECT c.*,
@@ -47,8 +35,7 @@ router.get(
            activity.latest_activity_at
          FROM purchasing_customers c
          LEFT JOIN LATERAL (
-           SELECT COUNT(*) FILTER (WHERE a.actor_user_id IS DISTINCT FROM $1
-             AND a.created_at > COALESCE(r.last_read_at, '-infinity'::timestamptz)) AS unread_count,
+           SELECT COUNT(*) FILTER (WHERE a.created_at > COALESCE(r.last_read_at, '-infinity'::timestamptz)) AS unread_count,
              MAX(a.created_at) AS latest_activity_at
            FROM purchasing_project_activity a
            LEFT JOIN purchasing_project_reads r
@@ -62,15 +49,12 @@ router.get(
 
       res.json({
         success: true,
-
         customers: result.rows,
       });
     } catch (error) {
       console.error("Get purchasing customers error:", error);
-
       res.status(500).json({
         success: false,
-
         error: "Failed to fetch customers",
       });
     }
@@ -78,49 +62,37 @@ router.get(
 );
 
 // GET single purchasing customer
-
 router.get(
   "/purchasing/customers/:customerId",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
-
     const pool = getPool(req);
 
     try {
       const result = await pool.query(
         `SELECT *
-
          FROM purchasing_customers
-
          WHERE id = $1`,
-
         [customerId],
       );
 
       if (result.rows.length === 0) {
         res.status(404).json({
           success: false,
-
           error: "Customer not found",
         });
-
         return;
       }
 
       res.json({
         success: true,
-
         customer: result.rows[0],
       });
     } catch (error) {
       console.error("Get purchasing customer error:", error);
-
       res.status(500).json({
         success: false,
-
         error: "Failed to fetch customer",
       });
     }
@@ -170,8 +142,7 @@ router.get(
            activity.latest_activity_at
          FROM purchasing_customer_projects p
          LEFT JOIN LATERAL (
-           SELECT COUNT(*) FILTER (WHERE a.actor_user_id IS DISTINCT FROM $2
-             AND a.created_at > COALESCE(r.last_read_at, '-infinity'::timestamptz)) AS unread_count,
+           SELECT COUNT(*) FILTER (WHERE a.created_at > COALESCE(r.last_read_at, '-infinity'::timestamptz)) AS unread_count,
              MAX(a.created_at) AS latest_activity_at
            FROM purchasing_project_activity a
            LEFT JOIN purchasing_project_reads r

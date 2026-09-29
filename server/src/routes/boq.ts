@@ -1,7 +1,5 @@
 import { Router, Request, Response } from "express";
-
 import { Pool } from "pg";
-
 import { authenticateToken } from "./auth";
 
 const router = Router();
@@ -71,19 +69,30 @@ router.use(async (req: AuthRequest, res: Response, next) => {
       }
     }
 
-    res.once("finish", () => {
-      if (res.statusCode < 200 || res.statusCode >= 300) return;
-      void pool
-        .query(
-          `INSERT INTO purchasing_project_activity
-         (customer_id, project_id, actor_user_id, activity_type)
-         VALUES ($1, $2, $3, $4)`,
-          [customerId, projectId, req.user?.id, `${req.method} ${req.path}`],
-        )
-        .catch((error) =>
-          console.error("Purchasing activity record failed:", error),
-        );
-    });
+    // Save the activity before returning success, so list badges are current
+    // even when the user navigates back immediately after the request.
+    const sendJson = res.json.bind(res);
+    res.json = ((body: any) => {
+      if (
+        res.statusCode >= 200 &&
+        res.statusCode < 300 &&
+        body?.success === true
+      ) {
+        void pool
+          .query(
+            `INSERT INTO purchasing_project_activity
+           (customer_id, project_id, actor_user_id, activity_type)
+           VALUES ($1, $2, $3, $4)`,
+            [customerId, projectId, req.user?.id, `${req.method} ${req.path}`],
+          )
+          .catch((error) =>
+            console.error("Purchasing activity record failed:", error),
+          )
+          .finally(() => sendJson(body));
+        return res;
+      }
+      return sendJson(body);
+    }) as typeof res.json;
   } catch (error) {
     console.error("Purchasing activity lookup failed:", error);
   }
