@@ -724,8 +724,8 @@ const MultiMemberSelect = ({
           />
           <div
             className="wl-member-options"
-            role="listbox"
-            aria-multiselectable="true"
+            role="group"
+            aria-label="Third-party members"
           >
             {filtered.length === 0 ? (
               <div className="wl-member-empty">No matching members</div>
@@ -745,7 +745,8 @@ const MultiMemberSelect = ({
                   />
                   <span className="wl-member-identity">
                     <strong>
-                      {u.first_name} {u.last_name}
+                      {`${u.first_name || ""} ${u.last_name || ""}`.trim() ||
+                        u.username}
                     </strong>
                     <small>@{u.username}</small>
                   </span>
