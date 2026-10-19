@@ -97,6 +97,8 @@ const JOB_TYPES: JobTypeOption[] = [
   { value: "quotations", label: "Quotations" },
   { value: "invoices", label: "Invoices" },
   { value: "followup", label: "Follow Up" },
+  { value: "repair_jobs", label: "Repair Jobs" },
+  { value: "sensor_calibrations", label: "Sensor Calibrations" },
   { value: "other", label: "Other" },
 ];
 
@@ -669,6 +671,106 @@ const SearchableSelect = ({
   );
 };
 
+// Searchable multiple-member selector for new task participants.
+const MultiMemberSelect = ({
+  users,
+  value,
+  onChange,
+}: {
+  users: SystemUser[];
+  value: string[];
+  onChange: (users: string[]) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const filtered = users.filter((u) =>
+    `${u.first_name} ${u.last_name} ${u.username}`
+      .toLowerCase()
+      .includes(query.toLowerCase()),
+  );
+  return (
+    <div style={{ position: "relative" }}>
+      <button
+        type="button"
+        className="form-input"
+        onClick={() => setOpen(!open)}
+        style={{ width: "100%", textAlign: "left" }}
+      >
+        {value.length
+          ? `${value.length} member(s) selected`
+          : "Select third-party users..."}{" "}
+        ▾
+      </button>
+      {open && (
+        <div
+          style={{
+            position: "absolute",
+            zIndex: 110,
+            width: "100%",
+            background: "white",
+            border: "1px solid #ddd",
+            borderRadius: 6,
+            boxShadow: "0 8px 20px #0002",
+            padding: 8,
+          }}
+        >
+          <input
+            className="form-input"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search users..."
+            style={{ width: "100%" }}
+          />
+          <div style={{ maxHeight: 170, overflowY: "auto" }}>
+            {filtered.map((u) => (
+              <label
+                key={u.username}
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  padding: 6,
+                  alignItems: "center",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={value.includes(u.username)}
+                  onChange={(e) =>
+                    onChange(
+                      e.target.checked
+                        ? [...value, u.username]
+                        : value.filter((v) => v !== u.username),
+                    )
+                  }
+                />
+                {u.first_name} {u.last_name} (@{u.username})
+              </label>
+            ))}
+          </div>
+          <button type="button" onClick={() => setOpen(false)}>
+            Done
+          </button>
+        </div>
+      )}
+      {value.length > 0 && (
+        <div style={{ fontSize: 12, marginTop: 4 }}>
+          {value.map((v) => (
+            <span key={v} style={{ marginRight: 8 }}>
+              @{v}{" "}
+              <button
+                type="button"
+                onClick={() => onChange(value.filter((x) => x !== v))}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const WorklistTasksDashboard = () => {
   const navigate = useNavigate();
   const { year } = useParams<{ year: string }>();
@@ -690,6 +792,9 @@ const WorklistTasksDashboard = () => {
   const [jobItems, setJobItems] = useState<JobItem[]>([]);
 
   const [showAdd, setShowAdd] = useState(false);
+  const [newThirdParties, setNewThirdParties] = useState<string[]>([]);
+  const [mentionSearch, setMentionSearch] = useState<string | null>(null);
+  const descriptionRef = React.useRef<HTMLTextAreaElement>(null);
   const [form, setForm] = useState({
     customer_id: "",
     customer_name: "",
@@ -821,15 +926,48 @@ const WorklistTasksDashboard = () => {
     }
   };
 
+  const handleDescriptionChange = (value: string, cursor: number) => {
+    setForm((previous) => ({ ...previous, job_description: value }));
+    const beforeCursor = value.slice(0, cursor);
+    const match = beforeCursor.match(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/);
+    setMentionSearch(match ? match[1] : null);
+  };
+
+  const insertMention = (username: string) => {
+    const el = descriptionRef.current;
+    const cursor = el?.selectionStart ?? form.job_description.length;
+    const before = form.job_description.slice(0, cursor);
+    const match = before.match(/(?:^|\s)@([a-zA-Z0-9_.-]*)$/);
+    if (!match) return;
+    const atIndex = cursor - match[1].length - 1;
+    const updated =
+      form.job_description.slice(0, atIndex) +
+      `@${username} ` +
+      form.job_description.slice(cursor);
+    setForm((previous) => ({ ...previous, job_description: updated }));
+    setMentionSearch(null);
+    requestAnimationFrame(() => {
+      el?.focus();
+      const pos = atIndex + username.length + 2;
+      el?.setSelectionRange(pos, pos);
+    });
+  };
+
   const handleAddTask = async () => {
     setSaving(true);
     try {
       await axios.post(
         `${API}/jobAssigned/tasks`,
-        { ...form, year: parseInt(year || "0", 10) },
+        {
+          ...form,
+          year: parseInt(year || "0", 10),
+          third_parties: newThirdParties,
+        },
         { headers: authHeaders() },
       );
       setShowAdd(false);
+      setNewThirdParties([]);
+      setMentionSearch(null);
       setForm({
         customer_id: "",
         customer_name: "",
@@ -2081,20 +2219,78 @@ const WorklistTasksDashboard = () => {
                   </select>
                 </div>
 
+                <div className="form-group">
+                  <label>Third Party (optional)</label>
+                  <MultiMemberSelect
+                    users={systemUsers}
+                    value={newThirdParties}
+                    onChange={setNewThirdParties}
+                  />
+                </div>
+
                 <div className="form-group full-width">
                   <label>Job Description</label>
-                  <textarea
-                    value={form.job_description}
-                    onChange={(e) =>
-                      setForm((f) => ({
-                        ...f,
-                        job_description: e.target.value,
-                      }))
-                    }
-                    className="form-input"
-                    rows={3}
-                    placeholder="Describe the job..."
-                  />
+                  <div style={{ position: "relative" }}>
+                    <textarea
+                      ref={descriptionRef}
+                      value={form.job_description}
+                      onChange={(e) =>
+                        handleDescriptionChange(
+                          e.target.value,
+                          e.target.selectionStart,
+                        )
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") setMentionSearch(null);
+                      }}
+                      className="form-input"
+                      rows={3}
+                      placeholder="Describe the job... Type @ to mention a member"
+                    />
+                    {mentionSearch !== null && (
+                      <div
+                        style={{
+                          position: "absolute",
+                          zIndex: 120,
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          background: "white",
+                          border: "1px solid #ddd",
+                          maxHeight: 190,
+                          overflowY: "auto",
+                          boxShadow: "0 8px 20px #0002",
+                        }}
+                      >
+                        {systemUsers
+                          .filter((u) =>
+                            `${u.first_name} ${u.last_name} ${u.username}`
+                              .toLowerCase()
+                              .includes(mentionSearch.toLowerCase()),
+                          )
+                          .slice(0, 12)
+                          .map((u) => (
+                            <button
+                              type="button"
+                              key={u.username}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => insertMention(u.username)}
+                              style={{
+                                display: "block",
+                                width: "100%",
+                                padding: 9,
+                                textAlign: "left",
+                                border: 0,
+                                background: "white",
+                                cursor: "pointer",
+                              }}
+                            >
+                              {u.first_name} {u.last_name} (@{u.username})
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

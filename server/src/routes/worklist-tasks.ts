@@ -1,15 +1,10 @@
 // ============================================
-
 // Worklist asks Routes
-
 // Save as: server/src/routes/worklist-tasks.ts
-
 // ============================================
 
 import { Router, Request, Response } from "express";
-
 import { Pool } from "pg";
-
 import { authenticateToken } from "./auth";
 
 const router = Router();
@@ -17,31 +12,20 @@ const router = Router();
 interface AuthRequest extends Request {
   user?: {
     id: number;
-
     username: string;
-
     role: string;
-
     permissions: { portals: string[] };
   };
 }
 
 const getPool = (req: Request): Pool => req.app.locals.pool;
-
 // An admin's task assigned to their own account is visible only to that admin.
-
 // The creator's current role is checked against users; no schema change is needed.
-
 const isAdminSelfAssignedSql = `(
-
   t.created_by = t.assigned_member
-
   AND EXISTS (
-
     SELECT 1 FROM users task_creator
-
     WHERE task_creator.username = t.created_by
-
       AND task_creator.role = 'admin'
 
   )
@@ -120,29 +104,17 @@ const canAccessTask = async (
 
   const result = await pool.query(
     `SELECT EXISTS (
-
       SELECT 1 FROM worklist_tasks_v2 t
-
       WHERE t.id = $1
-
         AND (t.assigned_member = $2 OR NOT ${isAdminSelfAssignedSql})
-
         AND (
-
-          $3 = 'all' OR t.assigned_member = $2 OR EXISTS (
-
+          $3 = 'all' OR t.assigned_member = $2 OR EXISTS (SELECT 1 FROM worklist_task_participants p WHERE p.task_id = t.id AND p.username = $2) OR EXISTS (
             SELECT 1 FROM worklist_task_updates u
-
             WHERE u.task_id = t.id
-
               AND $2 = ANY(string_to_array(replace(COALESCE(u.third_party, ''), ' ', ''), ','))
-
           )
-
         )
-
     ) AS allowed`,
-
     [taskId, access.username, access.scope],
   );
 
@@ -150,19 +122,15 @@ const canAccessTask = async (
 };
 
 // Valid status values — keep in sync with frontend STATUS_OPTIONS
-
 const VALID_STATUSES = ["todo", "in_progress", "on_hold", "permission", "done"];
 
 // ─── DROPDOWN DATA ────────────────────────────────────────────────
 
 router.get(
   "/worklist/dropdown/customers",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
-
     try {
       const result = await pool.query(
         "SELECT id, name FROM customers ORDER BY name ASC",
@@ -171,9 +139,7 @@ router.get(
       res.json({ success: true, customers: result.rows });
     } catch (error) {
       res
-
         .status(500)
-
         .json({ success: false, error: "Failed to fetch customers" });
     }
   },
@@ -181,12 +147,9 @@ router.get(
 
 router.get(
   "/worklist/dropdown/customers/:customerId/projects",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
-
     const pool = getPool(req);
 
     try {
@@ -199,9 +162,7 @@ router.get(
       res.json({ success: true, projects: result.rows });
     } catch (error) {
       res
-
         .status(500)
-
         .json({ success: false, error: "Failed to fetch projects" });
     }
   },
@@ -209,12 +170,9 @@ router.get(
 
 router.get(
   "/worklist/dropdown/customers/:customerId/compressor-service",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
-
     const pool = getPool(req);
 
     try {
@@ -233,12 +191,9 @@ router.get(
 
 router.get(
   "/worklist/dropdown/customers/:customerId/compressor-repair",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
-
     const pool = getPool(req);
 
     try {
@@ -257,12 +212,9 @@ router.get(
 
 router.get(
   "/worklist/dropdown/customers/:customerId/system-repair",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
-
     const pool = getPool(req);
 
     try {
@@ -281,12 +233,9 @@ router.get(
 
 router.get(
   "/worklist/dropdown/customers/:customerId/system-inspection",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { customerId } = req.params;
-
     const pool = getPool(req);
 
     try {
@@ -305,9 +254,7 @@ router.get(
 
 router.get(
   "/worklist/dropdown/users",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
 
@@ -324,159 +271,58 @@ router.get(
 );
 
 // ─── TASKS CRUD ───────────────────────────────────────────────────
-
 // GET tasks for specific year
-
 // Also computes has_third_party (for the red-arrow indicator) and
-
 // third_party_names (so search can match a third-party assignee's name)
-
 // by aggregating across that task's update log rows.
 
 router.get(
   "/jobAssigned/tasks/:year",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { year } = req.params;
-
     const pool = getPool(req);
 
     try {
       const access = await getJobAccess(req, pool);
-
       if (access.scope === "none") {
         res
-
           .status(403)
-
           .json({ success: false, error: "Job Assigned access required" });
-
         return;
       }
 
       const result = await pool.query(
         `SELECT t.*,
-
-
-
-          EXISTS (
-
-
-
-            SELECT 1 FROM worklist_task_updates u
-
-
-
-            WHERE u.task_id = t.id
-
-
-
-              AND u.third_party IS NOT NULL
-
-
-
-              AND u.third_party <> ''
-
-
-
-          ) AS has_third_party,
-
-
-
-          (
-
-
-
-            SELECT STRING_AGG(DISTINCT u.third_party, ', ')
-
-
-
-            FROM worklist_task_updates u
-
-
-
-            WHERE u.task_id = t.id
-
-
-
-              AND u.third_party IS NOT NULL
-
-
-
-              AND u.third_party <> ''
-
-
-
+          (EXISTS (SELECT 1 FROM worklist_task_participants p WHERE p.task_id = t.id) OR EXISTS (SELECT 1 FROM worklist_task_updates u WHERE u.task_id = t.id AND COALESCE(u.third_party, '') <> '')) AS has_third_party,
+          (SELECT STRING_AGG(DISTINCT names.username, ', ')
+           FROM (SELECT p.username FROM worklist_task_participants p WHERE p.task_id = t.id
+                 UNION ALL
+                 SELECT trim(x.username) FROM worklist_task_updates u
+                 CROSS JOIN LATERAL unnest(string_to_array(u.third_party, ',')) AS x(username)
+                 WHERE u.task_id = t.id AND u.third_party IS NOT NULL) names
           ) AS third_party_names,
-
-
-
-          (t.assigned_member = $2 OR EXISTS (
-
-
-
+          (t.assigned_member = $2 OR EXISTS (SELECT 1 FROM worklist_task_participants p WHERE p.task_id = t.id AND p.username = $2) OR EXISTS (
             SELECT 1 FROM worklist_task_updates own_update
-
-
-
             WHERE own_update.task_id = t.id
-
-
-
               AND $2 = ANY(string_to_array(replace(COALESCE(own_update.third_party, ''), ' ', ''), ','))
-
-
-
           )) AS is_my_task
-
-
-
         FROM worklist_tasks_v2 t
-
-
-
         WHERE t.year = $1
-
-
-
           AND (t.assigned_member = $2 OR NOT ${isAdminSelfAssignedSql})
-
-
-
-          AND ($3 = 'all' OR t.assigned_member = $2 OR EXISTS (
-
-
-
+          AND ($3 = 'all' OR t.assigned_member = $2 OR EXISTS (SELECT 1 FROM worklist_task_participants p WHERE p.task_id = t.id AND p.username = $2) OR EXISTS (
             SELECT 1 FROM worklist_task_updates own_update
-
-
-
             WHERE own_update.task_id = t.id
-
-
-
               AND $2 = ANY(string_to_array(replace(COALESCE(own_update.third_party, ''), ' ', ''), ','))
-
-
-
           ))
-
-
-
         ORDER BY t.task_no ASC`,
-
         [year, access.username, access.scope],
       );
 
       res.json({
         success: true,
-
         tasks: result.rows,
-
         accessScope: access.scope,
-
         canCreateTasks: access.canCreateTasks,
       });
     } catch (error) {
@@ -489,22 +335,16 @@ router.get(
 
 router.get(
   "/myTasks/tasks/:year",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { year } = req.params;
-
     const pool = getPool(req);
-
     try {
       const access = await getJobAccess(req, pool);
 
       if (access.scope === "none") {
         res
-
           .status(403)
-
           .json({ success: false, error: "My Tasks access required" });
 
         return;
@@ -514,123 +354,30 @@ router.get(
 
       const result = await pool.query(
         `SELECT t.*,
-
-
-
-          EXISTS (
-
-
-
-            SELECT 1
-
-
-
-            FROM worklist_task_updates u
-
-
-
-            WHERE u.task_id = t.id
-
-
-
-              AND u.third_party IS NOT NULL
-
-
-
-              AND u.third_party <> ''
-
-
-
-          ) AS has_third_party,
-
-
-
-          (
-
-
-
-            SELECT STRING_AGG(DISTINCT u.third_party, ', ')
-
-
-
-            FROM worklist_task_updates u
-
-
-
-            WHERE u.task_id = t.id
-
-
-
-              AND u.third_party IS NOT NULL
-
-
-
-              AND u.third_party <> ''
-
-
-
+          (EXISTS (SELECT 1 FROM worklist_task_participants p WHERE p.task_id = t.id) OR EXISTS (SELECT 1 FROM worklist_task_updates u WHERE u.task_id = t.id AND COALESCE(u.third_party, '') <> '')) AS has_third_party,
+          (SELECT STRING_AGG(DISTINCT names.username, ', ')
+           FROM (SELECT p.username FROM worklist_task_participants p WHERE p.task_id = t.id
+                 UNION ALL
+                 SELECT trim(x.username) FROM worklist_task_updates u
+                 CROSS JOIN LATERAL unnest(string_to_array(u.third_party, ',')) AS x(username)
+                 WHERE u.task_id = t.id AND u.third_party IS NOT NULL) names
           ) AS third_party_names,
-
-
-
           -- true when this task is only in the list because I was
-
-
-
           -- tagged as a third party on an update row, not directly assigned
-
-
-
           (t.assigned_member IS DISTINCT FROM $2) AS is_third_party_assignment
-
-
-
         FROM worklist_tasks_v2 t
-
-
-
         WHERE t.year = $1
-
-
-
           AND (t.assigned_member = $2 OR NOT ${isAdminSelfAssignedSql})
-
-
-
           AND (
-
-
-
             t.assigned_member = $2
-
-
-
+            OR EXISTS (SELECT 1 FROM worklist_task_participants p WHERE p.task_id = t.id AND p.username = $2)
             OR EXISTS (
-
-
-
               SELECT 1 FROM worklist_task_updates u
-
-
-
               WHERE u.task_id = t.id
-
-
-
                 AND $2 = ANY(string_to_array(replace(COALESCE(u.third_party, ''), ' ', ''), ','))
-
-
-
             )
-
-
-
           )
-
-
-
         ORDER BY t.task_no ASC`,
-
         [year, username],
       );
 
@@ -671,24 +418,16 @@ router.post(
 
     const {
       year,
-
       customer_id,
-
       customer_name,
-
       job_type,
-
       job_reference_id,
-
       job_reference_name,
-
       assigned_member,
-
       job_description,
-
       due_date,
-
       status,
+      third_parties,
     } = req.body;
 
     if (!year) {
@@ -698,6 +437,43 @@ router.post(
     }
 
     try {
+      if (
+        third_parties !== undefined &&
+        (!Array.isArray(third_parties) ||
+          third_parties.some((x: unknown) => typeof x !== "string"))
+      ) {
+        res
+          .status(400)
+          .json({ success: false, error: "Invalid third-party users" });
+        return;
+      }
+      const requestedThirdParties: string[] = third_parties || [];
+      const mentionCandidates = [
+        ...String(job_description || "").matchAll(/(^|\s)@([a-zA-Z0-9_.-]+)/g),
+      ].map((m: RegExpMatchArray) => m[2]);
+      const requested = [
+        ...new Set([...requestedThirdParties, ...mentionCandidates]),
+      ];
+      const validUsers = requested.length
+        ? await pool.query(
+            "SELECT username FROM users WHERE is_active = true AND username = ANY($1::text[])",
+            [requested],
+          )
+        : { rows: [] };
+      const validSet = new Set(
+        validUsers.rows.map((row: { username: string }) => row.username),
+      );
+      const invalidThirdParties = requestedThirdParties.filter(
+        (name) => !validSet.has(name),
+      );
+      if (invalidThirdParties.length) {
+        res.status(400).json({
+          success: false,
+          error: `Unknown or inactive third-party users: ${invalidThirdParties.join(", ")}`,
+        });
+        return;
+      }
+
       // Auto-increment task_no per year
 
       const maxNoResult = await pool.query(
@@ -761,6 +537,18 @@ router.post(
       );
 
       const newTask = result.rows[0];
+
+      for (const username of requested) {
+        if (!validSet.has(username)) continue;
+        const source = requestedThirdParties.includes(username)
+          ? "third_party"
+          : "mention";
+        await pool.query(
+          `INSERT INTO worklist_task_participants (task_id, username, source)
+                          VALUES ($1, $2, $3) ON CONFLICT (task_id, username) DO UPDATE SET source = EXCLUDED.source`,
+          [newTask.id, username, source],
+        );
+      }
 
       // ── Sync to project_assigned_members if job_type is "project" ──
 
