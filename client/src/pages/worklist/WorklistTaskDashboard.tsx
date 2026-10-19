@@ -671,7 +671,7 @@ const SearchableSelect = ({
   );
 };
 
-// Searchable multiple-member selector for new task participants.
+// Dropdown matches the existing form controls; selections remain inside the field.
 const MultiMemberSelect = ({
   users,
   value,
@@ -683,83 +683,100 @@ const MultiMemberSelect = ({
 }) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [open]);
   const filtered = users.filter((u) =>
     `${u.first_name} ${u.last_name} ${u.username}`
       .toLowerCase()
       .includes(query.toLowerCase()),
   );
   return (
-    <div style={{ position: "relative" }}>
+    <div className="wl-member-select" ref={rootRef}>
       <button
         type="button"
-        className="form-input"
-        onClick={() => setOpen(!open)}
-        style={{ width: "100%", textAlign: "left" }}
+        className={`form-input wl-member-trigger ${open ? "is-open" : ""}`}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => setOpen((v) => !v)}
       >
-        {value.length
-          ? `${value.length} member(s) selected`
-          : "Select third-party users..."}{" "}
-        ▾
+        <span className="wl-member-trigger-text">
+          {value.length
+            ? `${value.length} member${value.length === 1 ? "" : "s"} selected`
+            : "Select third-party users..."}
+        </span>
+        <span aria-hidden="true">▾</span>
       </button>
       {open && (
-        <div
-          style={{
-            position: "absolute",
-            zIndex: 110,
-            width: "100%",
-            background: "white",
-            border: "1px solid #ddd",
-            borderRadius: 6,
-            boxShadow: "0 8px 20px #0002",
-            padding: 8,
-          }}
-        >
+        <div className="wl-member-menu">
           <input
-            className="form-input"
+            autoFocus
+            className="form-input wl-member-search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search users..."
-            style={{ width: "100%" }}
+            placeholder="Search by name or username..."
           />
-          <div style={{ maxHeight: 170, overflowY: "auto" }}>
-            {filtered.map((u) => (
-              <label
-                key={u.username}
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  padding: 6,
-                  alignItems: "center",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={value.includes(u.username)}
-                  onChange={(e) =>
-                    onChange(
-                      e.target.checked
-                        ? [...value, u.username]
-                        : value.filter((v) => v !== u.username),
-                    )
-                  }
-                />
-                {u.first_name} {u.last_name} (@{u.username})
-              </label>
-            ))}
+          <div
+            className="wl-member-options"
+            role="listbox"
+            aria-multiselectable="true"
+          >
+            {filtered.length === 0 ? (
+              <div className="wl-member-empty">No matching members</div>
+            ) : (
+              filtered.map((u) => (
+                <label className="wl-member-option" key={u.username}>
+                  <input
+                    type="checkbox"
+                    checked={value.includes(u.username)}
+                    onChange={(e) =>
+                      onChange(
+                        e.target.checked
+                          ? [...value, u.username]
+                          : value.filter((v) => v !== u.username),
+                      )
+                    }
+                  />
+                  <span className="wl-member-identity">
+                    <strong>
+                      {u.first_name} {u.last_name}
+                    </strong>
+                    <small>@{u.username}</small>
+                  </span>
+                </label>
+              ))
+            )}
           </div>
-          <button type="button" onClick={() => setOpen(false)}>
-            Done
-          </button>
+          <div className="wl-member-menu-footer">
+            <span>{value.length} selected</span>
+            <button
+              type="button"
+              className="wl-member-done"
+              onClick={() => {
+                setOpen(false);
+                setQuery("");
+              }}
+            >
+              Done
+            </button>
+          </div>
         </div>
       )}
       {value.length > 0 && (
-        <div style={{ fontSize: 12, marginTop: 4 }}>
-          {value.map((v) => (
-            <span key={v} style={{ marginRight: 8 }}>
-              @{v}{" "}
+        <div className="wl-selected-members">
+          {value.map((username) => (
+            <span className="wl-selected-chip" key={username}>
+              @{username}
               <button
                 type="button"
-                onClick={() => onChange(value.filter((x) => x !== v))}
+                aria-label={`Remove ${username}`}
+                onClick={() => onChange(value.filter((v) => v !== username))}
               >
                 ×
               </button>
@@ -768,6 +785,30 @@ const MultiMemberSelect = ({
         </div>
       )}
     </div>
+  );
+};
+
+// Only real usernames are highlighted; escaping is handled by React text nodes.
+const HighlightedDescription = ({
+  text,
+  users,
+}: {
+  text: string;
+  users: SystemUser[];
+}) => {
+  const valid = new Set(users.map((u) => u.username.toLowerCase()));
+  return (
+    <>
+      {text.split(/(@[a-zA-Z0-9_.-]+)/g).map((part, i) =>
+        part.startsWith("@") && valid.has(part.slice(1).toLowerCase()) ? (
+          <mark className="wl-mention" key={i}>
+            {part}
+          </mark>
+        ) : (
+          <React.Fragment key={i}>{part}</React.Fragment>
+        ),
+      )}
+    </>
   );
 };
 
@@ -1872,7 +1913,10 @@ const WorklistTasksDashboard = () => {
                                       >
                                         Description
                                       </span>
-                                      {task.job_description}
+                                      <HighlightedDescription
+                                        text={task.job_description || ""}
+                                        users={systemUsers}
+                                      />
                                     </div>
                                   )}
                                   <TaskUpdateLog
@@ -2230,38 +2274,61 @@ const WorklistTasksDashboard = () => {
 
                 <div className="form-group full-width">
                   <label>Job Description</label>
-                  <div style={{ position: "relative" }}>
-                    <textarea
-                      ref={descriptionRef}
-                      value={form.job_description}
-                      onChange={(e) =>
-                        handleDescriptionChange(
-                          e.target.value,
-                          e.target.selectionStart,
-                        )
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Escape") setMentionSearch(null);
-                      }}
-                      className="form-input"
-                      rows={3}
-                      placeholder="Describe the job... Type @ to mention a member"
-                    />
-                    {mentionSearch !== null && (
+                  <div className="wl-description-wrap">
+                    <div className="wl-description-editor">
                       <div
-                        style={{
-                          position: "absolute",
-                          zIndex: 120,
-                          top: "100%",
-                          left: 0,
-                          right: 0,
-                          background: "white",
-                          border: "1px solid #ddd",
-                          maxHeight: 190,
-                          overflowY: "auto",
-                          boxShadow: "0 8px 20px #0002",
-                        }}
+                        className="wl-description-highlight"
+                        aria-hidden="true"
                       >
+                        <HighlightedDescription
+                          text={form.job_description}
+                          users={systemUsers}
+                        />
+                        {form.job_description.endsWith("\n") ? " " : null}
+                      </div>
+                      <textarea
+                        ref={descriptionRef}
+                        value={form.job_description}
+                        onChange={(e) =>
+                          handleDescriptionChange(
+                            e.target.value,
+                            e.target.selectionStart,
+                          )
+                        }
+                        onClick={(e) =>
+                          handleDescriptionChange(
+                            e.currentTarget.value,
+                            e.currentTarget.selectionStart,
+                          )
+                        }
+                        onKeyUp={(e) => {
+                          if (e.key !== "Escape")
+                            handleDescriptionChange(
+                              e.currentTarget.value,
+                              e.currentTarget.selectionStart,
+                            );
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") setMentionSearch(null);
+                        }}
+                        onScroll={(e) => {
+                          const mirror = e.currentTarget
+                            .previousElementSibling as HTMLElement | null;
+                          if (mirror) {
+                            mirror.scrollTop = e.currentTarget.scrollTop;
+                            mirror.scrollLeft = e.currentTarget.scrollLeft;
+                          }
+                        }}
+                        className="form-input wl-description-textarea"
+                        rows={3}
+                        placeholder="Describe the job... Type @ to mention a member"
+                      />
+                    </div>
+                    {mentionSearch !== null && (
+                      <div className="wl-mention-menu">
+                        <div className="wl-mention-menu-title">
+                          Mention a team member
+                        </div>
                         {systemUsers
                           .filter((u) =>
                             `${u.first_name} ${u.last_name} ${u.username}`
@@ -2272,20 +2339,15 @@ const WorklistTasksDashboard = () => {
                           .map((u) => (
                             <button
                               type="button"
+                              className="wl-mention-option"
                               key={u.username}
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => insertMention(u.username)}
-                              style={{
-                                display: "block",
-                                width: "100%",
-                                padding: 9,
-                                textAlign: "left",
-                                border: 0,
-                                background: "white",
-                                cursor: "pointer",
-                              }}
                             >
-                              {u.first_name} {u.last_name} (@{u.username})
+                              <strong>
+                                {u.first_name} {u.last_name}
+                              </strong>
+                              <small>@{u.username}</small>
                             </button>
                           ))}
                       </div>
