@@ -249,32 +249,152 @@ const EntryFlowPanel = ({
     if (tab === 1) {
       if (entry.approved) {
         return (
-          <div>
-            <div style={{ color: "#059669", fontWeight: 600 }}>
-              ✓ Approved by {entry.approved_by} on {fmtDT(entry.approved_at)}
-            </div>
-
-            <div style={{ marginTop: "8px" }}>
-              <span style={labelStyle}>Approved Qty</span>
-              {renderEntryQty(entry)}
-            </div>
-
-            {entry.remark && (
-              <div style={{ marginTop: "8px" }}>
-                <span style={labelStyle}>Remark</span>
+          <div
+            style={{
+              background: "#ffffff",
+              border: "1px solid #d1fae5",
+              borderRadius: "12px",
+              padding: "18px",
+              maxWidth: "900px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                flexWrap: "wrap",
+                paddingBottom: "16px",
+                borderBottom: "1px solid #e5e7eb",
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "38px",
+                  height: "38px",
+                  borderRadius: "50%",
+                  background: "#dcfce7",
+                  color: "#15803d",
+                  fontWeight: 800,
+                  fontSize: "20px",
+                }}
+              >
+                ✓
+              </span>
+              <div style={{ flex: "1 1 180px" }}>
                 <div
                   style={{
-                    marginTop: "4px",
-                    padding: "8px",
-                    background: "#f9fafb",
-                    border: "1px solid #e5e7eb",
-                    borderRadius: "6px",
+                    fontWeight: 700,
+                    fontSize: "15px",
+                    color: "#166534",
                   }}
                 >
-                  {entry.remark}
+                  Purchase request approved
+                </div>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#64748b",
+                    marginTop: "3px",
+                  }}
+                >
+                  Approved by{" "}
+                  <strong style={{ color: "#334155" }}>
+                    {entry.approved_by || "—"}
+                  </strong>
+                  {entry.approved_at ? ` · ${fmtDT(entry.approved_at)}` : ""}
                 </div>
               </div>
-            )}
+              <span
+                style={{
+                  borderRadius: "999px",
+                  padding: "5px 11px",
+                  background: "#dcfce7",
+                  color: "#166534",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                }}
+              >
+                Approved
+              </span>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
+                gap: "12px",
+                marginTop: "16px",
+              }}
+            >
+              <div
+                style={{
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "9px",
+                  padding: "13px 15px",
+                }}
+              >
+                <div style={{ ...labelStyle, marginBottom: "8px" }}>
+                  Approved quantity
+                </div>
+                <div
+                  style={{
+                    fontSize: "21px",
+                    fontWeight: 750,
+                    color: "#0f172a",
+                  }}
+                >
+                  {fmtQty(entry.approved_quantity ?? entry.required_quantity)}
+                </div>
+              </div>
+              <div
+                style={{
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "9px",
+                  padding: "13px 15px",
+                }}
+              >
+                <div style={{ ...labelStyle, marginBottom: "8px" }}>
+                  Requested quantity
+                </div>
+                <div
+                  style={{
+                    fontSize: "21px",
+                    fontWeight: 700,
+                    color: "#475569",
+                  }}
+                >
+                  {fmtQty(entry.required_quantity)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: "16px" }}>
+              <div style={{ ...labelStyle, marginBottom: "8px" }}>
+                Approval remarks
+              </div>
+              <div
+                style={{
+                  padding: "13px 15px",
+                  borderRadius: "9px",
+                  background: "#f8fafc",
+                  border: "1px solid #e2e8f0",
+                  color: entry.remark?.trim() ? "#334155" : "#94a3b8",
+                  fontSize: "13px",
+                  lineHeight: 1.6,
+                  whiteSpace: "pre-wrap",
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {entry.remark?.trim() || "No remarks added during approval."}
+              </div>
+            </div>
           </div>
         );
       }
