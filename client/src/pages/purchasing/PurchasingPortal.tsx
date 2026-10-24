@@ -6,7 +6,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./PurchasingPortal.css";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -52,6 +53,18 @@ const PurchasingPortal = () => {
       path: "/purchasing/customer-list",
       color: "#2196F3",
     },
+    // ...(user?.role === "admin" || user?.role === "data_entry"
+    //   ? [
+    //       {
+    //         id: 3,
+    //         title: "BOQ",
+    //         description: "Bill of Quantities data entry",
+    //         icon: "📊",
+    //         path: "/purchasing/boq",
+    //         color: "#0891b2",
+    //       },
+    //     ]
+    //   : []),
   ];
 
   const handlePortalClick = (path: string) => {
@@ -65,7 +78,7 @@ const PurchasingPortal = () => {
   return (
     <div className="purchasing-portal">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div className="logo-container" onClick={handleBackToDashboard}>
             <img
@@ -83,7 +96,8 @@ const PurchasingPortal = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       {/* Main Content */}
       <div className="main-content">

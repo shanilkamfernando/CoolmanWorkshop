@@ -7,7 +7,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./ProjectDashboard.css";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -131,7 +132,7 @@ const JobCardDetail = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/jobcards/${jobCardId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/jobcards/${jobCardId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       const { jobcard, items: its, labor: lab, grn: g, dispatch: d } = res.data;
@@ -236,7 +237,7 @@ const JobCardDetail = () => {
       const token = localStorage.getItem("token");
       if (isNew) {
         const res = await axios.post(
-          `http://localhost:5000/api/customers/${customerId}/jobcards`,
+          `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/jobcards`,
           main,
           { headers: { Authorization: `Bearer ${token}` } },
         );
@@ -248,7 +249,7 @@ const JobCardDetail = () => {
         setJobCardNumber(res.data.jobcard.job_card_number);
       } else {
         await axios.put(
-          `http://localhost:5000/api/customers/${customerId}/jobcards/${jobCardId}`,
+          `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/jobcards/${jobCardId}`,
           main,
           { headers: { Authorization: `Bearer ${token}` } },
         );
@@ -271,7 +272,7 @@ const JobCardDetail = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/jobcards/${jobCardId}/items`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/jobcards/${jobCardId}/items`,
         { items: filled },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -293,7 +294,7 @@ const JobCardDetail = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/jobcards/${jobCardId}/labor`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/jobcards/${jobCardId}/labor`,
         { labor: filled },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -310,7 +311,7 @@ const JobCardDetail = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/jobcards/${jobCardId}/grn`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/jobcards/${jobCardId}/grn`,
         grn,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -327,7 +328,7 @@ const JobCardDetail = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/jobcards/${jobCardId}/dispatch`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/jobcards/${jobCardId}/dispatch`,
         dispatch,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -473,7 +474,7 @@ const JobCardDetail = () => {
   return (
     <div className="project-dashboard">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div
             className="logo-container"
@@ -499,7 +500,8 @@ const JobCardDetail = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       <div className="project-main-content">
         <div className="project-header-row">
