@@ -25,6 +25,8 @@ interface PurchasingCustomer {
   address: string;
   created_by: string;
   created_at: string;
+  unread_count?: number;
+  latest_activity_at?: string | null;
 }
 
 const getInitials = (name: string) => {
@@ -52,7 +54,7 @@ const getColor = (name: string) => {
   return colors[Math.abs(h) % colors.length];
 };
 
-const PurchasingCustomerPortal = () => {
+const PurchasingCustomerList = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [customers, setCustomers] = useState<PurchasingCustomer[]>([]);
@@ -76,14 +78,20 @@ const PurchasingCustomerPortal = () => {
     const u = localStorage.getItem("user");
     if (u) setUser(JSON.parse(u));
     fetchCustomers();
+    const timer = window.setInterval(() => fetchCustomers(false), 30000);
+    const onFocus = () => fetchCustomers(false);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+    };
   }, []);
 
-  const fetchCustomers = async () => {
-    setLoading(true);
+  const fetchCustomers = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const res = await axios.get(
-        "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
-        // "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers",
         { headers: headers() },
       );
       setCustomers(res.data.customers || []);
@@ -102,7 +110,7 @@ const PurchasingCustomerPortal = () => {
     setSaving(true);
     try {
       await axios.post(
-        "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers",
         // "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers",
         {
           name: newName.trim(),
@@ -128,7 +136,7 @@ const PurchasingCustomerPortal = () => {
   const handleDelete = async (customer: PurchasingCustomer) => {
     try {
       await axios.delete(
-        `https://coolmanworkshop-production.up.railway.app/api/workshop/customers/${customer.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/purchasing/customers/${customer.id}`,
         // `https://coolmanworkshop-production.up.railway.app/api/purchasing/customers/${customer.id}`,
         { headers: headers() },
       );
@@ -184,24 +192,19 @@ const PurchasingCustomerPortal = () => {
         {/* Page header */}
         <div className="project-header-row">
           <div>
-            <h2 style={{ margin: 0 }}>Workshop Customers</h2>
+            <h2 style={{ margin: 0 }}>Customers</h2>
             <p style={{ color: "#888", fontSize: "0.9rem", marginTop: "4px" }}>
               {filtered.length} customer{filtered.length !== 1 ? "s" : ""} ·
               Select a customer to view operations
             </p>
           </div>
           <div style={{ display: "flex", gap: "10px" }}>
-            {isAdmin && (
-              <button
-                className="btn-add-small"
-                onClick={() => setShowAdd(true)}
-              >
-                + Add Customer
-              </button>
-            )}
+            <button className="btn-add-small" onClick={() => setShowAdd(true)}>
+              + Add Customer
+            </button>
             <button
               className="btn-back"
-              onClick={() => navigate("/purchasing/workshop")}
+              onClick={() => navigate("/purchasing")}
             >
               ← Back
             </button>
@@ -401,14 +404,48 @@ const PurchasingCustomerPortal = () => {
                       "0 2px 6px rgba(0,0,0,0.05)";
                   }}
                   onClick={() =>
-                    navigate(
-                      `/purchasing/workshop/customers/${customer.id}/dashboard`,
-                      {
-                        state: { customer },
+                    navigate(`/purchasing/customers/${customer.id}/projects`, {
+                      state: {
+                        customer: { id: customer.id, name: customer.name },
                       },
-                    )
+                    })
                   }
+                  // onClick={() =>
+                  //   navigate(`/purchasing/customers/${customer.id}/dashboard`, {
+                  //     state: {
+                  //       customer: { id: customer.id, name: customer.name },
+                  //       // workshopCustomerId: customer.workshop_customer_id, // ← add this
+                  //     },
+                  //   })
+                  // }
                 >
+                  {Number(customer.unread_count || 0) > 0 && (
+                    <span
+                      title={`${customer.unread_count} unread project updates`}
+                      aria-label={`${customer.unread_count} unread project updates`}
+                      style={{
+                        position: "absolute",
+                        top: "12px",
+                        right: isAdmin ? "48px" : "12px",
+                        minWidth: "23px",
+                        height: "23px",
+                        padding: "0 6px",
+                        borderRadius: "999px",
+                        background: "#dc2626",
+                        color: "white",
+                        fontSize: "12px",
+                        fontWeight: 700,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      {Number(customer.unread_count) > 99
+                        ? "99+"
+                        : customer.unread_count}
+                    </span>
+                  )}
                   {isAdmin && (
                     <button
                       onClick={(e) => {
@@ -582,4 +619,4 @@ const PurchasingCustomerPortal = () => {
   );
 };
 
-export default PurchasingCustomerPortal;
+export default PurchasingCustomerList;

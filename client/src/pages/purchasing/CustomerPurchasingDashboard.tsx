@@ -660,6 +660,70 @@ const CustomerPurchasingDashboard = () => {
 
   const token = () => localStorage.getItem("token");
   const hdr = () => ({ Authorization: `Bearer ${token()}` });
+
+  // Keep the selected project across refreshes without mixing customers.
+  const projectStorageKey = `purchasing:selected-project:${customerId}`;
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(
+    () => {
+      const fromNavigation = Number(location.state?.project?.id);
+      if (Number.isSafeInteger(fromNavigation) && fromNavigation > 0)
+        return fromNavigation;
+      const fromSession = Number(
+        sessionStorage.getItem(`purchasing:selected-project:${customerId}`),
+      );
+      return Number.isSafeInteger(fromSession) && fromSession > 0
+        ? fromSession
+        : null;
+    },
+  );
+
+  useEffect(() => {
+    const fromNavigation = Number(location.state?.project?.id);
+    if (Number.isSafeInteger(fromNavigation) && fromNavigation > 0) {
+      sessionStorage.setItem(projectStorageKey, String(fromNavigation));
+      setSelectedProjectId(fromNavigation);
+      return;
+    }
+    // If navigation state was lost, validate the stored project against the server.
+    let cancelled = false;
+    axios
+      .get(`${API_BASE}/purchasing/customers/${customerId}/projects`, {
+        headers: hdr(),
+      })
+      .then(({ data }) => {
+        if (cancelled) return;
+        const available = data?.projects || [];
+        const stored = Number(sessionStorage.getItem(projectStorageKey));
+        const matching = available.find(
+          (p: { id: number }) => Number(p.id) === stored,
+        );
+        const resolved =
+          matching || (available.length === 1 ? available[0] : null);
+        if (resolved) {
+          sessionStorage.setItem(projectStorageKey, String(resolved.id));
+          setSelectedProjectId(Number(resolved.id));
+        } else {
+          sessionStorage.removeItem(projectStorageKey);
+          setSelectedProjectId(null);
+        }
+      })
+      .catch((error) =>
+        console.error("Unable to resolve Purchasing project:", error),
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, [customerId, location.state?.project?.id]);
+
+  // All write operations use this helper; never save silently without a project.
+  const writeHdr = () => {
+    if (!selectedProjectId || !Number.isSafeInteger(selectedProjectId)) {
+      throw new Error(
+        "No Purchasing project selected. Return to the customer projects page and open the correct project before saving.",
+      );
+    }
+    return { ...hdr(), "X-Purchasing-Project-Id": String(selectedProjectId) };
+  };
   const BASE = `${API_BASE}/boq/customer/${customerId}/entries`;
 
   const isAdmin = user?.role === "admin";
@@ -740,7 +804,7 @@ const CustomerPurchasingDashboard = () => {
       await axios.post(
         BASE,
         { ...boqForm, entry_type: "boq" },
-        { headers: hdr() },
+        { headers: writeHdr() },
       );
       setBOQForm({
         boq_item_id: "",
@@ -757,7 +821,7 @@ const CustomerPurchasingDashboard = () => {
       fetchEntries();
       fetchBOQItems();
     } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to add");
+      alert(err.response?.data?.error || err.message || "Failed to add");
     } finally {
       setSaving(false);
     }
@@ -774,7 +838,7 @@ const CustomerPurchasingDashboard = () => {
       await axios.post(
         BASE,
         { ...nonBOQForm, entry_type: "non_boq" },
-        { headers: hdr() },
+        { headers: writeHdr() },
       );
       setNonBOQForm({
         product: "",
@@ -787,7 +851,7 @@ const CustomerPurchasingDashboard = () => {
       setShowNonBOQForm(false);
       fetchEntries();
     } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to add");
+      alert(err.response?.data?.error || err.message || "Failed to add");
     } finally {
       setSaving(false);
     }
@@ -796,11 +860,11 @@ const CustomerPurchasingDashboard = () => {
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this entry?")) return;
     try {
-      await axios.delete(`${BASE}/${id}`, { headers: hdr() });
+      await axios.delete(`${BASE}/${id}`, { headers: writeHdr() });
       fetchEntries();
       fetchBOQItems();
     } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to delete");
+      alert(err.response?.data?.error || err.message || "Failed to delete");
     }
   };
 
@@ -811,13 +875,13 @@ const CustomerPurchasingDashboard = () => {
   ) => {
     try {
       const r = await axios.put(`${BASE}/${entryId}/${action}`, data, {
-        headers: hdr(),
+        headers: writeHdr(),
       });
       setEntries((prev) =>
         prev.map((e) => (e.id === entryId ? r.data.entry : e)),
       );
     } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to save");
+      alert(err.response?.data?.error || err.message || "Failed to save");
     }
   };
 
@@ -830,13 +894,13 @@ const CustomerPurchasingDashboard = () => {
       const r = await axios.put(
         `${BASE}/${entryId}/approve`,
         { approved_quantity: approvedQty, remark: remark },
-        { headers: hdr() },
+        { headers: writeHdr() },
       );
       setEntries((prev) =>
         prev.map((e) => (e.id === entryId ? r.data.entry : e)),
       );
     } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to approve");
+      alert(err.response?.data?.error || err.message || "Failed to approve");
     }
   };
   // ── BOQ MASTER handlers ──
@@ -846,13 +910,13 @@ const CustomerPurchasingDashboard = () => {
     try {
       if (editingBOQItem) {
         await axios.put(`${API_BASE}/boq/${editingBOQItem.id}`, boqMasterForm, {
-          headers: hdr(),
+          headers: writeHdr(),
         });
       } else {
         await axios.post(
           `${API_BASE}/boq`,
           { ...boqMasterForm, customer_id: customerId },
-          { headers: hdr() },
+          { headers: writeHdr() },
         );
       }
       setBOQMasterForm({
@@ -866,7 +930,7 @@ const CustomerPurchasingDashboard = () => {
       setEditingBOQItem(null);
       fetchBOQItems();
     } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to save");
+      alert(err.response?.data?.error || err.message || "Failed to save");
     } finally {
       setSavingBOQMaster(false);
     }
@@ -876,11 +940,11 @@ const CustomerPurchasingDashboard = () => {
     if (!confirm(`Delete "${name}"?`)) return;
     try {
       await axios.delete(`${API_BASE}/boq/${id}`, {
-        headers: hdr(),
+        headers: writeHdr(),
       });
       fetchBOQItems();
     } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to delete");
+      alert(err.response?.data?.error || err.message || "Failed to delete");
     }
   };
 
@@ -914,7 +978,7 @@ const CustomerPurchasingDashboard = () => {
       await axios.put(
         `${API_BASE}/boq/customer/${customerId}/complete`,
         {},
-        { headers: hdr() },
+        { headers: writeHdr() },
       );
 
       setBOQDone(true);
@@ -923,7 +987,11 @@ const CustomerPurchasingDashboard = () => {
 
       alert("BOQ Master has been completed and locked.");
     } catch (err: any) {
-      alert(err.response?.data?.error || "Failed to complete BOQ Master");
+      alert(
+        err.response?.data?.error ||
+          err.message ||
+          "Failed to complete BOQ Master",
+      );
     }
   };
 

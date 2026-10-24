@@ -138,6 +138,11 @@ const PurchasingProjectsPortal = () => {
   const handleProjectClick = async (project: Project) => {
     if (openingProject.current || !customerId) return;
     openingProject.current = true;
+    // Persist the selected project before navigation, including across page refreshes.
+    sessionStorage.setItem(
+      `purchasing:selected-project:${customerId}`,
+      String(project.id),
+    );
     // Only this project's notifications are cleared, and only for the logged-in user.
     // Do not block access if the notification endpoint is temporarily unavailable.
     try {
