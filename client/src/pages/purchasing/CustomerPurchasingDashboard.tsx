@@ -201,46 +201,78 @@ const EntryFlowPanel = ({
   const setField = (k: string, v: string) =>
     setDraft((d: any) => ({ ...d, [k]: v }));
 
+  const stageCard: React.CSSProperties = {
+    background: "#fff",
+    border: "1px solid #e5e7eb",
+    borderRadius: "12px",
+    padding: "18px 20px",
+    boxShadow: "0 1px 3px rgba(15,23,42,0.04)",
+  };
+  const stageGrid: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
+    gap: "12px",
+  };
+  const detailBox: React.CSSProperties = {
+    background: "#f8fafc",
+    border: "1px solid #e8edf3",
+    borderRadius: "8px",
+    padding: "12px 14px",
+    minWidth: 0,
+  };
+  const detailValue: React.CSSProperties = {
+    fontSize: "13px",
+    color: "#111827",
+    fontWeight: 600,
+    overflowWrap: "anywhere",
+  };
+  const fieldLabel = (name: string) => (
+    <span style={{ ...labelStyle, marginBottom: "7px" }}>{name}</span>
+  );
+  const readOnlyDetail = (name: string, value: React.ReactNode) => (
+    <div style={detailBox}>
+      {fieldLabel(name)}
+      <div style={detailValue}>{value || "—"}</div>
+    </div>
+  );
+
   const renderTab = (tab: number) => {
     if (tab === 0) {
       return (
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))",
-            gap: "14px",
-          }}
-        >
-          <div>
-            <span style={labelStyle}>Product</span>
-            <span>{entry.product || "—"}</span>
+        <div style={stageCard}>
+          <div
+            style={{
+              fontSize: "14px",
+              fontWeight: 700,
+              color: "#111827",
+              marginBottom: "14px",
+            }}
+          >
+            📋 Request details
           </div>
-          <div>
-            <span style={labelStyle}>Specification</span>
-            <span>{entry.specification || "—"}</span>
-          </div>
-          <div>
-            <span style={labelStyle}>Part No</span>
-            <span>{entry.part_number || "—"}</span>
-          </div>
-          <div>
-            <span style={labelStyle}>Quantity</span>
-            {renderEntryQty(entry)}
-          </div>
-          <div>
-            <span style={labelStyle}>Required Date</span>
-            <span>
-              {entry.required_date ? fmtDate(entry.required_date) : "—"}
-            </span>
-          </div>
-          <div>
-            <span style={labelStyle}>Requested By</span>
-            <span>{entry.requested_by || "—"}</span>
+          <div style={stageGrid}>
+            {readOnlyDetail("Product", entry.product)}
+            {readOnlyDetail("Specification", entry.specification)}
+            {readOnlyDetail("Part No", entry.part_number)}
+            {readOnlyDetail("Quantity", renderEntryQty(entry))}
+            {readOnlyDetail(
+              "Required Date",
+              entry.required_date ? fmtDate(entry.required_date) : "—",
+            )}
+            {readOnlyDetail("Requested By", entry.requested_by)}
           </div>
           {entry.description && (
-            <div style={{ gridColumn: "span 2" }}>
-              <span style={labelStyle}>Description</span>
-              <span>{entry.description}</span>
+            <div style={{ ...detailBox, marginTop: "12px" }}>
+              {fieldLabel("Description")}
+              <div
+                style={{
+                  ...detailValue,
+                  fontWeight: 400,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {entry.description}
+              </div>
             </div>
           )}
         </div>
@@ -462,20 +494,17 @@ const EntryFlowPanel = ({
     if (tab === 2) {
       const locked = isStageLocked("order");
       return (
-        <div style={{ maxWidth: "500px" }}>
+        <div style={stageCard}>
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "12px",
-            }}
+            style={{ fontSize: "14px", fontWeight: 700, marginBottom: "14px" }}
           >
+            📝 Order details
+          </div>
+          <div style={stageGrid}>
             <div>
-              <span style={labelStyle}>Order Form No</span>
+              {fieldLabel("Order Form No")}
               {!isOffice || locked ? (
-                <div style={{ fontSize: "13px" }}>
-                  {entry.order_form_no || "—"}
-                </div>
+                readOnlyDetail("Saved order number", entry.order_form_no)
               ) : (
                 <input
                   style={fStyle}
@@ -485,14 +514,12 @@ const EntryFlowPanel = ({
               )}
             </div>
             <div>
-              <span style={labelStyle}>Notes</span>
+              {fieldLabel("Notes")}
               {!isOffice || locked ? (
-                <div style={{ fontSize: "13px" }}>
-                  {entry.order_notes || "—"}
-                </div>
+                readOnlyDetail("Saved notes", entry.order_notes)
               ) : (
-                <input
-                  style={fStyle}
+                <textarea
+                  style={{ ...fStyle, minHeight: "40px", resize: "vertical" }}
                   value={draft.order_notes ?? entry.order_notes ?? ""}
                   onChange={(e) => setField("order_notes", e.target.value)}
                 />
@@ -520,23 +547,32 @@ const EntryFlowPanel = ({
     if (tab === 3) {
       if (!entry.approved)
         return (
-          <div style={{ fontStyle: "italic", color: "#9ca3af" }}>
-            Requires approval first.
+          <div style={{ ...stageCard, color: "#92400e" }}>
+            Approval is required before creating a purchase order.
           </div>
         );
       const locked = isStageLocked("po");
       return (
-        <div style={{ maxWidth: "300px" }}>
-          <span style={labelStyle}>PO Number</span>
-          {!isOffice || locked ? (
-            <div style={{ fontSize: "13px" }}>{entry.po_no || "—"}</div>
-          ) : (
-            <input
-              style={fStyle}
-              value={draft.po_no ?? entry.po_no ?? ""}
-              onChange={(e) => setField("po_no", e.target.value)}
-            />
-          )}
+        <div style={stageCard}>
+          <div
+            style={{ fontSize: "14px", fontWeight: 700, marginBottom: "14px" }}
+          >
+            🧾 Purchase order
+          </div>
+          <div style={{ maxWidth: "450px" }}>
+            {locked || !isOffice ? (
+              readOnlyDetail("PO Number", entry.po_no)
+            ) : (
+              <>
+                {fieldLabel("PO Number")}
+                <input
+                  style={fStyle}
+                  value={draft.po_no ?? entry.po_no ?? ""}
+                  onChange={(e) => setField("po_no", e.target.value)}
+                />
+              </>
+            )}
+          </div>
           <SavedBadge at={entry.po_saved_at} by={entry.po_saved_by} />
           {isOffice && !locked && (
             <button
@@ -557,17 +593,26 @@ const EntryFlowPanel = ({
     if (tab === 4) {
       const locked = isStageLocked("invoice");
       return (
-        <div style={{ maxWidth: "300px" }}>
-          <span style={labelStyle}>Invoice Number</span>
-          {!isOffice || locked ? (
-            <div style={{ fontSize: "13px" }}>{entry.invoice_no || "—"}</div>
-          ) : (
-            <input
-              style={fStyle}
-              value={draft.invoice_no ?? entry.invoice_no ?? ""}
-              onChange={(e) => setField("invoice_no", e.target.value)}
-            />
-          )}
+        <div style={stageCard}>
+          <div
+            style={{ fontSize: "14px", fontWeight: 700, marginBottom: "14px" }}
+          >
+            🗂️ Invoice details
+          </div>
+          <div style={{ maxWidth: "450px" }}>
+            {locked || !isOffice ? (
+              readOnlyDetail("Invoice Number", entry.invoice_no)
+            ) : (
+              <>
+                {fieldLabel("Invoice Number")}
+                <input
+                  style={fStyle}
+                  value={draft.invoice_no ?? entry.invoice_no ?? ""}
+                  onChange={(e) => setField("invoice_no", e.target.value)}
+                />
+              </>
+            )}
+          </div>
           <SavedBadge at={entry.invoice_saved_at} by={entry.invoice_saved_by} />
           {isOffice && !locked && (
             <button
@@ -587,53 +632,56 @@ const EntryFlowPanel = ({
 
     if (tab === 5) {
       const locked = isStageLocked("driver");
+      const fields = [
+        { k: "purchase_date", l: "Purchase Date", type: "date" },
+        { k: "drivers_name", l: "Driver" },
+        { k: "vehicle_no", l: "Vehicle" },
+        { k: "received", l: "Received By" },
+      ];
       return (
-        <div style={{ maxWidth: "520px" }}>
+        <div style={stageCard}>
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "12px",
-            }}
+            style={{ fontSize: "14px", fontWeight: 700, marginBottom: "14px" }}
           >
-            {[
-              { k: "purchase_date", l: "Purchase Date", type: "date" },
-              { k: "drivers_name", l: "Driver" },
-              { k: "vehicle_no", l: "Vehicle" },
-              { k: "received", l: "Received By" },
-            ].map((f) => (
+            🚚 Delivery details
+          </div>
+          <div style={stageGrid}>
+            {fields.map((f) => (
               <div key={f.k}>
-                <span style={labelStyle}>{f.l}</span>
                 {!isStores || locked ? (
-                  <div style={{ fontSize: "13px" }}>
-                    {f.k === "purchase_date" && (entry as any)[f.k]
+                  readOnlyDetail(
+                    f.l,
+                    f.k === "purchase_date" && (entry as any)[f.k]
                       ? fmtDate((entry as any)[f.k])
-                      : (entry as any)[f.k] || "—"}
-                  </div>
+                      : (entry as any)[f.k],
+                  )
                 ) : (
-                  <input
-                    type={f.type || "text"}
-                    style={fStyle}
-                    value={draft[f.k] ?? (entry as any)[f.k] ?? ""}
-                    onChange={(e) => setField(f.k, e.target.value)}
-                  />
+                  <>
+                    {fieldLabel(f.l)}
+                    <input
+                      type={f.type || "text"}
+                      style={fStyle}
+                      value={draft[f.k] ?? (entry as any)[f.k] ?? ""}
+                      onChange={(e) => setField(f.k, e.target.value)}
+                    />
+                  </>
                 )}
               </div>
             ))}
-            <div style={{ gridColumn: "span 2" }}>
-              <span style={labelStyle}>Notes</span>
-              {!isStores || locked ? (
-                <div style={{ fontSize: "13px" }}>
-                  {entry.delivery_notes || "—"}
-                </div>
-              ) : (
-                <input
-                  style={fStyle}
+          </div>
+          <div style={{ marginTop: "12px" }}>
+            {!isStores || locked ? (
+              readOnlyDetail("Delivery Notes", entry.delivery_notes)
+            ) : (
+              <>
+                {fieldLabel("Delivery Notes")}
+                <textarea
+                  style={{ ...fStyle, minHeight: "70px", resize: "vertical" }}
                   value={draft.delivery_notes ?? entry.delivery_notes ?? ""}
                   onChange={(e) => setField("delivery_notes", e.target.value)}
                 />
-              )}
-            </div>
+              </>
+            )}
           </div>
           <SavedBadge at={entry.driver_saved_at} by={entry.driver_saved_by} />
           {isStores && !locked && (
