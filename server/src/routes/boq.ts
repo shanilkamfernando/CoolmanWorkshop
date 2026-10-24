@@ -21,6 +21,12 @@ const getPool = (req: Request): Pool => req.app.locals.pool;
 // Attribute BOQ and entry changes to the project currently open in Purchasing.
 // Recording runs after a successful response and never changes the existing write.
 router.use(async (req: AuthRequest, res: Response, next) => {
+  console.log("[BOQ Activity] Incoming request", {
+    method: req.method,
+    path: req.path,
+    projectId: req.header("X-Purchasing-Project-Id") || null,
+  });
+
   const projectId = Number(req.header("X-Purchasing-Project-Id"));
   if (
     !["POST", "PUT", "DELETE"].includes(req.method) ||
@@ -72,6 +78,7 @@ router.use(async (req: AuthRequest, res: Response, next) => {
     // Save the activity before returning success, so list badges are current
     // even when the user navigates back immediately after the request.
     const sendJson = res.json.bind(res);
+
     res.json = ((body: any) => {
       if (
         res.statusCode >= 200 &&
@@ -81,16 +88,33 @@ router.use(async (req: AuthRequest, res: Response, next) => {
         void pool
           .query(
             `INSERT INTO purchasing_project_activity
-           (customer_id, project_id, actor_user_id, activity_type)
-           VALUES ($1, $2, $3, $4)`,
-            [customerId, projectId, req.user?.id, `${req.method} ${req.path}`],
+         (customer_id, project_id, actor_user_id, activity_type)
+         VALUES ($1, $2, $3, $4)`,
+            [
+              customerId,
+              projectId,
+              req.user?.id ? String(req.user.id) : null,
+              `${req.method} ${req.path}`,
+            ],
           )
-          .catch((error) =>
-            console.error("Purchasing activity record failed:", error),
-          )
-          .finally(() => sendJson(body));
+          .then(() => {
+            console.log("[BOQ Activity] Notification recorded", {
+              customerId,
+              projectId,
+              method: req.method,
+              path: req.path,
+            });
+          })
+          .catch((error) => {
+            console.error("[BOQ Activity] INSERT FAILED:", error);
+          })
+          .finally(() => {
+            sendJson(body);
+          });
+
         return res;
       }
+
       return sendJson(body);
     }) as typeof res.json;
   } catch (error) {
