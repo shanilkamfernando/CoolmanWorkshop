@@ -852,14 +852,19 @@ router.put(
 
         result = await pool.query(
           `UPDATE customer_purchasing_entries
-
-           SET approved = TRUE, approved_by = $1, approved_at = NOW(),
-
-               approved_quantity = $2
-
-           WHERE id = $3 RETURNING *`,
-
-          [username, req.body.approved_quantity ?? null, entryId],
+   SET approved = TRUE,
+       approved_by = $1,
+       approved_at = NOW(),
+       approved_quantity = $2,
+       remark = $3
+   WHERE id = $4
+   RETURNING *`,
+          [
+            username,
+            req.body.approved_quantity ?? null,
+            req.body.remark?.trim() || null,
+            entryId,
+          ],
         );
       } else if (action === "po") {
         result = await pool.query(
