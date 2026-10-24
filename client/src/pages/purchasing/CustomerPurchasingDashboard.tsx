@@ -53,6 +53,12 @@ interface Entry {
   delivery_notes: string;
   driver_saved_at: string;
   driver_saved_by: string;
+  delivered_location: string | null;
+  received_in_stores: boolean;
+  delivery_number: string | null;
+  delivered_site: string | null;
+  site_saved_at: string | null;
+  site_saved_by: string | null;
 }
 
 const fmtDate = (d: string) => {
@@ -85,11 +91,13 @@ const STEPS = [
   { label: "Order", icon: "📝", color: "#ca8a04", bg: "#fef9c3" },
   { label: "PO", icon: "🧾", color: "#2563eb", bg: "#dbeafe" },
   { label: "Invoice", icon: "🗂️", color: "#111827", bg: "#e5e7eb" },
-  { label: "Delivered", icon: "🚚", color: "#6b7280", bg: "#f3f4f6" },
+  { label: "Delivered 1", icon: "🏬", color: "#2563eb", bg: "#dbeafe" },
+  { label: "Delivered 2", icon: "🚚", color: "#16a34a", bg: "#dcfce7" },
 ];
 
 const getEntryStep = (e: Entry): number => {
-  if (e.drivers_name || e.purchase_date) return 5;
+  if (e.site_saved_at) return 6;
+  if (e.driver_saved_at) return 5;
   if (e.invoice_no) return 4;
   if (e.po_no) return 3;
   if (e.order_form_no) return 2;
@@ -637,14 +645,19 @@ const EntryFlowPanel = ({
         { k: "drivers_name", l: "Driver" },
         { k: "vehicle_no", l: "Vehicle" },
         { k: "received", l: "Received By" },
+        { k: "delivered_location", l: "Delivered Location" },
       ];
       return (
         <div style={stageCard}>
           <div
-            style={{ fontSize: "14px", fontWeight: 700, marginBottom: "14px" }}
+            style={{ fontSize: "14px", fontWeight: 700, marginBottom: "6px" }}
           >
-            🚚 Delivery details
+            🏬 Delivered 1 — Stores
           </div>
+          <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 16px" }}>
+            Record the delivery to stores. Confirm receipt in stores to unlock
+            Delivered 2.
+          </p>
           <div style={stageGrid}>
             {fields.map((f) => (
               <div key={f.k}>
@@ -683,21 +696,139 @@ const EntryFlowPanel = ({
               </>
             )}
           </div>
+          <div style={{ ...detailBox, marginTop: "14px" }}>
+            {!isStores || locked ? (
+              <div style={{ fontSize: "13px", fontWeight: 600 }}>
+                {entry.received_in_stores
+                  ? "✓ Received in Stores"
+                  : "Not yet confirmed in stores"}
+              </div>
+            ) : (
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  cursor: "pointer",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                }}
+              >
+                <input
+                  type="checkbox"
+                  style={{ width: "18px", height: "18px", flexShrink: 0 }}
+                  checked={
+                    draft.received_in_stores ??
+                    Boolean(entry.received_in_stores)
+                  }
+                  onChange={(e) =>
+                    setDraft((d: any) => ({
+                      ...d,
+                      received_in_stores: e.target.checked,
+                    }))
+                  }
+                />
+                Received in Stores — unlock Delivered 2 after saving
+              </label>
+            )}
+          </div>
           <SavedBadge at={entry.driver_saved_at} by={entry.driver_saved_by} />
           {isStores && !locked && (
             <button
-              style={{ ...saveBtnStyle, background: "#16a34a" }}
+              style={{ ...saveBtnStyle, background: "#2563eb" }}
               onClick={() =>
                 onSaveStage(entry.id, "driver", {
                   purchase_date: draft.purchase_date ?? entry.purchase_date,
                   drivers_name: draft.drivers_name ?? entry.drivers_name,
                   vehicle_no: draft.vehicle_no ?? entry.vehicle_no,
                   received: draft.received ?? entry.received,
+                  delivered_location:
+                    draft.delivered_location ?? entry.delivered_location,
+                  received_in_stores:
+                    draft.received_in_stores ??
+                    Boolean(entry.received_in_stores),
                   delivery_notes: draft.delivery_notes ?? entry.delivery_notes,
                 })
               }
             >
-              Save Delivery
+              Save Delivered 1
+            </button>
+          )}
+        </div>
+      );
+    }
+    if (tab === 6) {
+      if (!entry.received_in_stores || !entry.driver_saved_at) {
+        return (
+          <div style={stageCard}>
+            <div style={{ fontWeight: 700, marginBottom: "8px" }}>
+              🔒 Delivered 2 — Site
+            </div>
+            <div style={{ color: "#64748b", fontSize: "13px" }}>
+              Complete Delivered 1 and tick “Received in Stores” before entering
+              site delivery details.
+            </div>
+          </div>
+        );
+      }
+      const locked = isStageLocked("site");
+      return (
+        <div style={stageCard}>
+          <div
+            style={{ fontSize: "14px", fontWeight: 700, marginBottom: "6px" }}
+          >
+            🚚 Delivered 2 — Site
+          </div>
+          <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 16px" }}>
+            Enter the final delivery number and destination site.
+          </p>
+          <div style={stageGrid}>
+            {[
+              { k: "delivery_number", l: "Delivery Number" },
+              { k: "delivered_site", l: "Delivered Site" },
+            ].map((f) => (
+              <div key={f.k}>
+                {!isStores || locked ? (
+                  readOnlyDetail(f.l, (entry as any)[f.k])
+                ) : (
+                  <>
+                    {fieldLabel(f.l)}
+                    <input
+                      style={fStyle}
+                      required
+                      value={draft[f.k] ?? (entry as any)[f.k] ?? ""}
+                      onChange={(e) => setField(f.k, e.target.value)}
+                    />
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <SavedBadge
+            at={entry.site_saved_at || ""}
+            by={entry.site_saved_by || ""}
+          />
+          {isStores && !locked && (
+            <button
+              style={{ ...saveBtnStyle, background: "#16a34a" }}
+              onClick={() => {
+                const delivery_number = String(
+                  draft.delivery_number ?? entry.delivery_number ?? "",
+                ).trim();
+                const delivered_site = String(
+                  draft.delivered_site ?? entry.delivered_site ?? "",
+                ).trim();
+                if (!delivery_number || !delivered_site) {
+                  alert("Delivery number and delivered site are required.");
+                  return;
+                }
+                onSaveStage(entry.id, "site", {
+                  delivery_number,
+                  delivered_site,
+                });
+              }}
+            >
+              Save Delivered 2
             </button>
           )}
         </div>
@@ -724,6 +855,8 @@ const EntryFlowPanel = ({
         }}
       >
         {STEPS.map((s, i) => {
+          if (i === 6 && (!entry.received_in_stores || !entry.driver_saved_at))
+            return null;
           const done = i <= completed;
           const isSelected = i === selectedTab;
           return (
@@ -1178,8 +1311,8 @@ const CustomerPurchasingDashboard = () => {
   // keeps its normal order.
   const sortByDelivered = (list: Entry[]) =>
     [...list].sort((a, b) => {
-      const aDone = getEntryStep(a) === 5 ? 1 : 0;
-      const bDone = getEntryStep(b) === 5 ? 1 : 0;
+      const aDone = getEntryStep(a) === 6 ? 1 : 0;
+      const bDone = getEntryStep(b) === 6 ? 1 : 0;
       return aDone - bDone;
     });
 
@@ -1621,6 +1754,7 @@ const CustomerPurchasingDashboard = () => {
                       <th style={th}>Required Qty</th>
                       <th style={th}>Required Date</th>
                       <th style={th}>Description</th>
+                      <th style={th}>Delivered Location</th>
                       <th style={th}>Requested By</th>
                       {isAdmin && <th style={th}></th>}
                     </tr>
@@ -1629,7 +1763,7 @@ const CustomerPurchasingDashboard = () => {
                     {boqEntries.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={isAdmin ? 11 : 10}
+                          colSpan={isAdmin ? 12 : 11}
                           style={td({
                             textAlign: "center",
                             color: "#9ca3af",
@@ -1642,7 +1776,7 @@ const CustomerPurchasingDashboard = () => {
                     ) : (
                       boqEntries.map((entry, idx) => {
                         const stage = STEPS[getEntryStep(entry)];
-                        const isDelivered = getEntryStep(entry) === 5;
+                        const isDelivered = getEntryStep(entry) === 6;
 
                         return (
                           <React.Fragment key={entry.id}>
@@ -1743,6 +1877,9 @@ const CustomerPurchasingDashboard = () => {
                               >
                                 {entry.description || "—"}
                               </td>
+                              <td style={td()}>
+                                {entry.delivered_location || "—"}
+                              </td>
                               <td style={td()}>{entry.requested_by || "—"}</td>
                               {isAdmin && (
                                 <td style={td({ textAlign: "center" })}>
@@ -1771,7 +1908,7 @@ const CustomerPurchasingDashboard = () => {
                             {expandedEntryId === entry.id && (
                               <tr>
                                 <td
-                                  colSpan={isAdmin ? 11 : 10}
+                                  colSpan={isAdmin ? 12 : 11}
                                   style={{ padding: 0 }}
                                 >
                                   <EntryFlowPanel
@@ -1992,6 +2129,9 @@ const CustomerPurchasingDashboard = () => {
                         Description
                       </th>
                       <th style={{ ...th, background: "#fff7ed" }}>
+                        Delivered Location
+                      </th>
+                      <th style={{ ...th, background: "#fff7ed" }}>
                         Requested By
                       </th>
                       {isAdmin && (
@@ -2003,7 +2143,7 @@ const CustomerPurchasingDashboard = () => {
                     {nonBOQEntries.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={isAdmin ? 10 : 9}
+                          colSpan={isAdmin ? 11 : 10}
                           style={td({
                             textAlign: "center",
                             color: "#9ca3af",
@@ -2019,7 +2159,7 @@ const CustomerPurchasingDashboard = () => {
                           "Shortage from BOQ stock",
                         );
                         const stage = STEPS[getEntryStep(entry)];
-                        const isDelivered = getEntryStep(entry) === 5;
+                        const isDelivered = getEntryStep(entry) === 6;
                         const baseColor = isDelivered
                           ? "#f3f4f6"
                           : isShortage
@@ -2140,6 +2280,9 @@ const CustomerPurchasingDashboard = () => {
                               <td style={td({ color: "#6b7280" })}>
                                 {entry.description || "—"}
                               </td>
+                              <td style={td()}>
+                                {entry.delivered_location || "—"}
+                              </td>
                               <td style={td()}>{entry.requested_by || "—"}</td>
                               {isAdmin && (
                                 <td style={td({ textAlign: "center" })}>
@@ -2167,7 +2310,7 @@ const CustomerPurchasingDashboard = () => {
                             {expandedEntryId === entry.id && (
                               <tr>
                                 <td
-                                  colSpan={isAdmin ? 10 : 9}
+                                  colSpan={isAdmin ? 11 : 10}
                                   style={{ padding: 0 }}
                                 >
                                   <EntryFlowPanel

@@ -3,30 +3,19 @@ import { Pool } from "pg";
 import { authenticateToken } from "./auth";
 
 const router = Router();
-
 interface AuthRequest extends Request {
   user?: {
     id: number;
-
     username: string;
-
     role: string;
-
     permissions: { portals: string[] };
   };
 }
 
 const getPool = (req: Request): Pool => req.app.locals.pool;
-
 // Attribute BOQ and entry changes to the project currently open in Purchasing.
 // Recording runs after a successful response and never changes the existing write.
 router.use(async (req: AuthRequest, res: Response, next) => {
-  console.log("[BOQ Activity] Incoming request", {
-    method: req.method,
-    path: req.path,
-    projectId: req.header("X-Purchasing-Project-Id") || null,
-  });
-
   const projectId = Number(req.header("X-Purchasing-Project-Id"));
   if (
     !["POST", "PUT", "DELETE"].includes(req.method) ||
@@ -38,6 +27,7 @@ router.use(async (req: AuthRequest, res: Response, next) => {
   }
 
   const pool = getPool(req);
+
   try {
     const project = await pool.query(
       "SELECT customer_id FROM purchasing_customer_projects WHERE id = $1",
@@ -47,12 +37,14 @@ router.use(async (req: AuthRequest, res: Response, next) => {
       next();
       return;
     }
+
     const customerId = project.rows[0].customer_id;
     const entryCustomer = req.path.match(/^\/boq\/customer\/(\d+)\/entries/);
     if (entryCustomer && Number(entryCustomer[1]) !== Number(customerId)) {
       next();
       return;
     }
+
     if (
       req.path === "/boq" &&
       req.body?.customer_id &&
@@ -61,6 +53,7 @@ router.use(async (req: AuthRequest, res: Response, next) => {
       next();
       return;
     }
+
     if (/^\/boq\/\d+$/.test(req.path)) {
       const item = await pool.query(
         "SELECT customer_id FROM boq_items WHERE id = $1",
@@ -77,8 +70,8 @@ router.use(async (req: AuthRequest, res: Response, next) => {
 
     // Save the activity before returning success, so list badges are current
     // even when the user navigates back immediately after the request.
-    const sendJson = res.json.bind(res);
 
+    const sendJson = res.json.bind(res);
     res.json = ((body: any) => {
       if (
         res.statusCode >= 200 &&
@@ -86,32 +79,19 @@ router.use(async (req: AuthRequest, res: Response, next) => {
         body?.success === true
       ) {
         void pool
+
           .query(
             `INSERT INTO purchasing_project_activity
-         (customer_id, project_id, actor_user_id, activity_type)
-         VALUES ($1, $2, $3, $4)`,
-            [
-              customerId,
-              projectId,
-              req.user?.id ? String(req.user.id) : null,
-              `${req.method} ${req.path}`,
-            ],
+           (customer_id, project_id, actor_user_id, activity_type)
+           VALUES ($1, $2, $3, $4)`,
+            [customerId, projectId, req.user?.id, `${req.method} ${req.path}`],
           )
-          .then(() => {
-            console.log("[BOQ Activity] Notification recorded", {
-              customerId,
-              projectId,
-              method: req.method,
-              path: req.path,
-            });
-          })
-          .catch((error) => {
-            console.error("[BOQ Activity] INSERT FAILED:", error);
-          })
-          .finally(() => {
-            sendJson(body);
-          });
 
+          .catch((error) =>
+            console.error("Purchasing activity record failed:", error),
+          )
+
+          .finally(() => sendJson(body));
         return res;
       }
 
@@ -120,56 +100,37 @@ router.use(async (req: AuthRequest, res: Response, next) => {
   } catch (error) {
     console.error("Purchasing activity lookup failed:", error);
   }
+
   next();
 });
-
 router.get(
   "/boq",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
-
     const { customer_id } = req.query;
-
     try {
       let result;
-
       if (customer_id) {
         result = await pool.query(
           `SELECT b.*,
-
             (b.available_quantity - COALESCE(SUM(cpe.required_quantity)
-
               FILTER (WHERE cpe.entry_type = 'boq'), 0)) AS remaining_quantity
-
            FROM boq_items b
-
            LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id
-
            WHERE b.customer_id = $1
-
            GROUP BY b.id
-
            ORDER BY b.item_name ASC, b.specification ASC`,
-
           [customer_id],
         );
       } else {
         result = await pool.query(
           `SELECT b.*,
-
             (b.available_quantity - COALESCE(SUM(cpe.required_quantity)
-
               FILTER (WHERE cpe.entry_type = 'boq'), 0)) AS remaining_quantity
-
            FROM boq_items b
-
            LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id
-
            GROUP BY b.id
-
            ORDER BY b.item_name ASC, b.specification ASC`,
         );
       }
@@ -177,9 +138,7 @@ router.get(
       res.json({ success: true, items: result.rows });
     } catch (error) {
       res
-
         .status(500)
-
         .json({ success: false, error: "Failed to fetch BOQ items" });
     }
   },
@@ -187,31 +146,21 @@ router.get(
 
 router.post(
   "/boq",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
-
     if (!["admin", "data_entry"].includes(req.user?.role || "")) {
       res.status(403).json({
         success: false,
-
         error: "Only admin or data entry can add BOQ items",
       });
-
       return;
     }
-
     const {
       customer_id,
-
       item_name,
-
       specification,
-
       part_number,
-
       boq_quantity,
 
       available_quantity,
@@ -225,20 +174,20 @@ router.post(
 
     if (!customer_id) {
       res.status(400).json({ success: false, error: "Customer is required" });
-
       return;
     }
 
     const lockCheck = await pool.query(
       `SELECT EXISTS (
-
      SELECT 1
-
      FROM boq_items
-
      WHERE customer_id = $1
 
+
+
        AND boq_locked = TRUE
+
+
 
    ) AS locked`,
 
@@ -259,23 +208,21 @@ router.post(
       const result = await pool.query(
         `INSERT INTO boq_items
 
+
+
           (customer_id, item_name, specification, part_number, boq_quantity, available_quantity, created_by)
+
+
 
          VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
 
         [
           customer_id,
-
           item_name.trim(),
-
           specification || null,
-
           part_number || null,
-
           boq_quantity || 0,
-
           available_quantity || 0,
-
           req.user?.username || "Unknown",
         ],
       );
@@ -313,33 +260,24 @@ router.put(
 
     const {
       item_name,
-
       specification,
-
       part_number,
-
       boq_quantity,
-
       available_quantity,
     } = req.body;
 
     const lockCheck = await pool.query(
       `SELECT boq_locked
-
    FROM boq_items
-
    WHERE id = $1`,
-
       [id],
     );
 
     if (lockCheck.rows.length === 0) {
       res.status(404).json({
         success: false,
-
         error: "BOQ item not found",
       });
-
       return;
     }
 
@@ -357,9 +295,15 @@ router.put(
       const result = await pool.query(
         `UPDATE boq_items SET
 
+
+
           item_name = $1, specification = $2, part_number = $3,
 
+
+
           boq_quantity = $4, available_quantity = $5, updated_at = NOW()
+
+
 
          WHERE id = $6 RETURNING *`,
 
@@ -390,40 +334,56 @@ router.put(
 );
 
 // DELETE BOQ item (admin only). Keep purchasing history intact.
+
 router.delete(
   "/boq/:itemId",
+
   authenticateToken,
+
   async (req: AuthRequest, res: Response): Promise<void> => {
     if (req.user?.role !== "admin") {
       res.status(403).json({ success: false, error: "Admin only" });
+
       return;
     }
+
     const pool = getPool(req);
+
     try {
       const linked = await pool.query(
         "SELECT 1 FROM customer_purchasing_entries WHERE boq_item_id = $1 LIMIT 1",
+
         [req.params.itemId],
       );
+
       if (linked.rows.length) {
         res.status(409).json({
           success: false,
+
           error:
             "This BOQ product is used by a purchasing entry and cannot be deleted",
         });
+
         return;
       }
+
       const result = await pool.query(
         "DELETE FROM boq_items WHERE id = $1 RETURNING id",
+
         [req.params.itemId],
       );
+
       if (!result.rowCount) {
         res.status(404).json({ success: false, error: "BOQ item not found" });
+
         return;
       }
+
       res.json({ success: true });
     } catch (error: any) {
       res.status(error?.code === "23503" ? 409 : 500).json({
         success: false,
+
         error:
           error?.code === "23503"
             ? "This BOQ product is in use and cannot be deleted"
@@ -445,19 +405,35 @@ router.get(
       const result = await pool.query(
         `SELECT cpe.*,
 
+
+
        COALESCE(cpe.specification, b.specification) AS specification,
+
+
 
        COALESCE(cpe.part_number, b.part_number) AS part_number,
 
+
+
        b.boq_quantity,
+
+
 
        b.available_quantity as boq_available
 
+
+
        FROM customer_purchasing_entries cpe
+
+
 
        LEFT JOIN boq_items b ON b.id = cpe.boq_item_id
 
+
+
        WHERE cpe.customer_id = $1
+
+
 
        ORDER BY cpe.created_at ASC`,
 
@@ -624,9 +600,15 @@ router.post(
     const boqStatus = await pool.query(
       `SELECT COUNT(*)::int AS total,
 
+
+
           COUNT(*) FILTER (WHERE boq_locked = TRUE)::int AS locked
 
+
+
    FROM boq_items
+
+
 
    WHERE customer_id = $1`,
 
@@ -684,13 +666,23 @@ router.post(
         const boqResult = await pool.query(
           `SELECT b.available_quantity, b.part_number,
 
+
+
                 COALESCE(SUM(cpe.required_quantity), 0) as total_requested
+
+
 
            FROM boq_items b
 
+
+
            LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id AND cpe.entry_type = 'boq'
 
+
+
            WHERE b.id = $1
+
+
 
            GROUP BY b.id, b.available_quantity, b.part_number`,
 
@@ -726,7 +718,11 @@ router.post(
       const result = await pool.query(
         `INSERT INTO customer_purchasing_entries
 
+
+
     (customer_id, entry_type, boq_item_id, product, specification, part_number, available_quantity, required_quantity, shortage_quantity, required_date, description, requested_by)
+
+
 
    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
 
@@ -767,7 +763,11 @@ router.post(
         await pool.query(
           `INSERT INTO customer_purchasing_entries
 
+
+
       (customer_id, entry_type, boq_item_id, product, specification, part_number, required_quantity, required_date, description, requested_by)
+
+
 
      VALUES ($1,'non_boq',NULL,$2,$3,$4,$5,$6,$7,$8)`,
 
@@ -823,9 +823,15 @@ router.put(
         result = await pool.query(
           `UPDATE customer_purchasing_entries
 
+
+
            SET order_form_no = $1, order_notes = $2,
 
+
+
                order_saved_at = NOW(), order_saved_by = $3
+
+
 
            WHERE id = $4 RETURNING *`,
 
@@ -852,13 +858,19 @@ router.put(
 
         result = await pool.query(
           `UPDATE customer_purchasing_entries
-   SET approved = TRUE,
-       approved_by = $1,
-       approved_at = NOW(),
-       approved_quantity = $2,
-       remark = $3
-   WHERE id = $4
-   RETURNING *`,
+
+
+
+           SET approved = TRUE, approved_by = $1, approved_at = NOW(),
+
+
+
+               approved_quantity = $2, remark = $3
+
+
+
+           WHERE id = $4 RETURNING *`,
+
           [
             username,
             req.body.approved_quantity ?? null,
@@ -870,7 +882,11 @@ router.put(
         result = await pool.query(
           `UPDATE customer_purchasing_entries
 
+
+
            SET po_no = $1, po_saved_at = NOW(), po_saved_by = $2
+
+
 
            WHERE id = $3 RETURNING *`,
 
@@ -880,38 +896,88 @@ router.put(
         result = await pool.query(
           `UPDATE customer_purchasing_entries
 
+
+
            SET invoice_no = $1, invoice_saved_at = NOW(), invoice_saved_by = $2
+
+
 
            WHERE id = $3 RETURNING *`,
 
           [req.body.invoice_no || null, username, entryId],
         );
       } else if (action === "driver") {
+        // Delivered 1: receiving goods in stores. Only stores/office/admin roles may save.
+        if (!["stores", "office", "office_admin", "admin"].includes(role)) {
+          res
+            .status(403)
+            .json({ success: false, error: "Not permitted to save delivery" });
+          return;
+        }
+        const receivedInStores = req.body.received_in_stores === true;
+        const deliveredLocation = String(
+          req.body.delivered_location ?? "",
+        ).trim();
+        if (!deliveredLocation) {
+          res
+            .status(400)
+            .json({ success: false, error: "Delivered location is required" });
+          return;
+        }
+        // Once Delivered 2 is recorded, stores receipt must not be reverted.
         result = await pool.query(
           `UPDATE customer_purchasing_entries
-
            SET purchase_date = $1, drivers_name = $2, vehicle_no = $3,
-
                received = $4, delivery_notes = $5,
-
-               driver_saved_at = NOW(), driver_saved_by = $6
-
-           WHERE id = $7 RETURNING *`,
-
+               delivered_location = $6, received_in_stores = $7,
+               driver_saved_at = NOW(), driver_saved_by = $8
+           WHERE id = $9 AND customer_id = $10 AND site_saved_at IS NULL
+           RETURNING *`,
           [
             req.body.purchase_date || null,
-
             req.body.drivers_name || null,
-
             req.body.vehicle_no || null,
-
             req.body.received || null,
-
             req.body.delivery_notes || null,
-
+            deliveredLocation,
+            receivedInStores,
             username,
-
             entryId,
+            req.params.customerId,
+          ],
+        );
+      } else if (action === "site") {
+        if (!["stores", "office", "office_admin", "admin"].includes(role)) {
+          res.status(403).json({
+            success: false,
+            error: "Not permitted to save site delivery",
+          });
+          return;
+        }
+        const deliveryNumber = String(req.body.delivery_number ?? "").trim();
+        const deliveredSite = String(req.body.delivered_site ?? "").trim();
+        if (!deliveryNumber || !deliveredSite) {
+          res.status(400).json({
+            success: false,
+            error: "Delivery number and delivered site are required",
+          });
+          return;
+        }
+        // Enforce the prerequisite on the server, not only in the UI.
+        result = await pool.query(
+          `UPDATE customer_purchasing_entries
+           SET delivery_number = $1, delivered_site = $2,
+               site_saved_at = NOW(), site_saved_by = $3
+           WHERE id = $4 AND customer_id = $5
+             AND received_in_stores = TRUE AND driver_saved_at IS NOT NULL
+             AND site_saved_at IS NULL
+           RETURNING *`,
+          [
+            deliveryNumber,
+            deliveredSite,
+            username,
+            entryId,
+            req.params.customerId,
           ],
         );
       } else {
@@ -920,6 +986,14 @@ router.put(
         return;
       }
 
+      if (!result?.rows?.length) {
+        res.status(409).json({
+          success: false,
+          error:
+            "Entry not found, stage locked, or Delivered 1 stores receipt not confirmed",
+        });
+        return;
+      }
       res.json({ success: true, entry: result.rows[0] });
     } catch (error: any) {
       console.error(
@@ -999,7 +1073,11 @@ router.put(
       const checkResult = await pool.query(
         `SELECT COUNT(*)::int AS count
 
+
+
          FROM boq_items
+
+
 
          WHERE customer_id = $1`,
 
@@ -1021,11 +1099,19 @@ router.put(
       const result = await pool.query(
         `UPDATE boq_items
 
+
+
          SET boq_locked = TRUE,
+
+
 
              updated_at = NOW()
 
+
+
          WHERE customer_id = $1
+
+
 
          RETURNING *`,
 
