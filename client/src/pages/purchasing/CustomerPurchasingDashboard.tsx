@@ -761,8 +761,16 @@ const CustomerPurchasingDashboard = () => {
       const r = await axios.get(`${API_BASE}/boq?customer_id=${customerId}`, {
         headers: hdr(),
       });
-      setBOQItems(r.data.items || []);
-    } catch {}
+      const items: BOQItem[] = r.data.items || [];
+      setBOQItems(items);
+      // Restore completion from the database whenever this dashboard is opened.
+      // A BOQ is complete only if it contains items and every item is locked.
+      setBOQDone(
+        items.length > 0 && items.every((item) => item.boq_locked === true),
+      );
+    } catch (error) {
+      console.error("Failed to load BOQ completion status:", error);
+    }
   };
 
   // Step 1: choose product
