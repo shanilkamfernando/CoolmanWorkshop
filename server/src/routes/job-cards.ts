@@ -28,7 +28,7 @@ const generateJobCardNumber = async (pool: Pool): Promise<string> => {
     [year],
   );
   const count = parseInt(result.rows[0].count) + 1;
-  return `CMR.WJC.${String(count).padStart(4, "0")}@${year}`;
+  return `CMW.${String(count).padStart(4, "0")}@${year}`;
 };
 
 // ═══════════════════════════════════════════════════════════════

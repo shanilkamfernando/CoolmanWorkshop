@@ -29,17 +29,17 @@ const generateJobCardNumber = async (pool: Pool): Promise<string> => {
     `SELECT COALESCE(
         MAX(
           CAST(
-            SUBSTRING(job_card_number FROM 'CMR\\.WJC\\.WS\\.([0-9]+)@')
+            SUBSTRING(job_card_number FROM 'CMW\\.([0-9]+)@')
             AS INTEGER
           )
         ), 0
       ) AS max_num
      FROM workshop_job_cards
      WHERE job_card_number LIKE $1`,
-    [`CMR.WJC.WS.%@${year}`],
+    [`CMW\\.([0-9]+)@${year}`],
   );
   const next = parseInt(result.rows[0].max_num) + 1;
-  return `CMR.WJC.WS.${String(next).padStart(4, "0")}@${year}`;
+  return `CMW.${String(next).padStart(4, "0")}@${year}`;
 };
 
 // Find or create a purchasing customer matching the workshop customer name
