@@ -1064,8 +1064,8 @@
   min-height: 64px;
   resize: vertical;
   background: transparent;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+  color: #222 !important;
+  -webkit-text-fill-color: #222 !important;
   caret-color: #111827;
   overflow: auto;
 }
