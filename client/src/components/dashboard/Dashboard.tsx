@@ -184,14 +184,14 @@ const Dashboard = () => {
                 key={portal.id}
                 className={`portal-tile ${!hasAccess ? "disabled" : ""}`}
                 onClick={() => hasAccess && navigate(portal.path)}
+                title={portal.label}
               >
                 {/* <div className="portal-image">{portal.image}</div> */}
-                <div className="portal-icon">
-                  <img src={portal.image} className="portal-image" />
-                </div>
 
-                <h3>{portal.label}</h3>
-                <p>{portal.description}</p>
+                <img src={portal.image} className="portal-tile-image" />
+
+                {/* <h3>{portal.label}</h3>
+                <p>{portal.description}</p> */}
                 {!hasAccess && (
                   <div className="no-access-badge">🔒 No Access</div>
                 )}
