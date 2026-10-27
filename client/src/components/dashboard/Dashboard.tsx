@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Dashboard.css";
+import jobAssigned from "../../assets/jobAssigned.jpeg";
+import purchasing from "../../assets/purchasing.jpeg";
+import customers from "../../assets/customers.jpeg";
+import workshop from "../../assets/workshop.jpeg";
+import stores from "../../assets/stores.jpeg";
+import meetings from "../../assets/meetings.jpeg";
+import documents from "../../assets/documents.jpeg";
 
 type PortalId =
   | "customers"
@@ -28,7 +35,7 @@ interface User {
 interface Portal {
   id: PortalId;
   label: string;
-  icon: string;
+  image: string;
   path: string;
   description: string;
 }
@@ -63,49 +70,49 @@ const Dashboard = () => {
     {
       id: "jobAssigned",
       label: "Job Assigned",
-      icon: "⏱️",
+      image: jobAssigned,
       path: "/jobAssigned",
       description: "Task management",
     },
     {
       id: "purchasing",
       label: "Purchasing",
-      icon: "🚚",
+      image: purchasing,
       path: "/purchasing",
       description: "Handle procurement and orders",
     },
     {
       id: "customers",
       label: "Customers",
-      icon: "👥",
+      image: customers,
       path: "/customers",
       description: "Manage customer information",
     },
     {
       id: "workshop",
       label: "Workshop",
-      icon: "🔧",
+      image: workshop,
       path: "/workshop",
       description: "Workshop management",
     },
     {
       id: "stores",
       label: "Stores",
-      icon: "🏪",
+      image: stores,
       path: "/stores",
       description: "Manage store locations",
     },
     {
       id: "meetings",
       label: "Meetings",
-      icon: "👨‍💼",
+      image: meetings,
       path: "/meetings",
       description: "Schedule and track meetings",
     },
     {
       id: "documents",
       label: "Documents",
-      icon: "📄",
+      image: documents,
       path: "/documents",
       description: "Document management",
     },
@@ -178,7 +185,11 @@ const Dashboard = () => {
                 className={`portal-tile ${!hasAccess ? "disabled" : ""}`}
                 onClick={() => hasAccess && navigate(portal.path)}
               >
-                <div className="portal-icon">{portal.icon}</div>
+                {/* <div className="portal-image">{portal.image}</div> */}
+                <div className="portal-icon">
+                  <img src={portal.image} className="portal-image" />
+                </div>
+
                 <h3>{portal.label}</h3>
                 <p>{portal.description}</p>
                 {!hasAccess && (

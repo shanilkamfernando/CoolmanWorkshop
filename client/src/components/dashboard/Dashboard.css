@@ -119,9 +119,23 @@
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
 }
 
+.portal-image {
+  display: block;
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
 .portal-icon {
-  font-size: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 16px;
+}
+.portal-tile.admin-tile .portal-image {
+  width: 90px;
+  height: 90px;
 }
 
 .portal-tile h3 {
@@ -207,3 +221,10 @@
     grid-template-columns: 1fr;
   }
 } */
+.portal-image {
+  display: block;
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+  margin: 0 auto;
+}
