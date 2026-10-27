@@ -1077,9 +1077,10 @@
   outline: none;
 }
 .wl-description-highlight .wl-mention {
-  color: #0759b7;
-  background: #e6f1ff;
-  border-radius: 3px;
+  color: #0759b7 !important;
+  background-color: #e6f1ff !important;
+  border-radius: 4px;
+  padding: 1px 3px;
   font-weight: 600;
 }
 .wl-description-textarea::selection {
