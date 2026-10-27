@@ -91,8 +91,8 @@ const STEPS = [
   { label: "Order", icon: "📝", color: "#ca8a04", bg: "#fef9c3" },
   { label: "PO", icon: "🧾", color: "#2563eb", bg: "#dbeafe" },
   { label: "Invoice", icon: "🗂️", color: "#111827", bg: "#e5e7eb" },
-  { label: "Delivered 1", icon: "🏬", color: "#2563eb", bg: "#dbeafe" },
-  { label: "Delivered 2", icon: "🚚", color: "#16a34a", bg: "#dcfce7" },
+  { label: "Delivered - Stores", icon: "🏬", color: "#2563eb", bg: "#dbeafe" },
+  { label: "Delivered - Site", icon: "🚚", color: "#16a34a", bg: "#dcfce7" },
 ];
 
 const getEntryStep = (e: Entry): number => {
@@ -652,11 +652,11 @@ const EntryFlowPanel = ({
           <div
             style={{ fontSize: "14px", fontWeight: 700, marginBottom: "6px" }}
           >
-            🏬 Delivered 1 — Stores
+            🏬 Delivered - Stores
           </div>
           <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 16px" }}>
             Record the delivery to stores. Confirm receipt in stores to unlock
-            Delivered 2.
+            Delivered - Site.
           </p>
           <div style={stageGrid}>
             {fields.map((f) => (
@@ -728,7 +728,7 @@ const EntryFlowPanel = ({
                     }))
                   }
                 />
-                Received in Stores — unlock Delivered 2 after saving
+                Received in Stores — unlock Delivered - Site after saving
               </label>
             )}
           </div>
@@ -751,7 +751,7 @@ const EntryFlowPanel = ({
                 })
               }
             >
-              Save Delivered 1
+              Save Delivered - Stores
             </button>
           )}
         </div>
@@ -762,11 +762,11 @@ const EntryFlowPanel = ({
         return (
           <div style={stageCard}>
             <div style={{ fontWeight: 700, marginBottom: "8px" }}>
-              🔒 Delivered 2 — Site
+              🔒 Delivered - Site
             </div>
             <div style={{ color: "#64748b", fontSize: "13px" }}>
-              Complete Delivered 1 and tick “Received in Stores” before entering
-              site delivery details.
+              Complete Delivered - Stores and tick “Received in Stores” before
+              entering site delivery details.
             </div>
           </div>
         );
@@ -777,7 +777,7 @@ const EntryFlowPanel = ({
           <div
             style={{ fontSize: "14px", fontWeight: 700, marginBottom: "6px" }}
           >
-            🚚 Delivered 2 — Site
+            🚚 Delivered - Site
           </div>
           <p style={{ fontSize: "12px", color: "#64748b", margin: "0 0 16px" }}>
             Enter the final delivery number and destination site.
@@ -828,7 +828,7 @@ const EntryFlowPanel = ({
                 });
               }}
             >
-              Save Delivered 2
+              Save Delivered - Site
             </button>
           )}
         </div>
