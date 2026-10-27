@@ -85,8 +85,8 @@
 
 .user-info {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: baseline;
+  gap: 27px;
 }
 
 .role-badge {
@@ -197,6 +197,9 @@
   padding: 16px;
   border-radius: 8px;
   margin-bottom: 24px;
+  display: flex;
+  align-items: baseline;
+  gap: 2rem;
 }
 
 .status-section {
