@@ -1,6 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Dashboard.css";
+import jobAssigned from "../../assets/jobAssigned.jpeg";
+import purchasing from "../../assets/purchasing.jpeg";
+import customers from "../../assets/customers.jpeg";
+import workshop from "../../assets/workshop.jpeg";
+import stores from "../../assets/stores.jpeg";
+import meetings from "../../assets/meetings.jpeg";
+import documents from "../../assets/documents.jpeg";
 
 type PortalId =
   | "customers"
@@ -9,6 +16,7 @@ type PortalId =
   | "workshop"
   | "documents"
   | "jobAssigned"
+  | "myTasks"
   | "meetings"
   | "followup"
   | "staff";
@@ -27,7 +35,7 @@ interface User {
 interface Portal {
   id: PortalId;
   label: string;
-  icon: string;
+  image: string;
   path: string;
   description: string;
 }
@@ -52,52 +60,59 @@ const Dashboard = () => {
   };
 
   const portals: Portal[] = [
+    // {
+    //   id: "myTasks",
+    //   label: "My Tasks",
+    //   icon: "☑️",
+    //   path: "/myTasks",
+    //   description: "Specific Users Task management",
+    // },
     {
       id: "jobAssigned",
       label: "Job Assigned",
-      icon: "⏱️",
+      image: jobAssigned,
       path: "/jobAssigned",
       description: "Task management",
     },
     {
       id: "purchasing",
       label: "Purchasing",
-      icon: "🚚",
+      image: purchasing,
       path: "/purchasing",
       description: "Handle procurement and orders",
     },
     {
       id: "customers",
       label: "Customers",
-      icon: "👥",
+      image: customers,
       path: "/customers",
       description: "Manage customer information",
     },
     {
       id: "workshop",
       label: "Workshop",
-      icon: "🔧",
+      image: workshop,
       path: "/workshop",
       description: "Workshop management",
     },
     {
       id: "stores",
       label: "Stores",
-      icon: "🏪",
+      image: stores,
       path: "/stores",
       description: "Manage store locations",
     },
     {
       id: "meetings",
       label: "Meetings",
-      icon: "👨‍💼",
+      image: meetings,
       path: "/meetings",
       description: "Schedule and track meetings",
     },
     {
       id: "documents",
       label: "Documents",
-      icon: "📄",
+      image: documents,
       path: "/documents",
       description: "Document management",
     },
@@ -109,13 +124,13 @@ const Dashboard = () => {
     //   path: "/followup",
     //   description: "Customer follow-ups",
     // },
-    {
-      id: "staff",
-      label: "Staff",
-      icon: "👤",
-      path: "/staff",
-      description: "Employee management",
-    },
+    // {
+    //   id: "staff",
+    //   label: "Staff",
+    //   icon: "👤",
+    //   path: "/staff",
+    //   description: "Employee management",
+    // },
   ];
 
   const hasPortalAccess = (portalId: PortalId): boolean => {
@@ -169,10 +184,14 @@ const Dashboard = () => {
                 key={portal.id}
                 className={`portal-tile ${!hasAccess ? "disabled" : ""}`}
                 onClick={() => hasAccess && navigate(portal.path)}
+                title={portal.label}
               >
-                <div className="portal-icon">{portal.icon}</div>
-                <h3>{portal.label}</h3>
-                <p>{portal.description}</p>
+                {/* <div className="portal-image">{portal.image}</div> */}
+
+                <img src={portal.image} className="portal-tile-image" />
+
+                {/* <h3>{portal.label}</h3>
+                <p>{portal.description}</p> */}
                 {!hasAccess && (
                   <div className="no-access-badge">🔒 No Access</div>
                 )}

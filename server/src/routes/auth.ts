@@ -14,7 +14,7 @@ interface AuthRequest extends Request {
   user?: {
     id: number;
     username: string;
-    role: "admin" | "user";
+    role: "admin" | "user" | "office" | "office_admin" | "stores";
     permissions: {
       portals: string[];
       canManageUsers?: boolean;
@@ -50,6 +50,18 @@ const authenticateToken = (
 const isAdmin = (req: AuthRequest, res: Response, next: NextFunction): void => {
   if (req.user?.role !== "admin") {
     res.status(403).json({ error: "Admin access required" });
+    return;
+  }
+  next();
+};
+
+const isAdminOrOfficeAdmin = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+): void => {
+  if (!["admin", "office_admin"].includes(req.user?.role || "")) {
+    res.status(403).json({ error: "Insufficient permissions" });
     return;
   }
   next();
@@ -143,7 +155,7 @@ router.post("/signin", async (req: Request, res: Response): Promise<void> => {
     const result = await pool.query(
       `SELECT id, username, password, first_name, last_name, role, permissions, is_active
        FROM users
-       WHERE username = $1`,
+       WHERE LOWER(username) = LOWER($1)`,
       [username],
     );
 
@@ -289,7 +301,7 @@ router.put(
   isAdmin,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { userId } = req.params;
-    const { permissions, isActive } = req.body;
+    const { permissions, isActive, role } = req.body;
     const pool = getPool(req);
 
     try {
@@ -301,10 +313,10 @@ router.put(
 
       const result = await pool.query(
         `UPDATE users
-       SET permissions = $1, is_active = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE id = $3
-       RETURNING id, username, first_name, last_name, role, permissions, is_active`,
-        [JSON.stringify(permissions), isActive, userId],
+   SET permissions = $1, is_active = $2, role = $3, updated_at = CURRENT_TIMESTAMP
+   WHERE id = $4
+   RETURNING id, username, first_name, last_name, role, permissions, is_active`,
+        [JSON.stringify(permissions), isActive, role || "user", userId],
       );
 
       if (result.rows.length === 0) {

@@ -7,7 +7,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./ProjectDashboard.css";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -84,7 +85,7 @@ const DocumentsDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       if (response.data.customer) setCustomer(response.data.customer);
@@ -97,7 +98,7 @@ const DocumentsDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/documents`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/documents`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setDocuments(response.data.documents || []);
@@ -136,7 +137,7 @@ const DocumentsDashboard = () => {
       formData.append("uploaded_by", user?.username || "Unknown");
 
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/documents/upload`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/documents/upload`,
         formData,
         {
           headers: {
@@ -165,7 +166,7 @@ const DocumentsDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/documents/${doc.id}/download`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/documents/${doc.id}/download`,
         { headers: { Authorization: `Bearer ${token}` }, responseType: "blob" },
       );
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -198,7 +199,7 @@ const DocumentsDashboard = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/documents/${documentToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/documents/${documentToDelete.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setShowDeleteConfirm(false);
@@ -281,7 +282,7 @@ const DocumentsDashboard = () => {
   return (
     <div className="project-dashboard">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div
             className="logo-container"
@@ -311,7 +312,8 @@ const DocumentsDashboard = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       {/* Main Content */}
       <div className="project-main-content">
