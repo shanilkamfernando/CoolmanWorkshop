@@ -23,27 +23,126 @@ const getPool = (req: Request): Pool => req.app.locals.pool;
 // ─── PURCHASING CUSTOMERS & PROJECTS ──────────────────────────────
 // GET all purchasing customers
 
+// router.get(
+//   "/purchasing/customers",
+//   authenticateToken,
+//   async (req: AuthRequest, res: Response): Promise<void> => {
+//     const pool = getPool(req);
+//     try {
+//       const result = await pool.query(
+//         `SELECT c.*,
+//            COALESCE(activity.unread_count, 0)::int AS unread_count,
+//            activity.latest_activity_at
+//          FROM purchasing_customers c
+//          LEFT JOIN LATERAL (
+//            SELECT COUNT(*) FILTER (WHERE a.created_at > COALESCE(r.last_read_at, '-infinity'::timestamptz)) AS unread_count,
+//              MAX(a.created_at) AS latest_activity_at
+//            FROM purchasing_project_activity a
+//            LEFT JOIN purchasing_project_reads r
+//              ON r.project_id = a.project_id AND r.user_id = $1
+//            WHERE a.customer_id = c.id
+//          ) activity ON TRUE
+//          ORDER BY COALESCE(activity.unread_count, 0) DESC,
+//            activity.latest_activity_at DESC NULLS LAST, c.name ASC`,
+//         [req.user?.id],
+//       );
+
+//       res.json({
+//         success: true,
+//         customers: result.rows,
+//       });
+//     } catch (error) {
+//       console.error("Get purchasing customers error:", error);
+//       res.status(500).json({
+//         success: false,
+//         error: "Failed to fetch customers",
+//       });
+//     }
+//   },
+// );
+
 router.get(
   "/purchasing/customers",
   authenticateToken,
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
+    const client = await pool.connect();
+
     try {
+      await client.query("BEGIN");
+
+      // Prevent simultaneous list requests from creating duplicate
+      // Purchasing customer records during synchronization.
+      await client.query(
+        "LOCK TABLE purchasing_customers IN SHARE ROW EXCLUSIVE MODE",
+      );
+
+      // Link existing Purchasing customers to main Customers records
+      // when the name is a unique match in both tables.
+      await client.query(`
+        UPDATE purchasing_customers pc
+        SET workshop_customer_id = c.id,
+            name = c.name,
+            updated_at = NOW()
+        FROM customers c
+        WHERE pc.workshop_customer_id IS NULL
+          AND LOWER(TRIM(pc.name)) = LOWER(TRIM(c.name))
+          AND (
+            SELECT COUNT(*)
+            FROM customers c2
+            WHERE LOWER(TRIM(c2.name)) = LOWER(TRIM(c.name))
+          ) = 1
+          AND (
+            SELECT COUNT(*)
+            FROM purchasing_customers pc2
+            WHERE pc2.workshop_customer_id IS NULL
+              AND LOWER(TRIM(pc2.name)) = LOWER(TRIM(pc.name))
+          ) = 1
+          AND NOT EXISTS (
+            SELECT 1
+            FROM purchasing_customers existing
+            WHERE existing.workshop_customer_id = c.id
+          )
+      `);
+
+      // Add main Customers records that have not yet been linked.
+      await client.query(`
+        INSERT INTO purchasing_customers
+          (name, created_by, workshop_customer_id)
+        SELECT c.name, 'System Sync', c.id
+        FROM customers c
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM purchasing_customers pc
+          WHERE pc.workshop_customer_id = c.id
+        )
+      `);
+
+      await client.query("COMMIT");
+
+      // Return the Purchasing customer IDs so existing project
+      // relationships continue to work.
       const result = await pool.query(
         `SELECT c.*,
            COALESCE(activity.unread_count, 0)::int AS unread_count,
            activity.latest_activity_at
          FROM purchasing_customers c
          LEFT JOIN LATERAL (
-           SELECT COUNT(*) FILTER (WHERE a.created_at > COALESCE(r.last_read_at, '-infinity'::timestamptz)) AS unread_count,
+           SELECT
+             COUNT(*) FILTER (
+               WHERE a.created_at >
+                 COALESCE(r.last_read_at, '-infinity'::timestamptz)
+             ) AS unread_count,
              MAX(a.created_at) AS latest_activity_at
            FROM purchasing_project_activity a
            LEFT JOIN purchasing_project_reads r
-             ON r.project_id = a.project_id AND r.user_id = $1
+             ON r.project_id = a.project_id
+            AND r.user_id = $1
            WHERE a.customer_id = c.id
          ) activity ON TRUE
          ORDER BY COALESCE(activity.unread_count, 0) DESC,
-           activity.latest_activity_at DESC NULLS LAST, c.name ASC`,
+           activity.latest_activity_at DESC NULLS LAST,
+           c.name ASC`,
         [req.user?.id],
       );
 
@@ -52,11 +151,15 @@ router.get(
         customers: result.rows,
       });
     } catch (error) {
+      await client.query("ROLLBACK").catch(() => {});
       console.error("Get purchasing customers error:", error);
+
       res.status(500).json({
         success: false,
         error: "Failed to fetch customers",
       });
+    } finally {
+      client.release();
     }
   },
 );
