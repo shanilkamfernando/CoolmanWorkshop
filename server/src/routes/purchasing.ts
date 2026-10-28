@@ -71,60 +71,59 @@ router.get(
     try {
       await client.query("BEGIN");
 
-      // Prevent simultaneous list requests from creating duplicate
-      // Purchasing customer records during synchronization.
+      // Prevent simultaneous requests from creating duplicate records.
       await client.query(
         "LOCK TABLE purchasing_customers IN SHARE ROW EXCLUSIVE MODE",
       );
 
-      // Link existing Purchasing customers to main Customers records
-      // when the name is a unique match in both tables.
+      // Link existing Purchasing customers to Main Customers
+      // only when the trimmed, case-insensitive name is unique.
       await client.query(`
-        UPDATE purchasing_customers pc
-SET main_customer_id = c.id,
-    updated_at = NOW()
-FROM customers c
-WHERE pc.main_customer_id IS NULL
-  AND LOWER(TRIM(pc.name)) = LOWER(TRIM(c.name))
-  AND (
-    SELECT COUNT(*)
-    FROM customers c2
-    WHERE LOWER(TRIM(c2.name)) = LOWER(TRIM(c.name))
-  ) = 1
-  AND (
-    SELECT COUNT(*)
-    FROM purchasing_customers pc2
-    WHERE pc2.main_customer_id IS NULL
-      AND LOWER(TRIM(pc2.name)) = LOWER(TRIM(pc.name))
-  ) = 1
-  AND NOT EXISTS (
-    SELECT 1
-    FROM purchasing_customers existing
-    WHERE existing.main_customer_id = c.id
-  );
+        UPDATE purchasing_customers AS pc
+        SET main_customer_id = c.id,
+            updated_at = NOW()
+        FROM customers AS c
+        WHERE pc.main_customer_id IS NULL
+          AND LOWER(TRIM(pc.name)) = LOWER(TRIM(c.name))
+          AND (
+            SELECT COUNT(*)
+            FROM customers AS c2
+            WHERE LOWER(TRIM(c2.name)) = LOWER(TRIM(c.name))
+          ) = 1
+          AND (
+            SELECT COUNT(*)
+            FROM purchasing_customers AS pc2
+            WHERE pc2.main_customer_id IS NULL
+              AND LOWER(TRIM(pc2.name)) = LOWER(TRIM(pc.name))
+          ) = 1
+          AND NOT EXISTS (
+            SELECT 1
+            FROM purchasing_customers AS existing
+            WHERE existing.main_customer_id = c.id
+          )
       `);
 
-      // Add main Customers records that have not yet been linked.
+      // Create Purchasing records for unlinked Main Customers.
+      // IMPORTANT: Do not write to workshop_customer_id here.
       await client.query(`
-       INSERT INTO purchasing_customers
-    (name, created_by, main_customer_id)
-SELECT c.name, 'System Sync', c.id
-FROM customers c
-WHERE NOT EXISTS (
-    SELECT 1
-    FROM purchasing_customers pc
-    WHERE pc.main_customer_id = c.id
+        INSERT INTO purchasing_customers
+          (name, created_by, main_customer_id)
+        SELECT c.name, 'System Sync', c.id
+        FROM customers AS c
+        WHERE NOT EXISTS (
+          SELECT 1
+          FROM purchasing_customers AS pc
+          WHERE pc.main_customer_id = c.id
+        )
       `);
 
       await client.query("COMMIT");
 
-      // Return the Purchasing customer IDs so existing project
-      // relationships continue to work.
       const result = await pool.query(
         `SELECT c.*,
            COALESCE(activity.unread_count, 0)::int AS unread_count,
            activity.latest_activity_at
-         FROM purchasing_customers c
+         FROM purchasing_customers AS c
          LEFT JOIN LATERAL (
            SELECT
              COUNT(*) FILTER (
@@ -132,13 +131,14 @@ WHERE NOT EXISTS (
                  COALESCE(r.last_read_at, '-infinity'::timestamptz)
              ) AS unread_count,
              MAX(a.created_at) AS latest_activity_at
-           FROM purchasing_project_activity a
-           LEFT JOIN purchasing_project_reads r
+           FROM purchasing_project_activity AS a
+           LEFT JOIN purchasing_project_reads AS r
              ON r.project_id = a.project_id
             AND r.user_id = $1
            WHERE a.customer_id = c.id
-         ) activity ON TRUE
-         ORDER BY COALESCE(activity.unread_count, 0) DESC,
+         ) AS activity ON TRUE
+         ORDER BY
+           COALESCE(activity.unread_count, 0) DESC,
            activity.latest_activity_at DESC NULLS LAST,
            c.name ASC`,
         [req.user?.id],
