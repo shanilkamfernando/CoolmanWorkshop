@@ -1,13 +1,13 @@
 // ============================================
 // Purchasing Customer Portal - Customer List
-// Save as: client/src/pages/purchasing/PurchasingCustomerPortal.tsx
+// Replace: client/src/pages/purchasing/PurchasingCustomerPortal.tsx
+// UI matches the main CustomerList (same CSS classes) + search bar
 // ============================================
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import companyLogo from "../../assets/mainlogo.png";
-import "../customers/ProjectDashboard.css";
+import "../customers/Customers.css";
 import AppHeader from "../../components/AppHeader";
 
 interface User {
@@ -25,18 +25,22 @@ interface PurchasingCustomer {
   address: string;
   created_by: string;
   created_at: string;
-  unread_count?: number;
-  latest_activity_at?: string | null;
 }
 
-const getInitials = (name: string) => {
-  const w = name.trim().split(" ");
-  return w.length === 1
-    ? w[0].substring(0, 2).toUpperCase()
-    : (w[0][0] + w[w.length - 1][0]).toUpperCase();
+const API =
+  "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers";
+
+// Initials from customer name
+const getInitials = (name: string): string => {
+  const words = name.trim().split(" ");
+  if (words.length === 1) {
+    return words[0].substring(0, 2).toUpperCase();
+  }
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 };
 
-const getColor = (name: string) => {
+// Consistent color from name (same as main customer list)
+const getColorFromName = (name: string): string => {
   const colors = [
     "#667eea",
     "#2196F3",
@@ -49,9 +53,11 @@ const getColor = (name: string) => {
     "#009688",
     "#3F51B5",
   ];
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
-  return colors[Math.abs(h) % colors.length];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return colors[Math.abs(hash) % colors.length];
 };
 
 const PurchasingCustomerList = () => {
@@ -60,7 +66,7 @@ const PurchasingCustomerList = () => {
   const [customers, setCustomers] = useState<PurchasingCustomer[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [newName, setNewName] = useState("");
   const [newContact, setNewContact] = useState("");
   const [newEmail, setNewEmail] = useState("");
@@ -71,35 +77,38 @@ const PurchasingCustomerList = () => {
   );
 
   const isAdmin = user?.role === "admin";
-  const token = () => localStorage.getItem("token");
-  const headers = () => ({ Authorization: `Bearer ${token()}` });
+  const headers = () => ({
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  });
 
   useEffect(() => {
     const u = localStorage.getItem("user");
     if (u) setUser(JSON.parse(u));
     fetchCustomers();
-    const timer = window.setInterval(() => fetchCustomers(false), 30000);
-    const onFocus = () => fetchCustomers(false);
-    window.addEventListener("focus", onFocus);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", onFocus);
-    };
   }, []);
 
-  const fetchCustomers = async (showLoading = true) => {
-    if (showLoading) setLoading(true);
+  const fetchCustomers = async () => {
+    setLoading(true);
     try {
-      const res = await axios.get(
-        "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers",
-        { headers: headers() },
-      );
+      const res = await axios.get(API, { headers: headers() });
       setCustomers(res.data.customers || []);
     } catch (e) {
       setCustomers([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const resetForm = () => {
+    setNewName("");
+    setNewContact("");
+    setNewEmail("");
+    setNewAddress("");
+  };
+
+  const closeAddModal = () => {
+    setShowAddModal(false);
+    resetForm();
   };
 
   const handleAdd = async () => {
@@ -110,8 +119,7 @@ const PurchasingCustomerList = () => {
     setSaving(true);
     try {
       await axios.post(
-        "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers",
-        // "https://coolmanworkshop-production.up.railway.app/api/purchasing/customers",
+        API,
         {
           name: newName.trim(),
           contact_number: newContact,
@@ -120,11 +128,7 @@ const PurchasingCustomerList = () => {
         },
         { headers: headers() },
       );
-      setNewName("");
-      setNewContact("");
-      setNewEmail("");
-      setNewAddress("");
-      setShowAdd(false);
+      closeAddModal();
       fetchCustomers();
     } catch (e: any) {
       alert(e.response?.data?.error || "Failed to add customer");
@@ -135,11 +139,7 @@ const PurchasingCustomerList = () => {
 
   const handleDelete = async (customer: PurchasingCustomer) => {
     try {
-      await axios.delete(
-        `https://coolmanworkshop-production.up.railway.app/api/purchasing/customers/${customer.id}`,
-        // `https://coolmanworkshop-production.up.railway.app/api/purchasing/customers/${customer.id}`,
-        { headers: headers() },
-      );
+      await axios.delete(`${API}/${customer.id}`, { headers: headers() });
       setDeleteTarget(null);
       fetchCustomers();
     } catch (e: any) {
@@ -147,63 +147,37 @@ const PurchasingCustomerList = () => {
     }
   };
 
+  const handleCustomerClick = (customer: PurchasingCustomer) => {
+    navigate(`/purchasing/customers/${customer.id}/projects`, {
+      state: { customer: { id: customer.id, name: customer.name } },
+    });
+  };
+
+  const term = search.trim().toLowerCase();
   const filtered = customers.filter(
     (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      (c.contact_number || "").includes(search),
+      c.name.toLowerCase().includes(term) ||
+      (c.contact_number || "").includes(search.trim()) ||
+      (c.email || "").toLowerCase().includes(term),
   );
 
   return (
-    <div className="project-dashboard">
-      {/* Header */}
-      {/* <div className="portal-header">
-        <div className="header-left">
-          <div
-            className="logo-container"
-            onClick={() => navigate("/dashboard")}
-          >
-            <img src={companyLogo} alt="Logo" className="company-logo" />
-          </div>
-          <h1 className="portal-title" onClick={() => navigate("/dashboard")}>
-            <span className="brand-cool">COOL</span>
-            <span className="brand-man">Man</span> Refrigeration
-          </h1>
-        </div>
-        <div className="header-right">
-          <span
-            style={{
-              background: "#667eea",
-              color: "#fff",
-              padding: "5px 14px",
-              borderRadius: "20px",
-              fontSize: "0.85rem",
-              fontWeight: 600,
-            }}
-          >
-            🛒 Purchasing
-          </span>
-          <span className="user-icon">👤</span>
-          <span className="username">{user?.username || "User"}</span>
-        </div>
-      </div> */}
+    <div className="customer-portal">
       <AppHeader />
 
-      <div className="project-main-content">
+      <div className="main-content-full">
         {/* Page header */}
-        <div className="project-header-row">
-          <div>
-            <h2 style={{ margin: 0 }}>Customers</h2>
-            <p style={{ color: "#888", fontSize: "0.9rem", marginTop: "4px" }}>
-              {filtered.length} customer{filtered.length !== 1 ? "s" : ""} ·
-              Select a customer to view operations
-            </p>
-          </div>
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button className="btn-add-small" onClick={() => setShowAdd(true)}>
+        <div className="page-header-row">
+          <h2>Customers</h2>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            <button
+              className="btn-add-customer"
+              onClick={() => setShowAddModal(true)}
+            >
               + Add Customer
             </button>
             <button
-              className="btn-back"
+              className="btn-cancel"
               onClick={() => navigate("/purchasing")}
             >
               ← Back
@@ -211,7 +185,7 @@ const PurchasingCustomerList = () => {
           </div>
         </div>
 
-        {/* Search */}
+        {/* Search bar */}
         <div style={{ marginBottom: "20px" }}>
           <input
             type="text"
@@ -226,347 +200,149 @@ const PurchasingCustomerList = () => {
               width: "100%",
               maxWidth: "400px",
               outline: "none",
+              background: "#fff",
+              boxSizing: "border-box",
             }}
             onFocus={(e) => (e.target.style.borderColor = "#667eea")}
             onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
           />
         </div>
 
-        {/* Add Customer Form */}
-        {showAdd && (
-          <div
-            style={{
-              background: "#f8f9ff",
-              border: "2px solid #667eea",
-              borderRadius: "12px",
-              padding: "20px 24px",
-              marginBottom: "24px",
-            }}
-          >
-            <h3
-              style={{
-                margin: "0 0 16px",
-                fontSize: "1rem",
-                fontWeight: 700,
-                color: "#333",
-              }}
-            >
-              New Purchasing Customer
-            </h3>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-                gap: "12px",
-                marginBottom: "16px",
-              }}
-            >
-              {[
-                {
-                  label: "Customer Name *",
-                  value: newName,
-                  onChange: setNewName,
-                  placeholder: "Full name",
-                },
-                {
-                  label: "Contact Number",
-                  value: newContact,
-                  onChange: setNewContact,
-                  placeholder: "Phone number",
-                },
-                {
-                  label: "Email",
-                  value: newEmail,
-                  onChange: setNewEmail,
-                  placeholder: "Email address",
-                },
-                {
-                  label: "Address",
-                  value: newAddress,
-                  onChange: setNewAddress,
-                  placeholder: "Address",
-                },
-              ].map((f) => (
-                <div key={f.label}>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "12px",
-                      fontWeight: 700,
-                      color: "#555",
-                      marginBottom: "5px",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {f.label}
-                  </label>
-                  <input
-                    type="text"
-                    value={f.value}
-                    onChange={(e) => f.onChange(e.target.value)}
-                    placeholder={f.placeholder}
-                    onKeyDown={(e) => e.key === "Enter" && handleAdd()}
-                    style={{
-                      width: "100%",
-                      padding: "9px 12px",
-                      fontSize: "14px",
-                      border: "1.5px solid #ddd",
-                      borderRadius: "6px",
-                      boxSizing: "border-box" as const,
-                    }}
-                  />
-                </div>
-              ))}
-            </div>
-            <div style={{ display: "flex", gap: "8px" }}>
-              <button
-                className="btn-save-project"
-                onClick={handleAdd}
-                disabled={saving}
-              >
-                {saving ? "⏳ Saving..." : "✓ Add Customer"}
-              </button>
-              <button
-                className="btn-cancel-meeting"
-                onClick={() => {
-                  setShowAdd(false);
-                  setNewName("");
-                  setNewContact("");
-                  setNewEmail("");
-                  setNewAddress("");
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Customer Grid */}
+        {/* Customer grid */}
         {loading ? (
-          <div style={{ textAlign: "center", padding: "60px", color: "#999" }}>
-            Loading...
-          </div>
-        ) : filtered.length === 0 ? (
-          <div
-            style={{ textAlign: "center", padding: "80px 20px", color: "#999" }}
-          >
-            <div style={{ fontSize: "4rem", marginBottom: "16px" }}>🛒</div>
-            <h3 style={{ color: "#666", marginBottom: "8px" }}>
-              {search ? "No customers match" : "No customers yet"}
-            </h3>
-            {!search && (
-              <button
-                className="btn-add-small"
-                onClick={() => setShowAdd(true)}
-              >
-                + Add First Customer
-              </button>
-            )}
-          </div>
+          <div className="loading-center">Loading customers...</div>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: "16px",
-            }}
-          >
+          <div className="customers-grid">
             {filtered.map((customer) => {
               const initials = getInitials(customer.name);
-              const color = getColor(customer.name);
+              const color = getColorFromName(customer.name);
+
               return (
                 <div
                   key={customer.id}
-                  style={{
-                    background: "white",
-                    border: "2px solid #f0f0f0",
-                    borderRadius: "14px",
-                    padding: "20px",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    position: "relative",
-                    boxShadow: "0 2px 6px rgba(0,0,0,0.05)",
-                  }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLElement).style.borderColor = color;
-                    (e.currentTarget as HTMLElement).style.transform =
-                      "translateY(-3px)";
-                    (e.currentTarget as HTMLElement).style.boxShadow =
-                      "0 6px 18px rgba(0,0,0,0.1)";
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLElement).style.borderColor =
-                      "#f0f0f0";
-                    (e.currentTarget as HTMLElement).style.transform =
-                      "translateY(0)";
-                    (e.currentTarget as HTMLElement).style.boxShadow =
-                      "0 2px 6px rgba(0,0,0,0.05)";
-                  }}
-                  onClick={() =>
-                    navigate(`/purchasing/customers/${customer.id}/projects`, {
-                      state: {
-                        customer: { id: customer.id, name: customer.name },
-                      },
-                    })
-                  }
-                  // onClick={() =>
-                  //   navigate(`/purchasing/customers/${customer.id}/dashboard`, {
-                  //     state: {
-                  //       customer: { id: customer.id, name: customer.name },
-                  //       // workshopCustomerId: customer.workshop_customer_id, // ← add this
-                  //     },
-                  //   })
-                  // }
+                  className="customer-card"
+                  onClick={() => handleCustomerClick(customer)}
+                  style={{ position: "relative" }}
                 >
-                  {Number(customer.unread_count || 0) > 0 && (
-                    <span
-                      title={`${customer.unread_count} unread project updates`}
-                      aria-label={`${customer.unread_count} unread project updates`}
-                      style={{
-                        position: "absolute",
-                        top: "12px",
-                        right: isAdmin ? "48px" : "12px",
-                        minWidth: "23px",
-                        height: "23px",
-                        padding: "0 6px",
-                        borderRadius: "999px",
-                        background: "#dc2626",
-                        color: "white",
-                        fontSize: "12px",
-                        fontWeight: 700,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      {Number(customer.unread_count) > 99
-                        ? "99+"
-                        : customer.unread_count}
-                    </span>
-                  )}
                   {isAdmin && (
                     <button
+                      className="card-delete-btn"
                       onClick={(e) => {
                         e.stopPropagation();
                         setDeleteTarget(customer);
                       }}
-                      style={{
-                        position: "absolute",
-                        top: "12px",
-                        right: "12px",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: "16px",
-                        opacity: 0.4,
-                        transition: "opacity 0.2s",
-                        padding: "4px",
-                      }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.opacity = "1")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.opacity = "0.4")
-                      }
+                      title="Delete customer (Admin only)"
                     >
                       🗑️
                     </button>
                   )}
                   <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "14px",
-                      marginBottom: "14px",
-                    }}
+                    className="customer-logo"
+                    style={{ backgroundColor: color }}
                   >
-                    <div
-                      style={{
-                        width: "48px",
-                        height: "48px",
-                        borderRadius: "12px",
-                        background: color,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: "white",
-                        fontWeight: 700,
-                        fontSize: "1.1rem",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {initials}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <h3
-                        style={{
-                          margin: 0,
-                          fontSize: "1rem",
-                          fontWeight: 700,
-                          color: "#222",
-                          paddingRight: "28px",
-                        }}
-                      >
-                        {customer.name}
-                      </h3>
-                      {customer.contact_number && (
-                        <p
-                          style={{
-                            margin: "2px 0 0",
-                            fontSize: "0.85rem",
-                            color: "#888",
-                          }}
-                        >
-                          📞 {customer.contact_number}
-                        </p>
-                      )}
-                    </div>
+                    {initials}
                   </div>
-                  {customer.email && (
-                    <p
-                      style={{
-                        margin: "0 0 4px",
-                        fontSize: "0.83rem",
-                        color: "#999",
-                      }}
-                    >
-                      ✉️ {customer.email}
-                    </p>
-                  )}
-                  {customer.address && (
-                    <p
-                      style={{
-                        margin: "0 0 10px",
-                        fontSize: "0.83rem",
-                        color: "#999",
-                      }}
-                    >
-                      📍 {customer.address}
-                    </p>
-                  )}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "flex-end",
-                      marginTop: "12px",
-                      paddingTop: "12px",
-                      borderTop: "1px solid #f0f0f0",
-                    }}
-                  >
-                    <span style={{ fontSize: "12px", color: "#aaa" }}>
-                      View operations →
-                    </span>
-                  </div>
+                  <h3 className="customer-name">{customer.name}</h3>
                 </div>
               );
             })}
           </div>
         )}
+
+        {!loading && filtered.length === 0 && (
+          <div className="empty-state">
+            <p>
+              {search ? "No customers match your search" : "No customers found"}
+            </p>
+            {!search && (
+              <button
+                className="btn-add-customer"
+                onClick={() => setShowAddModal(true)}
+              >
+                + Add Your First Customer
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Delete Modal */}
+      {/* Add Customer Modal */}
+      {showAddModal && (
+        <div className="modal-overlay" onClick={closeAddModal}>
+          <div
+            className="modal-content-simple"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2>Add New Customer</h2>
+              <button className="close-button" onClick={closeAddModal}>
+                ×
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="form-group">
+                <label>
+                  Customer Name <span className="required">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  placeholder="Full name"
+                  autoFocus
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                />
+              </div>
+              <div className="form-group">
+                <label>Contact Number</label>
+                <input
+                  type="text"
+                  value={newContact}
+                  onChange={(e) => setNewContact(e.target.value)}
+                  placeholder="Phone number"
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                />
+              </div>
+              <div className="form-group">
+                <label>Email</label>
+                <input
+                  type="text"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="Email address"
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                />
+              </div>
+              <div className="form-group">
+                <label>Address</label>
+                <input
+                  type="text"
+                  value={newAddress}
+                  onChange={(e) => setNewAddress(e.target.value)}
+                  placeholder="Address"
+                  onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+                />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn-cancel" onClick={closeAddModal}>
+                Cancel
+              </button>
+              <button
+                className="btn-save"
+                onClick={handleAdd}
+                disabled={saving}
+              >
+                {saving ? "Saving..." : "Add Customer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
       {deleteTarget && (
         <div className="modal-overlay" onClick={() => setDeleteTarget(null)}>
           <div
@@ -574,7 +350,7 @@ const PurchasingCustomerList = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="modal-header">
-              <h2>🗑️ Delete Customer</h2>
+              <h2>Delete Customer</h2>
               <button
                 className="close-button"
                 onClick={() => setDeleteTarget(null)}
@@ -582,21 +358,17 @@ const PurchasingCustomerList = () => {
                 ×
               </button>
             </div>
+
             <div className="modal-body">
               <p>
                 Are you sure you want to delete{" "}
-                <strong>"{deleteTarget.name}"</strong>?
+                <strong>{deleteTarget.name}</strong>?
               </p>
-              <p
-                style={{
-                  color: "#f44336",
-                  marginTop: "10px",
-                  fontSize: "0.88rem",
-                }}
-              >
+              <p style={{ color: "#f44336", marginTop: "10px" }}>
                 This action cannot be undone.
               </p>
             </div>
+
             <div className="modal-footer">
               <button
                 className="btn-cancel"
