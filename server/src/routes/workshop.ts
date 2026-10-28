@@ -23,24 +23,34 @@ const getPool = (req: Request): Pool => req.app.locals.pool;
 // ─── Generate workshop job card number ───────────────────────────
 const generateJobCardNumber = async (pool: Pool): Promise<string> => {
   const year = new Date().getFullYear();
-  // Extract the numeric part from existing numbers and take the max,
-  // so deletions never cause a collision.
   const result = await pool.query(
     `SELECT COALESCE(
-        MAX(
-          CAST(
-            SUBSTRING(job_card_number FROM 'CMW\\.([0-9]+)@')
-            AS INTEGER
-          )
-        ), 0
+        MAX(CAST(SUBSTRING(job_card_number FROM 'CMW\\.([0-9]+)@') AS INTEGER)),
+        0
       ) AS max_num
      FROM workshop_job_cards
      WHERE job_card_number LIKE $1`,
-    [`CMW\\.([0-9]+)@${year}`],
+    [`CMW.%@${year}`],
   );
   const next = parseInt(result.rows[0].max_num) + 1;
   return `CMW.${String(next).padStart(4, "0")}@${year}`;
 };
+
+// Items for a job card, with the PO number pulled live from Purchasing
+const ITEMS_WITH_PO_SQL = `
+  SELECT i.id, i.job_card_id, i.row_no,
+         to_char(i.date::date, 'YYYY-MM-DD')     AS date,
+         LEFT(i.time::text, 5)                   AS time,
+         to_char(i.due_date::date, 'YYYY-MM-DD') AS due_date,
+         i.item, i.item_number, i.quantity, i.remarks, i.order_form_no,
+         (SELECT p.po_no
+            FROM purchasing_flow_products p
+           WHERE p.job_card_id = i.job_card_id
+             AND p.job_card_item_id = i.row_no
+           LIMIT 1) AS po_no
+    FROM workshop_job_card_items i
+   WHERE i.job_card_id = $1
+   ORDER BY i.row_no`;
 
 // Find or create a purchasing customer matching the workshop customer name
 const findOrCreatePurchasingCustomer = async (
@@ -175,6 +185,21 @@ router.delete(
   },
 );
 
+// GET the number the next job card will get (shown on the New Job Card form)
+router.get(
+  "/workshop/jobcards/next-number",
+  authenticateToken,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const jobCardNumber = await generateJobCardNumber(getPool(req));
+      res.json({ success: true, job_card_number: jobCardNumber });
+    } catch (error) {
+      console.error("Next job card number error:", error);
+      res.status(500).json({ success: false, error: "Failed to get number" });
+    }
+  },
+);
+
 // ═══════════════════════════════════════════════════════════════
 // WORKSHOP JOB CARDS
 // ═══════════════════════════════════════════════════════════════
@@ -218,10 +243,7 @@ router.get(
         pool.query("SELECT * FROM workshop_job_cards WHERE id = $1", [
           jobCardId,
         ]),
-        pool.query(
-          "SELECT * FROM workshop_job_card_items WHERE job_card_id = $1 ORDER BY row_no",
-          [jobCardId],
-        ),
+        pool.query(ITEMS_WITH_PO_SQL, [jobCardId]),
         pool.query(
           "SELECT * FROM workshop_job_card_labor WHERE job_card_id = $1 ORDER BY row_no",
           [jobCardId],
@@ -529,6 +551,7 @@ router.delete(
 );
 
 // ─── ITEM LIST ────────────────────────────────────────────────────
+// ─── ITEM LIST ────────────────────────────────────────────────────
 router.post(
   "/workshop/customers/:customerId/jobcards/:jobCardId/items",
   authenticateToken,
@@ -536,130 +559,163 @@ router.post(
     const { jobCardId } = req.params;
     const pool = getPool(req);
     const items: any[] = req.body.items || [];
+    const client = await pool.connect();
+
     try {
-      await pool.query(
+      await client.query("BEGIN");
+
+      // Order form numbers this job card already has, keyed by requested date
+      const existing = await client.query(
+        `SELECT order_form_no, to_char(date::date, 'YYYY-MM-DD') AS d
+           FROM workshop_job_card_items
+          WHERE job_card_id = $1 AND order_form_no IS NOT NULL`,
+        [jobCardId],
+      );
+      const ofByDate = new Map<string, string>();
+      const knownOF = new Set<string>();
+      for (const r of existing.rows) {
+        knownOF.add(r.order_form_no);
+        if (r.d && !ofByDate.has(r.d)) ofByDate.set(r.d, r.order_form_no);
+      }
+
+      await client.query(
         "DELETE FROM workshop_job_card_items WHERE job_card_id = $1",
         [jobCardId],
       );
 
       for (let i = 0; i < items.length; i++) {
         const it = items[i];
-        await pool.query(
+        const day = String(it.date || "").slice(0, 10); // stamped by the browser (local time)
+
+        // Keep the number an existing row already had; otherwise reuse the
+        // number for that day, otherwise take the next one from the counter.
+        let ofNo: string | null =
+          it.order_form_no && knownOF.has(it.order_form_no)
+            ? it.order_form_no
+            : null;
+        if (!ofNo) {
+          if (day && ofByDate.has(day)) {
+            ofNo = ofByDate.get(day)!;
+          } else {
+            const seq = await client.query(
+              "SELECT nextval('workshop_order_form_seq') AS n",
+            );
+            ofNo = `WOF${seq.rows[0].n}`;
+            if (day) ofByDate.set(day, ofNo);
+          }
+        }
+
+        await client.query(
           `INSERT INTO workshop_job_card_items
-            (job_card_id, row_no, date, of_number, of_date, in_number, item, item_number, quantity)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+            (job_card_id, row_no, date, time, due_date, item, item_number,
+             quantity, remarks, order_form_no)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
           [
             jobCardId,
             i + 1,
             it.date || null,
-            it.of_number,
-            it.of_date || null,
-            it.in_number,
+            it.time || null,
+            it.due_date || null,
             it.item,
             it.item_number,
             it.quantity || null,
+            it.remarks || null,
+            ofNo,
           ],
         );
       }
 
-      await pool.query(
+      await client.query(
         "UPDATE workshop_job_cards SET has_item_list=TRUE, updated_at=CURRENT_TIMESTAMP WHERE id=$1",
         [jobCardId],
       );
-
-      // ── Sync purchasing_flow_products from the saved item list ──
-      console.log(`[SYNC] === Starting for jobCardId=${jobCardId} ===`);
-      try {
-        const jc = await pool.query(
-          `SELECT purchasing_entry_id FROM workshop_job_cards WHERE id = $1`,
-          [jobCardId],
-        );
-        const entryId = jc.rows[0]?.purchasing_entry_id || null;
-        console.log(`[SYNC] entryId resolved to:`, entryId);
-
-        const savedItems = await pool.query(
-          `SELECT row_no, item, item_number, quantity
-           FROM workshop_job_card_items WHERE job_card_id = $1 ORDER BY row_no`,
-          [jobCardId],
-        );
-        console.log(
-          `[SYNC] found ${savedItems.rows.length} saved items:`,
-          savedItems.rows,
-        );
-
-        for (const it of savedItems.rows) {
-          console.log(`[SYNC] processing row_no=${it.row_no} item=${it.item}`);
-          const existing = await pool.query(
-            `SELECT id FROM purchasing_flow_products
-             WHERE job_card_id = $1 AND job_card_item_id = $2`,
-            [jobCardId, it.row_no],
-          );
-          if (existing.rows.length > 0) {
-            console.log(
-              `[SYNC] updating existing row id=${existing.rows[0].id}`,
-            );
-            await pool.query(
-              `UPDATE purchasing_flow_products
-               SET product = $1, item_number = $2, quantity = $3,
-                   purchasing_entry_id = $4, updated_at = NOW()
-               WHERE id = $5`,
-              [
-                it.item,
-                it.item_number,
-                it.quantity,
-                entryId,
-                existing.rows[0].id,
-              ],
-            );
-          } else {
-            console.log(
-              `[SYNC] inserting NEW row: entryId=${entryId}, jobCardId=${jobCardId}, row_no=${it.row_no}, item=${it.item}, qty=${it.quantity}`,
-            );
-            const ins = await pool.query(
-              `INSERT INTO purchasing_flow_products
-                (purchasing_entry_id, job_card_id, job_card_item_id, product, item_number, quantity)
-               VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-              [
-                entryId,
-                jobCardId,
-                it.row_no,
-                it.item,
-                it.item_number,
-                it.quantity,
-              ],
-            );
-            console.log(`[SYNC] inserted with id=${ins.rows[0].id}`);
-          }
-        }
-
-        const cleanupResult = await pool.query(
-          `DELETE FROM purchasing_flow_products
-           WHERE job_card_id = $1
-             AND job_card_item_id NOT IN (
-               SELECT row_no FROM workshop_job_card_items WHERE job_card_id = $1
-             )`,
-          [jobCardId],
-        );
-        console.log(
-          `[SYNC] cleanup deleted ${cleanupResult.rowCount} orphan rows`,
-        );
-        console.log(`[SYNC] === DONE for jobCardId=${jobCardId} ===`);
-      } catch (syncErr: any) {
-        console.error(
-          `[SYNC] FAILED for jobCardId=${jobCardId}:`,
-          syncErr?.message || syncErr,
-        );
-        console.error(`[SYNC] full error:`, syncErr);
-      }
-
-      const result = await pool.query(
-        "SELECT * FROM workshop_job_card_items WHERE job_card_id=$1 ORDER BY row_no",
-        [jobCardId],
-      );
-      res.json({ success: true, items: result.rows });
+      await client.query("COMMIT");
     } catch (error) {
+      await client.query("ROLLBACK");
       console.error("Save workshop items error:", error);
       res.status(500).json({ success: false, error: "Failed to save items" });
+      return;
+    } finally {
+      client.release();
+    }
+
+    // ── Sync purchasing_flow_products (now also carries the order form no) ──
+    try {
+      const jc = await pool.query(
+        `SELECT purchasing_entry_id FROM workshop_job_cards WHERE id = $1`,
+        [jobCardId],
+      );
+      const entryId = jc.rows[0]?.purchasing_entry_id || null;
+
+      const savedItems = await pool.query(
+        `SELECT row_no, item, item_number, quantity, order_form_no
+           FROM workshop_job_card_items WHERE job_card_id = $1 ORDER BY row_no`,
+        [jobCardId],
+      );
+
+      for (const it of savedItems.rows) {
+        const found = await pool.query(
+          `SELECT id FROM purchasing_flow_products
+            WHERE job_card_id = $1 AND job_card_item_id = $2`,
+          [jobCardId, it.row_no],
+        );
+        if (found.rows.length > 0) {
+          await pool.query(
+            `UPDATE purchasing_flow_products
+                SET product = $1, item_number = $2, quantity = $3,
+                    order_form_no = $4, purchasing_entry_id = $5, updated_at = NOW()
+              WHERE id = $6`,
+            [
+              it.item,
+              it.item_number,
+              it.quantity,
+              it.order_form_no,
+              entryId,
+              found.rows[0].id,
+            ],
+          );
+        } else {
+          await pool.query(
+            `INSERT INTO purchasing_flow_products
+              (purchasing_entry_id, job_card_id, job_card_item_id, product,
+               item_number, quantity, order_form_no)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              entryId,
+              jobCardId,
+              it.row_no,
+              it.item,
+              it.item_number,
+              it.quantity,
+              it.order_form_no,
+            ],
+          );
+        }
+      }
+
+      await pool.query(
+        `DELETE FROM purchasing_flow_products
+          WHERE job_card_id = $1
+            AND job_card_item_id NOT IN (
+              SELECT row_no FROM workshop_job_card_items WHERE job_card_id = $1
+            )`,
+        [jobCardId],
+      );
+    } catch (syncErr: any) {
+      console.error(
+        `[SYNC] FAILED for jobCardId=${jobCardId}:`,
+        syncErr?.message || syncErr,
+      );
+    }
+
+    try {
+      const result = await pool.query(ITEMS_WITH_PO_SQL, [jobCardId]);
+      res.json({ success: true, items: result.rows });
+    } catch (error) {
+      console.error("Reload workshop items error:", error);
+      res
+        .status(500)
+        .json({ success: false, error: "Saved, but failed to reload items" });
     }
   },
 );

@@ -1,13 +1,16 @@
 // ============================================
-// Workshop Job Card Detail - Word Document Style Forms
+// Workshop Job Card Detail
+// Flow: GRN -> Item List -> Labor Sheet -> Dispatch Note
 // Save as: client/src/pages/workshop/WorkshopJobCardDetail.tsx
 // ============================================
 
 import { useState, useEffect } from "react";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import companyLogo from "../../assets/mainlogo.png";
 import "../customers/ProjectDashboard.css";
+
+const API = "https://coolmanworkshop-production.up.railway.app/api";
 
 interface User {
   username: string;
@@ -16,14 +19,38 @@ interface User {
   role: string;
 }
 
+// ─── Local date / time helpers (browser local time, NOT UTC) ─────
+const pad = (n: number) => String(n).padStart(2, "0");
+const localDate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+const localTime = () => {
+  const d = new Date();
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+const dateOnly = (v: any) => (v ? String(v).split("T")[0] : "");
+const hhmm = (v: any) => (v ? String(v).slice(0, 5) : "");
+const esc = (v: any) =>
+  String(v ?? "").replace(
+    /[&<>"']/g,
+    (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
+        c
+      ] as string,
+  );
+
+// ─── Empty row / form factories ──────────────────────────────────
 const emptyItem = () => ({
-  date: new Date().toISOString().split("T")[0],
-  of_number: "",
-  of_date: "",
-  in_number: "",
+  date: "",
+  time: "",
+  due_date: "",
   item: "",
   item_number: "",
   quantity: "",
+  remarks: "",
+  order_form_no: "",
+  po_no: "",
 });
 const emptyLabor = () => ({
   date: "",
@@ -32,10 +59,102 @@ const emptyLabor = () => ({
   in_time: "",
   out_time: "",
 });
+type ItemRow = ReturnType<typeof emptyItem>;
+type LaborRow = ReturnType<typeof emptyLabor>;
 
-const TABS = ["Job Card", "Item List", "Labor Sheet", "GRN", "Dispatch Note"];
+// Full job card record (kept complete so the PUT never blanks hidden columns)
+const emptyMain = () => ({
+  date: "",
+  time: "",
+  job_card_name: "",
+  customer_name: "",
+  contact_number: "",
+  item: "",
+  item_number: "",
+  vehicle_number: "",
+  company_reference: "",
+  job_description: "",
+  note: "",
+  driver: "",
+  driver_id_number: "",
+  received_by: "",
+  approved_by: "",
+  workshop_received_date: "",
+  workshop_received_time: "",
+  workshop_received_note: "",
+  workshop_received_by: "",
+  finished_date: "",
+  finished_time: "",
+  finished_note: "",
+  checked_by: "",
+  stores_received_date: "",
+  stores_received_time: "",
+  stores_person: "",
+  office_received_date: "",
+  office_received_time: "",
+  office_person: "",
+  finalizing_note: "",
+  status: "open",
+});
+const DATE_FIELDS = [
+  "date",
+  "workshop_received_date",
+  "finished_date",
+  "stores_received_date",
+  "office_received_date",
+];
 
-// ─── Shared form field styles ───────────────────────────────────
+const emptyGrn = () => ({
+  date: "",
+  time: "",
+  vehicle_number: "",
+  job_description: "",
+  note: "",
+  driver: "",
+  driver_id_number: "",
+  office_person: "",
+});
+const emptyDispatch = () => ({
+  date: "",
+  time: "",
+  contact_detail: "",
+  invoice_number: "",
+  vehicle_number: "",
+  driver: "",
+  driver_id_number: "",
+  office_person: "",
+  stores_person: "",
+});
+
+const mapItems = (rows: any[]): ItemRow[] => [
+  ...rows.map((i) => ({
+    date: dateOnly(i.date),
+    time: hhmm(i.time),
+    due_date: dateOnly(i.due_date),
+    item: i.item || "",
+    item_number: i.item_number || "",
+    quantity: i.quantity != null ? String(i.quantity) : "",
+    remarks: i.remarks || "",
+    order_form_no: i.order_form_no || "",
+    po_no: i.po_no || "",
+  })),
+  ...Array.from({ length: Math.max(0, 10 - rows.length) }, emptyItem),
+];
+const mapLabor = (rows: any[]): LaborRow[] => [
+  ...rows.map((l) => ({
+    date: dateOnly(l.date),
+    person: l.person || "",
+    job_done: l.job_done || "",
+    in_time: hhmm(l.in_time),
+    out_time: hhmm(l.out_time),
+  })),
+  ...Array.from({ length: Math.max(0, 10 - rows.length) }, emptyLabor),
+];
+
+const TABS = ["GRN", "Item List", "Labor Sheet", "Dispatch Note"];
+const TAB_ICONS = ["📥", "📋", "👷", "🚚"];
+
+// ─── Shared styles ───────────────────────────────────────────────
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "5px 8px",
@@ -47,14 +166,12 @@ const inputStyle: React.CSSProperties = {
   boxSizing: "border-box",
   fontFamily: "inherit",
 };
-
 const cellStyle: React.CSSProperties = {
   border: "1px solid #333",
   padding: "4px 8px",
   verticalAlign: "middle",
   fontSize: "13px",
 };
-
 const labelStyle: React.CSSProperties = {
   fontWeight: 700,
   fontSize: "12px",
@@ -65,80 +182,77 @@ const labelStyle: React.CSSProperties = {
   background: "#f5f5f5",
   verticalAlign: "middle",
 };
-
 const tableStyle: React.CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
   marginBottom: "12px",
   fontSize: "13px",
 };
+const sigStyle: React.CSSProperties = {
+  ...cellStyle,
+  color: "#999",
+  fontSize: "11px",
+  fontStyle: "italic",
+};
 
-// ─── Form Field Component ────────────────────────────────────────
-const FF = ({
-  label,
+// ─── Small components (defined OUTSIDE the page to keep input focus) ─
+const L = ({ children, w }: { children: React.ReactNode; w?: number }) => (
+  <td style={{ ...labelStyle, width: w }}>{children}</td>
+);
+const C = ({
+  children,
+  span,
+  style,
+}: {
+  children: React.ReactNode;
+  span?: number;
+  style?: React.CSSProperties;
+}) => (
+  <td colSpan={span} style={{ ...cellStyle, ...style }}>
+    {children}
+  </td>
+);
+const Inp = ({
   value,
   onChange,
   type = "text",
-  readOnly = false,
-  width,
+  placeholder,
+  readOnly,
 }: {
-  label: string;
   value: string;
   onChange?: (v: string) => void;
   type?: string;
+  placeholder?: string;
   readOnly?: boolean;
-  width?: string;
 }) => (
-  <td style={{ ...cellStyle, width }}>
-    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-      <span
-        style={{
-          fontSize: "10px",
-          fontWeight: 700,
-          color: "#555",
-          textTransform: "uppercase",
-          letterSpacing: "0.3px",
-        }}
-      >
-        {label}
-      </span>
-      {readOnly ? (
-        <span style={{ fontSize: "13px", minHeight: "20px", color: "#333" }}>
-          {value || "—"}
-        </span>
-      ) : (
-        <input
-          type={type}
-          value={value}
-          onChange={(e) => onChange?.(e.target.value)}
-          style={inputStyle}
-        />
-      )}
-    </div>
-  </td>
-);
-
-// ─── Section Header ──────────────────────────────────────────────
-const SectionHeader = ({ title }: { title: string }) => (
-  <div
+  <input
+    type={type}
+    value={value}
+    readOnly={readOnly}
+    placeholder={placeholder}
+    onChange={(e) => onChange?.(e.target.value)}
     style={{
-      background: "#1a1a2e",
-      color: "white",
-      padding: "6px 12px",
-      fontWeight: 700,
-      fontSize: "12px",
-      textTransform: "uppercase",
-      letterSpacing: "1px",
-      marginBottom: "8px",
-      marginTop: "16px",
-      borderRadius: "4px",
+      ...inputStyle,
+      ...(readOnly ? { color: "#555", background: "#f9fafb" } : {}),
     }}
-  >
-    {title}
-  </div>
+  />
+);
+const Area = ({
+  value,
+  onChange,
+  height,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  height: string;
+}) => (
+  <textarea
+    value={value}
+    onChange={(e) => onChange(e.target.value)}
+    style={{ ...inputStyle, height, resize: "vertical", display: "block" }}
+  />
 );
 
-// ─── Company Header ──────────────────────────────────────────────
 const CompanyHeader = ({ subtitle }: { subtitle: string }) => (
   <div
     style={{
@@ -171,7 +285,6 @@ const CompanyHeader = ({ subtitle }: { subtitle: string }) => (
   </div>
 );
 
-// ── Download button ──────────────────────────────────────────────
 const DownloadBtn = ({
   section,
   label,
@@ -198,7 +311,7 @@ const DownloadBtn = ({
   </button>
 );
 
-// ── Table input cell ─────────────────────────────────────────────
+// Editable table cell
 const TI = ({
   value,
   onChange,
@@ -226,7 +339,47 @@ const TI = ({
     />
   </td>
 );
+// Read-only (auto) table cell
+const RO = ({ value }: { value: string }) => (
+  <td
+    style={{
+      border: "1px solid #ccc",
+      padding: "4px 8px",
+      fontSize: "13px",
+      background: "#f9fafb",
+      color: "#555",
+      whiteSpace: "nowrap",
+    }}
+  >
+    {value || "—"}
+  </td>
+);
 
+const getInitials = (name: string) => {
+  const w = name.trim().split(" ");
+  return w.length === 1
+    ? w[0].substring(0, 2).toUpperCase()
+    : (w[0][0] + w[w.length - 1][0]).toUpperCase();
+};
+const getColor = (name: string) => {
+  const colors = [
+    "#667eea",
+    "#2196F3",
+    "#4CAF50",
+    "#FF9800",
+    "#E91E63",
+    "#00BCD4",
+    "#9C27B0",
+    "#FF5722",
+    "#009688",
+    "#3F51B5",
+  ];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+  return colors[Math.abs(h) % colors.length];
+};
+
+// ═════════════════════════════════════════════════════════════════
 const WorkshopJobCardDetail = () => {
   const navigate = useNavigate();
   const { customerId, jobCardId } = useParams();
@@ -242,111 +395,85 @@ const WorkshopJobCardDetail = () => {
   );
   const [purchasingCustId, setPurchasingCustId] = useState<number | null>(null);
 
-  // ── Main card ──
-  const [main, setMain] = useState({
-    date: new Date().toISOString().split("T")[0],
-    time: new Date().toLocaleTimeString("en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-    job_card_name: "",
-    customer_name: "",
-    contact_number: "",
-    item: "",
-    item_number: "",
-    vehicle_number: "",
-    company_reference: "",
-    job_description: "",
-    note: "",
-    driver: "",
-    driver_id_number: "",
-    received_by: "",
-    approved_by: "",
-    // Workshop received
-    workshop_received_date: "",
-    workshop_received_time: "",
-    workshop_received_note: "",
-    workshop_received_by: "",
-    // Finishing
-    finished_date: "",
-    finished_time: "",
-    finished_note: "",
-    checked_by: "",
-    // Finalizing
-    stores_received_date: "",
-    stores_received_time: "",
-    stores_person: "",
-    office_received_date: "",
-    office_received_time: "",
-    office_person: "",
-    finalizing_note: "",
-    status: "open",
-  });
-
-  // ── Item list ──
-  const [items, setItems] = useState(() =>
+  const [main, setMain] = useState(emptyMain);
+  const [grn, setGrn] = useState(() => ({
+    ...emptyGrn(),
+    date: localDate(),
+    time: localTime(),
+  }));
+  const [items, setItems] = useState<ItemRow[]>(() =>
     Array.from({ length: 10 }, emptyItem),
   );
-
-  // ── Labor sheet ──
-  const [labor, setLabor] = useState(() =>
+  const [labor, setLabor] = useState<LaborRow[]>(() =>
     Array.from({ length: 10 }, emptyLabor),
   );
+  const [dispatch, setDispatch] = useState(emptyDispatch);
+  const [dispatchSaved, setDispatchSaved] = useState(false);
 
-  // ── GRN ──
-  const [grn, setGrn] = useState({
-    date: "",
-    time: "",
-    contact_detail: "",
-    vehicle_number: "",
-    job_description: "",
-    note: "",
-    driver: "",
-    driver_id_number: "",
-    office_person: "",
-  });
-
-  // ── Dispatch ──
-  const [dispatch, setDispatch] = useState({
-    date: "",
-    time: "",
-    contact_detail: "",
-    invoice_number: "",
-    vehicle_number: "",
-    driver: "",
-    driver_id_number: "",
-    office_person: "",
-    stores_person: "",
-  });
-
-  const BASE = `https://coolmanworkshop-production.up.railway.app/api/workshop/customers/${customerId}/jobcards`;
+  const BASE = `${API}/workshop/customers/${customerId}/jobcards`;
   const headers = () => ({
     Authorization: `Bearer ${localStorage.getItem("token")}`,
   });
 
-  const location = useLocation();
+  const setM = (k: string, v: string) => setMain((s) => ({ ...s, [k]: v }));
+  const setG = (k: string, v: string) => setGrn((s) => ({ ...s, [k]: v }));
+  const setD = (k: string, v: string) => setDispatch((s) => ({ ...s, [k]: v }));
 
+  // ── Load ───────────────────────────────────────────────────────
   useEffect(() => {
     const u = localStorage.getItem("user");
     if (u) setUser(JSON.parse(u));
-    fetchCustomerName();
-    if (!isNew) {
+    loadCustomer();
+    if (isNew) {
+      loadNextNumber();
+    } else {
       fetchJobCard();
-    } else if (location.state?.jobCardNumber) {
-      setJobCardNumber(location.state.jobCardNumber);
     }
-  }, [jobCardId, isNew]);
+  }, [jobCardId, customerId]);
 
-  const fetchCustomerName = async () => {
+  // Dispatch note auto-fills from the GRN until it has been saved
+  useEffect(() => {
+    if (activeTab === 3 && !dispatchSaved) {
+      setDispatch((d) => ({
+        ...d,
+        date: localDate(),
+        time: localTime(),
+        contact_detail: main.contact_number,
+        vehicle_number: grn.vehicle_number,
+        driver: grn.driver,
+        driver_id_number: grn.driver_id_number,
+        office_person: grn.office_person,
+      }));
+    }
+  }, [activeTab]);
+
+  const loadCustomer = async () => {
     try {
-      const res = await axios.get(
-        "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
-        { headers: headers() },
-      );
+      const res = await axios.get(`${API}/workshop/customers`, {
+        headers: headers(),
+      });
       const found = res.data.customers?.find(
         (c: any) => c.id === Number(customerId),
       );
-      if (found) setCustomerName(found.name);
+      if (found) {
+        setCustomerName(found.name);
+        if (isNew) {
+          setMain((s) => ({
+            ...s,
+            customer_name: found.name,
+            contact_number: found.contact_number || "",
+          }));
+        }
+      }
+    } catch {}
+  };
+
+  const loadNextNumber = async () => {
+    try {
+      const r = await axios.get(`${API}/workshop/jobcards/next-number`, {
+        headers: headers(),
+      });
+      setJobCardNumber(r.data.job_card_number || "");
     } catch {}
   };
 
@@ -359,73 +486,22 @@ const WorkshopJobCardDetail = () => {
       setJobCardNumber(jobcard.job_card_number);
       setPurchasingEntryId(jobcard.purchasing_entry_id || null);
       setPurchasingCustId(jobcard.purchasing_customer_id || null);
-      setMain({
-        date: jobcard.date?.split("T")[0] || "",
-        time: jobcard.time || "",
-        job_card_name: jobcard.job_card_name || "",
-        customer_name: jobcard.customer_name || "",
-        contact_number: jobcard.contact_number || "",
-        item: jobcard.item || "",
-        item_number: jobcard.item_number || "",
-        vehicle_number: jobcard.vehicle_number || "",
-        company_reference: jobcard.company_reference || "",
-        job_description: jobcard.job_description || "",
-        note: jobcard.note || "",
-        driver: jobcard.driver || "",
-        driver_id_number: jobcard.driver_id_number || "",
-        received_by: jobcard.received_by || "",
-        approved_by: jobcard.approved_by || "",
-        workshop_received_date:
-          jobcard.workshop_received_date?.split("T")[0] || "",
-        workshop_received_time: jobcard.workshop_received_time || "",
-        workshop_received_note: jobcard.workshop_received_note || "",
-        workshop_received_by: jobcard.workshop_received_by || "",
-        finished_date: jobcard.finished_date?.split("T")[0] || "",
-        finished_time: jobcard.finished_time || "",
-        finished_note: jobcard.finished_note || "",
-        checked_by: jobcard.checked_by || "",
-        stores_received_date: jobcard.stores_received_date?.split("T")[0] || "",
-        stores_received_time: jobcard.stores_received_time || "",
-        stores_person: jobcard.stores_person || "",
-        office_received_date: jobcard.office_received_date?.split("T")[0] || "",
-        office_received_time: jobcard.office_received_time || "",
-        office_person: jobcard.office_person || "",
-        finalizing_note: jobcard.finalizing_note || "",
-        status: jobcard.status || "open",
+
+      const m: any = emptyMain();
+      Object.keys(m).forEach((k) => {
+        const v = jobcard[k];
+        if (v == null) return;
+        m[k] = DATE_FIELDS.includes(k) ? dateOnly(v) : v;
       });
-      if (its?.length)
-        setItems([
-          ...its.map((i: any) => ({
-            date: i.date?.split("T")[0] || "",
-            of_number: i.of_number || "",
-            of_date: i.of_date?.split("T")[0] || "",
-            in_number: i.in_number || "",
-            item: i.item || "",
-            item_number: i.item_number || "",
-            quantity: i.quantity || "",
-          })),
-          ...Array(Math.max(0, 10 - its.length))
-            .fill(null)
-            .map(emptyItem),
-        ]);
-      if (lab?.length)
-        setLabor([
-          ...lab.map((l: any) => ({
-            date: l.date?.split("T")[0] || "",
-            person: l.person || "",
-            job_done: l.job_done || "",
-            in_time: l.in_time || "",
-            out_time: l.out_time || "",
-          })),
-          ...Array(Math.max(0, 10 - lab.length))
-            .fill(null)
-            .map(emptyLabor),
-        ]);
-      if (g)
+      setMain(m);
+
+      setItems(mapItems(its || []));
+      setLabor(mapLabor(lab || []));
+
+      if (g) {
         setGrn({
-          date: g.date?.split("T")[0] || "",
-          time: g.time || "",
-          contact_detail: g.contact_detail || "",
+          date: dateOnly(g.date),
+          time: hhmm(g.time),
           vehicle_number: g.vehicle_number || "",
           job_description: g.job_description || "",
           note: g.note || "",
@@ -433,10 +509,25 @@ const WorkshopJobCardDetail = () => {
           driver_id_number: g.driver_id_number || "",
           office_person: g.office_person || "",
         });
-      if (d)
+      } else {
+        // Older job cards: build the GRN from the job card record
+        setGrn({
+          date: m.date,
+          time: hhmm(m.time),
+          vehicle_number: m.vehicle_number,
+          job_description: m.job_description,
+          note: m.note,
+          driver: m.driver,
+          driver_id_number: m.driver_id_number,
+          office_person: m.received_by,
+        });
+      }
+
+      if (d) {
+        setDispatchSaved(true);
         setDispatch({
-          date: d.date?.split("T")[0] || "",
-          time: d.time || "",
+          date: dateOnly(d.date),
+          time: hhmm(d.time),
           contact_detail: d.contact_detail || "",
           invoice_number: d.invoice_number || "",
           vehicle_number: d.vehicle_number || "",
@@ -445,39 +536,104 @@ const WorkshopJobCardDetail = () => {
           office_person: d.office_person || "",
           stores_person: d.stores_person || "",
         });
+      }
     } catch (e) {
       console.error(e);
     }
   };
 
-  const handleSaveMain = async () => {
-    if (!main.item || !main.date) {
-      alert("Date and Item are required");
+  // ── Row helpers (auto date / time stamps) ──────────────────────
+  const updateItem = (i: number, patch: Partial<ItemRow>) =>
+    setItems((rows) =>
+      rows.map((r, ri) => {
+        if (ri !== i) return r;
+        const next = { ...r, ...patch };
+        if (!next.date && next.item.trim()) {
+          next.date = localDate();
+          next.time = localTime();
+        }
+        return next;
+      }),
+    );
+
+  const updateLabor = (i: number, patch: Partial<LaborRow>) =>
+    setLabor((rows) =>
+      rows.map((r, ri) => {
+        if (ri !== i) return r;
+        const next = { ...r, ...patch };
+        if (!next.date && (next.person.trim() || next.job_done.trim())) {
+          next.date = localDate();
+          if (!next.in_time) next.in_time = localTime();
+        }
+        return next;
+      }),
+    );
+
+  // ── Save: GRN (creates the job card the first time) ────────────
+  const handleSaveGRN = async () => {
+    if (!main.job_card_name.trim() || !main.item.trim()) {
+      alert("Job Card Name and Item are required");
       return;
     }
     setSaving(true);
     try {
+      const date = isNew ? localDate() : grn.date || localDate();
+      const time = isNew ? localTime() : grn.time || localTime();
+      const mainPayload = {
+        ...main,
+        date,
+        time,
+        vehicle_number: grn.vehicle_number,
+        job_description: grn.job_description,
+        note: grn.note,
+        driver: grn.driver,
+        driver_id_number: grn.driver_id_number,
+        received_by: grn.office_person,
+      };
+      const grnPayload = {
+        ...grn,
+        date,
+        time,
+        contact_detail: main.contact_number,
+      };
+
       if (isNew) {
-        const res = await axios.post(BASE, main, { headers: headers() });
-        const newId = res.data.jobcard.id;
-        const newJobCardNumber = res.data.jobcard.job_card_number;
-
-        setJobCardNumber(res.data.jobcard.job_card_number);
-
-        setJobCardNumber(newJobCardNumber);
-
-        navigate(`/workshop/customers/${customerId}/jobcards/${newId}`, {
+        const res = await axios.post(BASE, mainPayload, {
+          headers: headers(),
+        });
+        const created = res.data.jobcard;
+        await axios.post(`${BASE}/${created.id}/grn`, grnPayload, {
+          headers: headers(),
+        });
+        navigate(`/workshop/customers/${customerId}/jobcards/${created.id}`, {
           replace: true,
-          state: { jobCardNumber: newJobCardNumber },
         });
       } else {
-        await axios.put(`${BASE}/${jobCardId}`, main, { headers: headers() });
-        alert("Saved!");
+        await axios.put(`${BASE}/${jobCardId}`, mainPayload, {
+          headers: headers(),
+        });
+        await axios.post(`${BASE}/${jobCardId}/grn`, grnPayload, {
+          headers: headers(),
+        });
+        alert("GRN saved!");
       }
     } catch {
       alert("Failed to save");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleStatusChange = async (status: string) => {
+    setMain((s) => ({ ...s, status }));
+    try {
+      await axios.put(
+        `${BASE}/${jobCardId}`,
+        { ...main, status },
+        { headers: headers() },
+      );
+    } catch {
+      alert("Failed to update status");
     }
   };
 
@@ -487,13 +643,28 @@ const WorkshopJobCardDetail = () => {
       alert("Add at least one item");
       return;
     }
+    const missing = items
+      .map((it, idx) =>
+        it.item.trim() && !it.item_number.trim() ? idx + 1 : 0,
+      )
+      .filter(Boolean);
+    if (missing.length) {
+      alert(`Item No is required for row(s): ${missing.join(", ")}`);
+      return;
+    }
+    const payload = filled.map((i) => ({
+      ...i,
+      date: i.date || localDate(),
+      time: i.time || localTime(),
+    }));
     setSaving(true);
     try {
-      await axios.post(
+      const res = await axios.post(
         `${BASE}/${jobCardId}/items`,
-        { items: filled },
+        { items: payload },
         { headers: headers() },
       );
+      setItems(mapItems(res.data.items || []));
       alert("Item list saved!");
     } catch {
       alert("Failed to save");
@@ -508,11 +679,16 @@ const WorkshopJobCardDetail = () => {
       alert("Add at least one entry");
       return;
     }
+    const payload = filled.map((l) => ({
+      ...l,
+      date: l.date || localDate(),
+      in_time: l.in_time || localTime(),
+    }));
     setSaving(true);
     try {
       await axios.post(
         `${BASE}/${jobCardId}/labor`,
-        { labor: filled },
+        { labor: payload },
         { headers: headers() },
       );
       alert("Labor sheet saved!");
@@ -523,24 +699,20 @@ const WorkshopJobCardDetail = () => {
     }
   };
 
-  const handleSaveGRN = async () => {
-    setSaving(true);
-    try {
-      await axios.post(`${BASE}/${jobCardId}/grn`, grn, { headers: headers() });
-      alert("GRN saved!");
-    } catch {
-      alert("Failed to save");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleSaveDispatch = async () => {
     setSaving(true);
     try {
-      await axios.post(`${BASE}/${jobCardId}/dispatch`, dispatch, {
-        headers: headers(),
-      });
+      await axios.post(
+        `${BASE}/${jobCardId}/dispatch`,
+        {
+          ...dispatch,
+          date: dispatch.date || localDate(),
+          time: dispatch.time || localTime(),
+        },
+        { headers: headers() },
+      );
+      setDispatchSaved(true);
+      setMain((s) => ({ ...s, status: "dispatched" }));
       alert("Dispatch note saved!");
     } catch {
       alert("Failed to save");
@@ -549,10 +721,13 @@ const WorkshopJobCardDetail = () => {
     }
   };
 
-  // ── Download as HTML (print-friendly) ───────────────────────────
+  // ── Print / PDF ────────────────────────────────────────────────
   const handleDownload = (section: string) => {
+    const top = `<table>
+      <tr><td class="label">Job Card No</td><td><strong>${esc(jobCardNumber)}</strong></td><td class="label">Job Card Name</td><td><strong>${esc(main.job_card_name)}</strong></td></tr>
+    </table>`;
     let html = `<!DOCTYPE html><html><head><meta charset="utf-8">
-  <title>${jobCardNumber}_${section}</title>
+  <title>${esc(jobCardNumber)}_${section}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: Arial, sans-serif; font-size: 11px; color: #000; }
@@ -562,144 +737,74 @@ const WorkshopJobCardDetail = () => {
     td, th { border: 1px solid #000; padding: 4px 7px; font-size: 10px; vertical-align: middle; }
     th { background: #e0e0e0; font-weight: bold; text-align: left; }
     .label { font-weight: bold; background: #f0f0f0; white-space: nowrap; width: 1%; }
-    .section-title {
-      background: #333; color: white; font-weight: bold;
-      padding: 4px 8px; margin: 8px 0 4px;
-      font-size: 10px; text-transform: uppercase;
-    }
-    .signature-line { min-width: 80px; }
-    .divider { border-top: 2px solid #000; margin: 8px 0; }
     @page { size: A4; margin: 12mm; }
-    @media print {
-      body { font-size: 10px; }
-      .no-print { display: none !important; }
-    }
-  </style>
-  </head><body>
-  <div class="no-print" style="text-align:center; padding: 12px; background: #667eea; color: white; font-family: Arial; font-size: 13px; font-weight: 600; margin-bottom: 16px;">
-    🖨️ Click your browser's Print button (Ctrl+P / Cmd+P) — select "Save as PDF" to download as PDF
+    @media print { .no-print { display: none !important; } }
+  </style></head><body>
+  <div class="no-print" style="text-align:center;padding:12px;background:#667eea;color:#fff;font-size:13px;font-weight:600;margin-bottom:16px;">
+    🖨️ Press Ctrl+P and choose "Save as PDF" to download
   </div>
   <h1>COOLMan Refrigeration (Pvt) Ltd</h1>`;
 
-    if (section === "jobcard") {
-      html += `<h2>Workshop Job Card</h2>
+    if (section === "grn") {
+      html += `<h2>Goods Received Note (GRN)</h2>${top}
     <table>
-      <tr><td class="label">Job Card No</td><td colspan="3"><strong>${jobCardNumber}</strong></td><td class="label">Date</td><td>${main.date}</td><td class="label">Time</td><td>${main.time || ""}</td></tr>
-      <tr><td class="label">Job Card Name</td><td colspan="7"><strong>${main.job_card_name || ""}</strong></td></tr>
-      <tr><td class="label">Customer</td><td colspan="3">${main.customer_name || ""}</td><td class="label">Contact No</td><td colspan="3">${main.contact_number || ""}</td></tr>
-      <tr><td class="label">Item</td><td colspan="3">${main.item || ""}</td><td class="label">Item Number</td><td colspan="3">${main.item_number || ""}</td></tr>
-      <tr><td class="label">Vehicle Number</td><td colspan="7">${main.vehicle_number || ""}</td></tr>
-      <tr><td class="label">Company Reference</td><td colspan="7">${main.company_reference || ""}</td></tr>
-      <tr><td class="label">Job Description</td><td colspan="7" style="min-height:36px">${main.job_description || ""}</td></tr>
-      <tr><td class="label">Note</td><td colspan="7" style="min-height:30px">${main.note || ""}</td></tr>
-      <tr><td class="label">Driver</td><td>${main.driver || ""}</td><td class="label">ID Number</td><td>${main.driver_id_number || ""}</td><td class="label">Signature</td><td colspan="3" class="signature-line">&nbsp;</td></tr>
-      <tr><td class="label">Received By</td><td colspan="3">${main.received_by || ""}</td><td class="label">Signature</td><td colspan="3" class="signature-line">&nbsp;</td></tr>
-      <tr><td class="label">Approved By</td><td colspan="3">${main.approved_by || ""}</td><td class="label">Signature</td><td colspan="3" class="signature-line">&nbsp;</td></tr>
-    </table>
-    <div class="section-title">Office Use — Workshop Received</div>
-    <table>
-      <tr><td class="label">Received Date</td><td>${main.workshop_received_date || ""}</td><td class="label">Time</td><td>${main.workshop_received_time || ""}</td></tr>
-      <tr><td class="label">Note</td><td colspan="3">${main.workshop_received_note || ""}</td></tr>
-      <tr><td class="label">Received By</td><td>${main.workshop_received_by || ""}</td><td class="label">Signature</td><td class="signature-line">&nbsp;</td></tr>
-    </table>
-    <div class="section-title">Job Finishing</div>
-    <table>
-      <tr><td class="label">Finished Date</td><td>${main.finished_date || ""}</td><td class="label">Time</td><td>${main.finished_time || ""}</td></tr>
-      <tr><td class="label">Note</td><td colspan="3">${main.finished_note || ""}</td></tr>
-      <tr><td class="label">Checked By</td><td>${main.checked_by || ""}</td><td class="label">Signature</td><td class="signature-line">&nbsp;</td></tr>
-    </table>
-    <div class="section-title">Finalizing</div>
-    <table>
-      <tr><th></th><th>Received Date</th><th>Time</th><th>Person</th><th>Signature</th></tr>
-      <tr><td class="label">Stores</td><td>${main.stores_received_date || ""}</td><td>${main.stores_received_time || ""}</td><td>${main.stores_person || ""}</td><td class="signature-line">&nbsp;</td></tr>
-      <tr><td class="label">Office</td><td>${main.office_received_date || ""}</td><td>${main.office_received_time || ""}</td><td>${main.office_person || ""}</td><td class="signature-line">&nbsp;</td></tr>
-      <tr><td class="label">Note</td><td colspan="4">${main.finalizing_note || ""}</td></tr>
+      <tr><td class="label">Date</td><td>${esc(grn.date)}</td><td class="label">Time</td><td>${esc(grn.time)}</td></tr>
+      <tr><td class="label">Customer</td><td>${esc(main.customer_name)}</td><td class="label">Contact</td><td>${esc(main.contact_number)}</td></tr>
+      <tr><td class="label">Item</td><td>${esc(main.item)}</td><td class="label">Item Number</td><td>${esc(main.item_number)}</td></tr>
+      <tr><td class="label">Vehicle Number</td><td colspan="3">${esc(grn.vehicle_number)}</td></tr>
+      <tr><td class="label">Job Description</td><td colspan="3">${esc(grn.job_description)}</td></tr>
+      <tr><td class="label">Note</td><td colspan="3">${esc(grn.note)}</td></tr>
+      <tr><td class="label">Driver</td><td>${esc(grn.driver)}</td><td class="label">ID Number</td><td>${esc(grn.driver_id_number)}</td></tr>
+      <tr><td class="label">Office</td><td colspan="2">${esc(grn.office_person)}</td><td class="label">Signature: ________</td></tr>
     </table>`;
     } else if (section === "items") {
-      html += `<h2>Workshop Item List</h2>
-    <table><tr><td class="label">Job Card Number</td><td colspan="4"><strong>${jobCardNumber}</strong></td></tr></table>
+      html += `<h2>Workshop Item List</h2>${top}
     <table>
-      <tr><th style="width:30px">No</th><th>Date</th><th>Item</th><th>Item Number</th><th style="width:60px">Quantity</th></tr>
-      ${items.map((it, i) => `<tr><td style="text-align:center">${i + 1}</td><td>${it.date || ""}</td><td>${it.item || ""}</td><td>${it.item_number || ""}</td><td style="text-align:center">${it.quantity || ""}</td></tr>`).join("")}
+      <tr><th>No</th><th>Requested Date</th><th>Time</th><th>Due Date</th><th>Item</th><th>Item No</th><th>Qty</th><th>Remarks</th><th>Order Form No</th><th>PO No</th></tr>
+      ${items
+        .map(
+          (it, i) =>
+            `<tr><td>${i + 1}</td><td>${esc(it.date)}</td><td>${esc(it.time)}</td><td>${esc(it.due_date)}</td><td>${esc(it.item)}</td><td>${esc(it.item_number)}</td><td>${esc(it.quantity)}</td><td>${esc(it.remarks)}</td><td>${esc(it.order_form_no)}</td><td>${esc(it.po_no)}</td></tr>`,
+        )
+        .join("")}
     </table>`;
     } else if (section === "labor") {
-      html += `<h2>Workshop Labor Sheet</h2>
-    <table><tr><td class="label">Job Card Number</td><td colspan="5"><strong>${jobCardNumber}</strong></td></tr></table>
+      html += `<h2>Workshop Labor Sheet</h2>${top}
     <table>
-      <tr><th style="width:30px">No</th><th>Date</th><th>Person</th><th>Job Done</th><th style="width:70px">In Time</th><th style="width:70px">Out Time</th></tr>
-      ${labor.map((l, i) => `<tr><td style="text-align:center">${i + 1}</td><td>${l.date || ""}</td><td>${l.person || ""}</td><td>${l.job_done || ""}</td><td>${l.in_time || ""}</td><td>${l.out_time || ""}</td></tr>`).join("")}
-    </table>`;
-    } else if (section === "grn") {
-      html += `<h2>Good Received Note</h2>
-    <table>
-      <tr><td class="label">Date</td><td>${grn.date || ""}</td><td class="label">Time</td><td>${grn.time || ""}</td></tr>
-      <tr><td class="label">Customer</td><td>${main.customer_name || ""}</td><td class="label">Contact Detail</td><td>${grn.contact_detail || ""}</td></tr>
-      <tr><td class="label">Item</td><td>${main.item || ""}</td><td class="label">Item Number</td><td>${main.item_number || ""}</td></tr>
-      <tr><td class="label">Vehicle Number</td><td colspan="3">${grn.vehicle_number || ""}</td></tr>
-      <tr><td class="label">Job Card Number</td><td colspan="3"><strong>${jobCardNumber}</strong></td></tr>
-      <tr><td class="label">Job Description</td><td colspan="3" style="min-height:36px">${grn.job_description || ""}</td></tr>
-      <tr><td class="label">Note</td><td colspan="3" style="min-height:30px">${grn.note || ""}</td></tr>
-      <tr><td class="label">Driver</td><td>${grn.driver || ""}</td><td class="label">ID Number</td><td>${grn.driver_id_number || ""}</td></tr>
-      <tr><td class="label">Office</td><td colspan="2">${grn.office_person || ""}</td><td class="label">Signature: ________</td></tr>
+      <tr><th>No</th><th>Date</th><th>Person</th><th>Job Done</th><th>In Time</th><th>Out Time</th></tr>
+      ${labor
+        .map(
+          (l, i) =>
+            `<tr><td>${i + 1}</td><td>${esc(l.date)}</td><td>${esc(l.person)}</td><td>${esc(l.job_done)}</td><td>${esc(l.in_time)}</td><td>${esc(l.out_time)}</td></tr>`,
+        )
+        .join("")}
     </table>`;
     } else if (section === "dispatch") {
-      html += `<h2>Dispatch Note</h2>
+      html += `<h2>Dispatch Note</h2>${top}
     <table>
-      <tr><td class="label">Date</td><td>${dispatch.date || ""}</td><td class="label">Time</td><td>${dispatch.time || ""}</td></tr>
-      <tr><td class="label">Customer</td><td>${main.customer_name || ""}</td><td class="label">Contact Detail</td><td>${dispatch.contact_detail || ""}</td></tr>
-      <tr><td class="label">Item</td><td>${main.item || ""}</td><td class="label">Item Number</td><td>${main.item_number || ""}</td></tr>
-      <tr><td class="label">Job Card Number</td><td colspan="3"><strong>${jobCardNumber}</strong></td></tr>
-      <tr><td class="label">Invoice Number</td><td colspan="3">${dispatch.invoice_number || ""}</td></tr>
-      <tr><td class="label">Vehicle Number</td><td colspan="3">${dispatch.vehicle_number || ""}</td></tr>
-      <tr><td class="label">Driver</td><td>${dispatch.driver || ""}</td><td class="label">ID Number</td><td>${dispatch.driver_id_number || ""}</td></tr>
-      <tr><td class="label">Office</td><td colspan="2">${dispatch.office_person || ""}</td><td class="label">Signature: ________</td></tr>
-      <tr><td class="label">Stores</td><td colspan="2">${dispatch.stores_person || ""}</td><td class="label">Signature: ________</td></tr>
+      <tr><td class="label">Date</td><td>${esc(dispatch.date)}</td><td class="label">Time</td><td>${esc(dispatch.time)}</td></tr>
+      <tr><td class="label">Customer</td><td>${esc(main.customer_name)}</td><td class="label">Contact</td><td>${esc(dispatch.contact_detail)}</td></tr>
+      <tr><td class="label">Item</td><td>${esc(main.item)}</td><td class="label">Item Number</td><td>${esc(main.item_number)}</td></tr>
+      <tr><td class="label">Invoice Number</td><td colspan="3">${esc(dispatch.invoice_number)}</td></tr>
+      <tr><td class="label">Vehicle Number</td><td colspan="3">${esc(dispatch.vehicle_number)}</td></tr>
+      <tr><td class="label">Driver</td><td>${esc(dispatch.driver)}</td><td class="label">ID Number</td><td>${esc(dispatch.driver_id_number)}</td></tr>
+      <tr><td class="label">Office</td><td colspan="2">${esc(dispatch.office_person)}</td><td class="label">Signature: ________</td></tr>
+      <tr><td class="label">Stores</td><td colspan="2">${esc(dispatch.stores_person)}</td><td class="label">Signature: ________</td></tr>
     </table>`;
     }
 
-    html += `
-  <script>
-    window.onload = function() {
-      window.print();
-    };
-  </script>
-  </body></html>`;
-
-    // Open in new window — browser print dialog opens automatically
-    const printWindow = window.open("", "_blank");
-    if (printWindow) {
-      printWindow.document.write(html);
-      printWindow.document.close();
+    html += `<script>window.onload = function () { window.print(); };</script></body></html>`;
+    const w = window.open("", "_blank");
+    if (w) {
+      w.document.write(html);
+      w.document.close();
     }
   };
 
-  const getInitials = (name: string) => {
-    const w = name.trim().split(" ");
-    return w.length === 1
-      ? w[0].substring(0, 2).toUpperCase()
-      : (w[0][0] + w[w.length - 1][0]).toUpperCase();
-  };
-  const getColor = (name: string) => {
-    const colors = [
-      "#667eea",
-      "#2196F3",
-      "#4CAF50",
-      "#FF9800",
-      "#E91E63",
-      "#00BCD4",
-      "#9C27B0",
-      "#FF5722",
-      "#009688",
-      "#3F51B5",
-    ];
-    let h = 0;
-    for (let i = 0; i < name.length; i++)
-      h = name.charCodeAt(i) + ((h << 5) - h);
-    return colors[Math.abs(h) % colors.length];
-  };
   const clr = customerName ? getColor(customerName) : "#667eea";
   const initials = customerName ? getInitials(customerName) : "WS";
 
+  // ═══════════════════════════ RENDER ═══════════════════════════
   return (
     <div className="project-dashboard">
       {/* Header */}
@@ -735,32 +840,24 @@ const WorkshopJobCardDetail = () => {
         <div className="project-header-row">
           <div>
             <h2 style={{ margin: 0 }}>
-              {isNew ? (
-                "🆕 New Job Card"
-              ) : (
-                <>
-                  🗂️ {jobCardNumber}
-                  {main.job_card_name && (
-                    <span
-                      style={{
-                        marginLeft: "12px",
-                        fontSize: "0.9em",
-                        color: "#4f46e5",
-                        fontWeight: 500,
-                      }}
-                    >
-                      — {main.job_card_name}
-                    </span>
-                  )}
-                </>
+              {isNew ? "🆕 New Job Card" : `🗂️ ${jobCardNumber}`}
+              {main.job_card_name && (
+                <span
+                  style={{
+                    marginLeft: "12px",
+                    fontSize: "0.9em",
+                    color: "#4f46e5",
+                    fontWeight: 500,
+                  }}
+                >
+                  — {main.job_card_name}
+                </span>
               )}
             </h2>
             {!isNew && (
               <select
                 value={main.status}
-                onChange={(e) =>
-                  setMain((s) => ({ ...s, status: e.target.value }))
-                }
+                onChange={(e) => handleStatusChange(e.target.value)}
                 style={{
                   marginTop: "6px",
                   padding: "4px 10px",
@@ -825,769 +922,311 @@ const WorkshopJobCardDetail = () => {
                 marginBottom: "-2px",
               }}
             >
-              {["🗒️", "📋", "👷", "📥", "🚚"][i]} {tab}
+              {TAB_ICONS[i]} {tab}
             </button>
           ))}
         </div>
 
-        {!isNew && (
+        {/* Job card number chip + purchasing link */}
+        <div
+          style={{
+            display: "flex",
+            gap: "10px",
+            alignItems: "center",
+            marginBottom: "16px",
+            flexWrap: "wrap",
+          }}
+        >
           <div
             style={{
-              display: "flex",
-              gap: "10px",
-              alignItems: "center",
-              marginBottom: "16px",
-              flexWrap: "wrap",
+              padding: "8px 14px",
+              background: "#f0f4ff",
+              borderRadius: "8px",
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#667eea",
+              border: "1.5px solid #c7d7ff",
             }}
           >
-            <div
+            🗂️ Job Card: {jobCardNumber || "..."}
+          </div>
+          {isNew && (
+            <span style={{ fontSize: "12px", color: "#888" }}>
+              This number is confirmed when you save the GRN.
+            </span>
+          )}
+          {!isNew && purchasingEntryId && purchasingCustId && (
+            <button
+              onClick={() =>
+                navigate(
+                  `/purchasing/workshop/customers/${customerId}/dashboard`,
+                  {
+                    state: {
+                      customer: { id: Number(customerId), name: customerName },
+                      highlightEntryId: purchasingEntryId,
+                    },
+                  },
+                )
+              }
               style={{
-                padding: "8px 14px",
-                background: "#f0f4ff",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "8px 16px",
+                background: "#667eea",
+                color: "#fff",
+                border: "none",
                 borderRadius: "8px",
+                cursor: "pointer",
                 fontSize: "13px",
                 fontWeight: 600,
-                color: "#667eea",
-                border: "1.5px solid #c7d7ff",
-                display: "inline-block",
               }}
             >
-              🗂️ Job Card: {jobCardNumber}
-            </div>
-            {purchasingEntryId && purchasingCustId && (
-              <button
-                onClick={() =>
-                  navigate(
-                    `/purchasing/workshop/customers/${customerId}/dashboard`,
-                    {
-                      state: {
-                        customer: {
-                          id: Number(customerId),
-                          name: customerName,
-                        },
-                        highlightEntryId: purchasingEntryId,
-                      },
-                    },
-                  )
-                }
-                // onClick={() =>
-                //   navigate(
-                //     `/purchasing/customers/${purchasingCustId}/entries`,
-                //     {
-                //       state: {
-                //         customer: { id: purchasingCustId, name: customerName },
-                //         highlightEntryId: purchasingEntryId,
-                //       },
-                //     },
-                //   )
-                // }
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "8px 16px",
-                  background: "#667eea",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "8px",
-                  cursor: "pointer",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                }}
-              >
-                🛒 View Purchasing Entry
-              </button>
-            )}
-          </div>
-        )}
+              🛒 View Purchasing Entry
+            </button>
+          )}
+        </div>
 
-        {/* ══════════════════════════════════════════════════════ */}
-        {/* TAB 0 — MAIN JOB CARD (Word document form layout)     */}
-        {/* ══════════════════════════════════════════════════════ */}
+        {/* ═══ TAB 0 — GRN ═══ */}
         {activeTab === 0 && (
-          <div style={{ maxWidth: "900px" }}>
-            <CompanyHeader subtitle="Workshop Job Card" />
-
-            {/* Row 1: Date + Time */}
+          <div style={{ maxWidth: "800px" }}>
+            <CompanyHeader subtitle="Goods Received Note (GRN)" />
             <table style={tableStyle}>
               <tbody>
                 <tr>
-                  <td style={labelStyle} width="120">
-                    Job Card Name
-                  </td>
-                  <td colSpan={3} style={cellStyle}>
-                    <input
-                      type="text"
+                  <L w={120}>Job Card No</L>
+                  <C>
+                    <strong>{jobCardNumber || "..."}</strong>
+                  </C>
+                  <L w={120}>Job Card Name *</L>
+                  <C>
+                    <Inp
                       value={main.job_card_name}
-                      onChange={(e) =>
-                        setMain((s) => ({
-                          ...s,
-                          job_card_name: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
-                      placeholder="Give this job card a name (e.g. 'AC Compressor Repair')"
+                      onChange={(v) => setM("job_card_name", v)}
+                      placeholder="e.g. AC Compressor Repair"
                     />
-                  </td>
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle} width="120">
-                    Date
-                  </td>
-                  <td style={cellStyle}>
-                    <input
-                      type="date"
-                      value={main.date}
-                      onChange={(e) =>
-                        setMain((s) => ({ ...s, date: e.target.value }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                  <td style={labelStyle} width="80">
-                    Time
-                  </td>
-                  <td style={cellStyle}>
-                    <input
-                      type="time"
-                      value={main.time}
-                      onChange={(e) =>
-                        setMain((s) => ({ ...s, time: e.target.value }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
+                  <L>Date</L>
+                  <C>
+                    <Inp value={grn.date} type="date" readOnly />
+                  </C>
+                  <L>Time</L>
+                  <C>
+                    <Inp value={grn.time} type="time" readOnly />
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Customer</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
-                      value={main.customer_name}
-                      onChange={(e) =>
-                        setMain((s) => ({
-                          ...s,
-                          customer_name: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
-                      placeholder="Customer name"
-                    />
-                  </td>
-                  <td style={labelStyle}>Contact No</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
+                  <L>Customer</L>
+                  <C>
+                    <Inp value={main.customer_name} readOnly />
+                  </C>
+                  <L>Contact Detail</L>
+                  <C>
+                    <Inp
                       value={main.contact_number}
-                      onChange={(e) =>
-                        setMain((s) => ({
-                          ...s,
-                          contact_number: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
+                      onChange={(v) => setM("contact_number", v)}
                     />
-                  </td>
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Item</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
+                  <L>Item *</L>
+                  <C>
+                    <Inp
                       value={main.item}
-                      onChange={(e) =>
-                        setMain((s) => ({ ...s, item: e.target.value }))
-                      }
-                      style={inputStyle}
-                      placeholder="Item description *"
+                      onChange={(v) => setM("item", v)}
+                      placeholder="Item description"
                     />
-                  </td>
-                  <td style={labelStyle}>Item Number</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
+                  </C>
+                  <L>Item Number</L>
+                  <C>
+                    <Inp
                       value={main.item_number}
-                      onChange={(e) =>
-                        setMain((s) => ({ ...s, item_number: e.target.value }))
-                      }
-                      style={inputStyle}
+                      onChange={(v) => setM("item_number", v)}
                     />
-                  </td>
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Vehicle Number</td>
-                  <td colSpan={3} style={cellStyle}>
-                    <input
-                      type="text"
-                      value={main.vehicle_number}
-                      onChange={(e) =>
-                        setMain((s) => ({
-                          ...s,
-                          vehicle_number: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
+                  <L>Vehicle Number</L>
+                  <C span={3}>
+                    <Inp
+                      value={grn.vehicle_number}
+                      onChange={(v) => setG("vehicle_number", v)}
                     />
-                  </td>
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Company Reference</td>
-                  <td colSpan={3} style={cellStyle}>
-                    <input
-                      type="text"
-                      value={main.company_reference}
-                      onChange={(e) =>
-                        setMain((s) => ({
-                          ...s,
-                          company_reference: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
+                  <L>Job Description</L>
+                  <C span={3} style={{ height: "60px" }}>
+                    <Area
+                      value={grn.job_description}
+                      onChange={(v) => setG("job_description", v)}
+                      height="55px"
                     />
-                  </td>
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Job Description</td>
-                  <td colSpan={3} style={{ ...cellStyle, height: "60px" }}>
-                    <textarea
-                      value={main.job_description}
-                      onChange={(e) =>
-                        setMain((s) => ({
-                          ...s,
-                          job_description: e.target.value,
-                        }))
-                      }
-                      style={{
-                        ...inputStyle,
-                        height: "55px",
-                        resize: "vertical",
-                        display: "block",
-                      }}
+                  <L>Note</L>
+                  <C span={3} style={{ height: "50px" }}>
+                    <Area
+                      value={grn.note}
+                      onChange={(v) => setG("note", v)}
+                      height="45px"
                     />
-                  </td>
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Note</td>
-                  <td colSpan={3} style={{ ...cellStyle, height: "50px" }}>
-                    <textarea
-                      value={main.note}
-                      onChange={(e) =>
-                        setMain((s) => ({ ...s, note: e.target.value }))
-                      }
-                      style={{
-                        ...inputStyle,
-                        height: "45px",
-                        resize: "vertical",
-                        display: "block",
-                      }}
+                  <L>Driver</L>
+                  <C>
+                    <Inp
+                      value={grn.driver}
+                      onChange={(v) => setG("driver", v)}
                     />
-                  </td>
+                  </C>
+                  <L>ID Number</L>
+                  <C>
+                    <Inp
+                      value={grn.driver_id_number}
+                      onChange={(v) => setG("driver_id_number", v)}
+                    />
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Driver</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
-                      value={main.driver}
-                      onChange={(e) =>
-                        setMain((s) => ({ ...s, driver: e.target.value }))
-                      }
-                      style={inputStyle}
+                  <L>Office</L>
+                  <C span={2}>
+                    <Inp
+                      value={grn.office_person}
+                      onChange={(v) => setG("office_person", v)}
                     />
-                  </td>
-                  <td style={labelStyle}>ID Number</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
-                      value={main.driver_id_number}
-                      onChange={(e) =>
-                        setMain((s) => ({
-                          ...s,
-                          driver_id_number: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td style={labelStyle}>Received By</td>
-                  <td colSpan={2} style={cellStyle}>
-                    <input
-                      type="text"
-                      value={main.received_by}
-                      onChange={(e) =>
-                        setMain((s) => ({ ...s, received_by: e.target.value }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                  <td
-                    style={{
-                      ...cellStyle,
-                      color: "#999",
-                      fontSize: "11px",
-                      fontStyle: "italic",
-                    }}
-                  >
-                    Signature: ___________
-                  </td>
-                </tr>
-                <tr>
-                  <td style={labelStyle}>Approved By</td>
-                  <td colSpan={2} style={cellStyle}>
-                    <input
-                      type="text"
-                      value={main.approved_by}
-                      onChange={(e) =>
-                        setMain((s) => ({ ...s, approved_by: e.target.value }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                  <td
-                    style={{
-                      ...cellStyle,
-                      color: "#999",
-                      fontSize: "11px",
-                      fontStyle: "italic",
-                    }}
-                  >
-                    Signature: ___________
-                  </td>
+                  </C>
+                  <td style={sigStyle}>Signature: ___________</td>
                 </tr>
               </tbody>
             </table>
-
-            {!isNew && (
-              <>
-                <SectionHeader title="Office Use — Workshop Received" />
-                <table style={tableStyle}>
-                  <tbody>
-                    <tr>
-                      <td style={labelStyle} width="140">
-                        Received Date
-                      </td>
-                      <td style={cellStyle}>
-                        <input
-                          type="date"
-                          value={main.workshop_received_date}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              workshop_received_date: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                      <td style={labelStyle} width="60">
-                        Time
-                      </td>
-                      <td style={cellStyle}>
-                        <input
-                          type="time"
-                          value={main.workshop_received_time}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              workshop_received_time: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={labelStyle}>Note</td>
-                      <td colSpan={3} style={cellStyle}>
-                        <input
-                          type="text"
-                          value={main.workshop_received_note}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              workshop_received_note: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={labelStyle}>Received By</td>
-                      <td colSpan={2} style={cellStyle}>
-                        <input
-                          type="text"
-                          value={main.workshop_received_by}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              workshop_received_by: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                      <td
-                        style={{
-                          ...cellStyle,
-                          color: "#999",
-                          fontSize: "11px",
-                          fontStyle: "italic",
-                        }}
-                      >
-                        Signature: ___________
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <SectionHeader title="Job Finishing" />
-                <table style={tableStyle}>
-                  <tbody>
-                    <tr>
-                      <td style={labelStyle} width="140">
-                        Finished Date
-                      </td>
-                      <td style={cellStyle}>
-                        <input
-                          type="date"
-                          value={main.finished_date}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              finished_date: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                      <td style={labelStyle} width="60">
-                        Time
-                      </td>
-                      <td style={cellStyle}>
-                        <input
-                          type="time"
-                          value={main.finished_time}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              finished_time: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={labelStyle}>Note</td>
-                      <td colSpan={3} style={cellStyle}>
-                        <input
-                          type="text"
-                          value={main.finished_note}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              finished_note: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={labelStyle}>Checked By</td>
-                      <td colSpan={2} style={cellStyle}>
-                        <input
-                          type="text"
-                          value={main.checked_by}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              checked_by: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                      <td
-                        style={{
-                          ...cellStyle,
-                          color: "#999",
-                          fontSize: "11px",
-                          fontStyle: "italic",
-                        }}
-                      >
-                        Signature: ___________
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-
-                <SectionHeader title="Finalizing" />
-                <table style={tableStyle}>
-                  <thead>
-                    <tr>
-                      <th style={{ ...labelStyle, width: "80px" }}></th>
-                      <th style={labelStyle}>Received Date</th>
-                      <th style={labelStyle}>Time</th>
-                      <th style={labelStyle}>Person</th>
-                      <th style={{ ...labelStyle, width: "140px" }}>
-                        Signature
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td style={labelStyle}>Stores</td>
-                      <td style={cellStyle}>
-                        <input
-                          type="date"
-                          value={main.stores_received_date}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              stores_received_date: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                      <td style={cellStyle}>
-                        <input
-                          type="time"
-                          value={main.stores_received_time}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              stores_received_time: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                      <td style={cellStyle}>
-                        <input
-                          type="text"
-                          value={main.stores_person}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              stores_person: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                      <td
-                        style={{
-                          ...cellStyle,
-                          color: "#999",
-                          fontSize: "11px",
-                          fontStyle: "italic",
-                        }}
-                      >
-                        ___________
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={labelStyle}>Office</td>
-                      <td style={cellStyle}>
-                        <input
-                          type="date"
-                          value={main.office_received_date}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              office_received_date: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                      <td style={cellStyle}>
-                        <input
-                          type="time"
-                          value={main.office_received_time}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              office_received_time: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                      <td style={cellStyle}>
-                        <input
-                          type="text"
-                          value={main.office_person}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              office_person: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                      <td
-                        style={{
-                          ...cellStyle,
-                          color: "#999",
-                          fontSize: "11px",
-                          fontStyle: "italic",
-                        }}
-                      >
-                        ___________
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style={labelStyle}>Note</td>
-                      <td colSpan={4} style={cellStyle}>
-                        <input
-                          type="text"
-                          value={main.finalizing_note}
-                          onChange={(e) =>
-                            setMain((s) => ({
-                              ...s,
-                              finalizing_note: e.target.value,
-                            }))
-                          }
-                          style={inputStyle}
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </>
-            )}
-
             <div
               style={{
                 display: "flex",
                 gap: "10px",
                 justifyContent: "flex-end",
-                marginTop: "16px",
+                marginTop: "12px",
                 flexWrap: "wrap",
               }}
             >
               {!isNew && (
                 <DownloadBtn
-                  section="jobcard"
-                  label="Job Card"
+                  section="grn"
+                  label="GRN"
                   onDownload={handleDownload}
                 />
               )}
               <button
                 className="btn-save-project"
-                onClick={handleSaveMain}
+                onClick={handleSaveGRN}
                 disabled={saving}
               >
                 {saving
                   ? "⏳ Saving..."
                   : isNew
-                    ? "💾 Create Job Card"
-                    : "💾 Save Changes"}
+                    ? "💾 Create Job Card (Save GRN)"
+                    : "💾 Save GRN"}
               </button>
             </div>
           </div>
         )}
 
-        {/* ══════════════════════════════════════════════════════ */}
-        {/* TAB 1 — ITEM LIST                                      */}
-        {/* ══════════════════════════════════════════════════════ */}
+        {/* ═══ TAB 1 — ITEM LIST ═══ */}
         {activeTab === 1 && (
-          <div style={{ maxWidth: "700px" }}>
+          <div style={{ maxWidth: "1150px" }}>
             <CompanyHeader subtitle="Workshop Item List" />
             <table style={tableStyle}>
               <tbody>
                 <tr>
-                  <td style={labelStyle} width="140">
-                    Job Card Number
-                  </td>
-                  <td style={cellStyle} colSpan={4}>
-                    {jobCardNumber}
-                  </td>
+                  <L w={120}>Job Card No</L>
+                  <C>
+                    <strong>{jobCardNumber}</strong>
+                  </C>
+                  <L w={120}>Job Card Name</L>
+                  <C>
+                    <strong>{main.job_card_name}</strong>
+                  </C>
                 </tr>
               </tbody>
             </table>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  {["No", "Date", "Item", "Item Number", "Quantity"].map(
-                    (h) => (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ ...tableStyle, minWidth: "1000px" }}>
+                <thead>
+                  <tr>
+                    {[
+                      "No",
+                      "Requested Date",
+                      "Time",
+                      "Due Date",
+                      "Item *",
+                      "Item No *",
+                      "Quantity",
+                      "Remarks",
+                      "Order Form No",
+                      "PO No",
+                    ].map((h) => (
                       <th
                         key={h}
-                        style={{
-                          ...labelStyle,
-                          textAlign: "center",
-                          border: "1px solid #333",
-                        }}
+                        style={{ ...labelStyle, textAlign: "center" }}
                       >
                         {h}
                       </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((it, i) => (
-                  <tr key={i}>
-                    <td
-                      style={{
-                        ...cellStyle,
-                        textAlign: "center",
-                        fontWeight: 600,
-                        width: "36px",
-                        background: "#f5f5f5",
-                      }}
-                    >
-                      {i + 1}
-                    </td>
-                    <TI
-                      value={it.date}
-                      onChange={(v) =>
-                        setItems((r) =>
-                          r.map((x, ri) => (ri === i ? { ...x, date: v } : x)),
-                        )
-                      }
-                      type="date"
-                    />
-                    <TI
-                      value={it.item}
-                      onChange={(v) =>
-                        setItems((r) =>
-                          r.map((x, ri) => (ri === i ? { ...x, item: v } : x)),
-                        )
-                      }
-                    />
-                    <TI
-                      value={it.item_number}
-                      onChange={(v) =>
-                        setItems((r) =>
-                          r.map((x, ri) =>
-                            ri === i ? { ...x, item_number: v } : x,
-                          ),
-                        )
-                      }
-                    />
-                    <TI
-                      value={it.quantity}
-                      onChange={(v) =>
-                        setItems((r) =>
-                          r.map((x, ri) =>
-                            ri === i ? { ...x, quantity: v } : x,
-                          ),
-                        )
-                      }
-                      type="number"
-                    />
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {items.map((it, i) => (
+                    <tr key={i}>
+                      <td
+                        style={{
+                          ...cellStyle,
+                          textAlign: "center",
+                          fontWeight: 600,
+                          width: "36px",
+                          background: "#f5f5f5",
+                        }}
+                      >
+                        {i + 1}
+                      </td>
+                      <RO value={it.date} />
+                      <RO value={it.time} />
+                      <TI
+                        value={it.due_date}
+                        type="date"
+                        onChange={(v) => updateItem(i, { due_date: v })}
+                      />
+                      <TI
+                        value={it.item}
+                        onChange={(v) => updateItem(i, { item: v })}
+                      />
+                      <TI
+                        value={it.item_number}
+                        onChange={(v) => updateItem(i, { item_number: v })}
+                      />
+                      <TI
+                        value={it.quantity}
+                        type="number"
+                        onChange={(v) => updateItem(i, { quantity: v })}
+                      />
+                      <TI
+                        value={it.remarks}
+                        onChange={(v) => updateItem(i, { remarks: v })}
+                      />
+                      <RO value={it.order_form_no} />
+                      <RO value={it.po_no} />
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p style={{ fontSize: "12px", color: "#888", margin: "0 0 8px" }}>
+              Requested date / time and Order Form No are generated
+              automatically. PO No fills in once it is entered in Purchasing.
+            </p>
             <div
               style={{
                 display: "flex",
@@ -1599,7 +1238,7 @@ const WorkshopJobCardDetail = () => {
             >
               <button
                 className="btn-add-small"
-                onClick={() => setItems((i) => [...i, emptyItem()])}
+                onClick={() => setItems((r) => [...r, emptyItem()])}
               >
                 + Add Row
               </button>
@@ -1621,21 +1260,21 @@ const WorkshopJobCardDetail = () => {
           </div>
         )}
 
-        {/* ══════════════════════════════════════════════════════ */}
-        {/* TAB 2 — LABOR SHEET                                    */}
-        {/* ══════════════════════════════════════════════════════ */}
+        {/* ═══ TAB 2 — LABOR SHEET ═══ */}
         {activeTab === 2 && (
           <div style={{ maxWidth: "900px" }}>
             <CompanyHeader subtitle="Workshop Labor Sheet" />
             <table style={tableStyle}>
               <tbody>
                 <tr>
-                  <td style={labelStyle} width="140">
-                    Job Card Number
-                  </td>
-                  <td style={cellStyle} colSpan={5}>
-                    {jobCardNumber}
-                  </td>
+                  <L w={120}>Job Card No</L>
+                  <C>
+                    <strong>{jobCardNumber}</strong>
+                  </C>
+                  <L w={120}>Job Card Name</L>
+                  <C>
+                    <strong>{main.job_card_name}</strong>
+                  </C>
                 </tr>
               </tbody>
             </table>
@@ -1650,14 +1289,7 @@ const WorkshopJobCardDetail = () => {
                     "In Time",
                     "Out Time",
                   ].map((h) => (
-                    <th
-                      key={h}
-                      style={{
-                        ...labelStyle,
-                        textAlign: "center",
-                        border: "1px solid #333",
-                      }}
-                    >
+                    <th key={h} style={{ ...labelStyle, textAlign: "center" }}>
                       {h}
                     </th>
                   ))}
@@ -1677,61 +1309,33 @@ const WorkshopJobCardDetail = () => {
                     >
                       {i + 1}
                     </td>
-                    <TI
-                      value={lb.date}
-                      onChange={(v) =>
-                        setLabor((r) =>
-                          r.map((x, ri) => (ri === i ? { ...x, date: v } : x)),
-                        )
-                      }
-                      type="date"
-                    />
+                    <RO value={lb.date} />
                     <TI
                       value={lb.person}
-                      onChange={(v) =>
-                        setLabor((r) =>
-                          r.map((x, ri) =>
-                            ri === i ? { ...x, person: v } : x,
-                          ),
-                        )
-                      }
+                      onChange={(v) => updateLabor(i, { person: v })}
                     />
                     <TI
                       value={lb.job_done}
-                      onChange={(v) =>
-                        setLabor((r) =>
-                          r.map((x, ri) =>
-                            ri === i ? { ...x, job_done: v } : x,
-                          ),
-                        )
-                      }
+                      onChange={(v) => updateLabor(i, { job_done: v })}
                     />
                     <TI
                       value={lb.in_time}
-                      onChange={(v) =>
-                        setLabor((r) =>
-                          r.map((x, ri) =>
-                            ri === i ? { ...x, in_time: v } : x,
-                          ),
-                        )
-                      }
                       type="time"
+                      onChange={(v) => updateLabor(i, { in_time: v })}
                     />
                     <TI
                       value={lb.out_time}
-                      onChange={(v) =>
-                        setLabor((r) =>
-                          r.map((x, ri) =>
-                            ri === i ? { ...x, out_time: v } : x,
-                          ),
-                        )
-                      }
                       type="time"
+                      onChange={(v) => updateLabor(i, { out_time: v })}
                     />
                   </tr>
                 ))}
               </tbody>
             </table>
+            <p style={{ fontSize: "12px", color: "#888", margin: "0 0 8px" }}>
+              Date and In Time are filled automatically when you start a row (In
+              Time can still be edited). Enter Out Time when the work is done.
+            </p>
             <div
               style={{
                 display: "flex",
@@ -1765,377 +1369,102 @@ const WorkshopJobCardDetail = () => {
           </div>
         )}
 
-        {/* ══════════════════════════════════════════════════════ */}
-        {/* TAB 3 — GOOD RECEIVED NOTE                            */}
-        {/* ══════════════════════════════════════════════════════ */}
+        {/* ═══ TAB 3 — DISPATCH NOTE ═══ */}
         {activeTab === 3 && (
-          <div style={{ maxWidth: "800px" }}>
-            <CompanyHeader subtitle="Good Received Note" />
-            <table style={tableStyle}>
-              <tbody>
-                <tr>
-                  <td style={labelStyle} width="140">
-                    Date
-                  </td>
-                  <td style={cellStyle}>
-                    <input
-                      type="date"
-                      value={grn.date}
-                      onChange={(e) =>
-                        setGrn((s) => ({ ...s, date: e.target.value }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                  <td style={labelStyle} width="60">
-                    Time
-                  </td>
-                  <td style={cellStyle}>
-                    <input
-                      type="time"
-                      value={grn.time}
-                      onChange={(e) =>
-                        setGrn((s) => ({ ...s, time: e.target.value }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td style={labelStyle}>Customer</td>
-                  <td style={cellStyle}>{main.customer_name}</td>
-                  <td style={labelStyle}>Contact Detail</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
-                      value={grn.contact_detail}
-                      onChange={(e) =>
-                        setGrn((s) => ({
-                          ...s,
-                          contact_detail: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td style={labelStyle}>Item</td>
-                  <td style={cellStyle}>{main.item}</td>
-                  <td style={labelStyle}>Item Number</td>
-                  <td style={cellStyle}>{main.item_number}</td>
-                </tr>
-                <tr>
-                  <td style={labelStyle}>Vehicle Number</td>
-                  <td colSpan={3} style={cellStyle}>
-                    <input
-                      type="text"
-                      value={grn.vehicle_number}
-                      onChange={(e) =>
-                        setGrn((s) => ({
-                          ...s,
-                          vehicle_number: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td style={labelStyle}>Job Card Number</td>
-                  <td colSpan={3} style={cellStyle}>
-                    {jobCardNumber}
-                  </td>
-                </tr>
-                <tr>
-                  <td style={labelStyle}>Job Description</td>
-                  <td colSpan={3} style={{ ...cellStyle, height: "60px" }}>
-                    <textarea
-                      value={grn.job_description}
-                      onChange={(e) =>
-                        setGrn((s) => ({
-                          ...s,
-                          job_description: e.target.value,
-                        }))
-                      }
-                      style={{
-                        ...inputStyle,
-                        height: "55px",
-                        resize: "vertical",
-                        display: "block",
-                      }}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td style={labelStyle}>Note</td>
-                  <td colSpan={3} style={{ ...cellStyle, height: "50px" }}>
-                    <textarea
-                      value={grn.note}
-                      onChange={(e) =>
-                        setGrn((s) => ({ ...s, note: e.target.value }))
-                      }
-                      style={{
-                        ...inputStyle,
-                        height: "45px",
-                        resize: "vertical",
-                        display: "block",
-                      }}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td style={labelStyle}>Driver</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
-                      value={grn.driver}
-                      onChange={(e) =>
-                        setGrn((s) => ({ ...s, driver: e.target.value }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                  <td style={labelStyle}>ID Number</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
-                      value={grn.driver_id_number}
-                      onChange={(e) =>
-                        setGrn((s) => ({
-                          ...s,
-                          driver_id_number: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                </tr>
-                <tr>
-                  <td style={labelStyle}>Office</td>
-                  <td colSpan={2} style={cellStyle}>
-                    <input
-                      type="text"
-                      value={grn.office_person}
-                      onChange={(e) =>
-                        setGrn((s) => ({ ...s, office_person: e.target.value }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                  <td
-                    style={{
-                      ...cellStyle,
-                      color: "#999",
-                      fontSize: "11px",
-                      fontStyle: "italic",
-                    }}
-                  >
-                    Signature: ___________
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-            <div
-              style={{
-                display: "flex",
-                gap: "10px",
-                justifyContent: "flex-end",
-                marginTop: "12px",
-              }}
-            >
-              <DownloadBtn
-                section="grn"
-                label="GRN"
-                onDownload={handleDownload}
-              />
-              <button
-                className="btn-save-project"
-                onClick={handleSaveGRN}
-                disabled={saving}
-              >
-                {saving ? "⏳ Saving..." : "💾 Save GRN"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ══════════════════════════════════════════════════════ */}
-        {/* TAB 4 — DISPATCH NOTE                                  */}
-        {/* ══════════════════════════════════════════════════════ */}
-        {activeTab === 4 && (
           <div style={{ maxWidth: "800px" }}>
             <CompanyHeader subtitle="Dispatch Note" />
             <table style={tableStyle}>
               <tbody>
                 <tr>
-                  <td style={labelStyle} width="140">
-                    Date
-                  </td>
-                  <td style={cellStyle}>
-                    <input
-                      type="date"
-                      value={dispatch.date}
-                      onChange={(e) =>
-                        setDispatch((s) => ({ ...s, date: e.target.value }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
-                  <td style={labelStyle} width="60">
-                    Time
-                  </td>
-                  <td style={cellStyle}>
-                    <input
-                      type="time"
-                      value={dispatch.time}
-                      onChange={(e) =>
-                        setDispatch((s) => ({ ...s, time: e.target.value }))
-                      }
-                      style={inputStyle}
-                    />
-                  </td>
+                  <L w={120}>Job Card No</L>
+                  <C>
+                    <strong>{jobCardNumber}</strong>
+                  </C>
+                  <L w={120}>Job Card Name</L>
+                  <C>
+                    <strong>{main.job_card_name}</strong>
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Customer</td>
-                  <td style={cellStyle}>{main.customer_name}</td>
-                  <td style={labelStyle}>Contact Detail</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
+                  <L>Date</L>
+                  <C>
+                    <Inp value={dispatch.date} type="date" readOnly />
+                  </C>
+                  <L>Time</L>
+                  <C>
+                    <Inp value={dispatch.time} type="time" readOnly />
+                  </C>
+                </tr>
+                <tr>
+                  <L>Customer</L>
+                  <C>{main.customer_name}</C>
+                  <L>Contact Detail</L>
+                  <C>
+                    <Inp
                       value={dispatch.contact_detail}
-                      onChange={(e) =>
-                        setDispatch((s) => ({
-                          ...s,
-                          contact_detail: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
+                      onChange={(v) => setD("contact_detail", v)}
                     />
-                  </td>
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Item</td>
-                  <td style={cellStyle}>{main.item}</td>
-                  <td style={labelStyle}>Item Number</td>
-                  <td style={cellStyle}>{main.item_number}</td>
+                  <L>Item</L>
+                  <C>{main.item}</C>
+                  <L>Item Number</L>
+                  <C>{main.item_number}</C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Job Card Number</td>
-                  <td colSpan={3} style={cellStyle}>
-                    {jobCardNumber}
-                  </td>
-                </tr>
-                <tr>
-                  <td style={labelStyle}>Invoice Number</td>
-                  <td colSpan={3} style={cellStyle}>
-                    <input
-                      type="text"
+                  <L>Invoice Number</L>
+                  <C span={3}>
+                    <Inp
                       value={dispatch.invoice_number}
-                      onChange={(e) =>
-                        setDispatch((s) => ({
-                          ...s,
-                          invoice_number: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
+                      onChange={(v) => setD("invoice_number", v)}
                     />
-                  </td>
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Vehicle Number</td>
-                  <td colSpan={3} style={cellStyle}>
-                    <input
-                      type="text"
+                  <L>Vehicle Number</L>
+                  <C span={3}>
+                    <Inp
                       value={dispatch.vehicle_number}
-                      onChange={(e) =>
-                        setDispatch((s) => ({
-                          ...s,
-                          vehicle_number: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
+                      onChange={(v) => setD("vehicle_number", v)}
                     />
-                  </td>
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Driver</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
+                  <L>Driver</L>
+                  <C>
+                    <Inp
                       value={dispatch.driver}
-                      onChange={(e) =>
-                        setDispatch((s) => ({ ...s, driver: e.target.value }))
-                      }
-                      style={inputStyle}
+                      onChange={(v) => setD("driver", v)}
                     />
-                  </td>
-                  <td style={labelStyle}>ID Number</td>
-                  <td style={cellStyle}>
-                    <input
-                      type="text"
+                  </C>
+                  <L>ID Number</L>
+                  <C>
+                    <Inp
                       value={dispatch.driver_id_number}
-                      onChange={(e) =>
-                        setDispatch((s) => ({
-                          ...s,
-                          driver_id_number: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
+                      onChange={(v) => setD("driver_id_number", v)}
                     />
-                  </td>
+                  </C>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Office</td>
-                  <td colSpan={2} style={cellStyle}>
-                    <input
-                      type="text"
+                  <L>Office</L>
+                  <C span={2}>
+                    <Inp
                       value={dispatch.office_person}
-                      onChange={(e) =>
-                        setDispatch((s) => ({
-                          ...s,
-                          office_person: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
+                      onChange={(v) => setD("office_person", v)}
                     />
-                  </td>
-                  <td
-                    style={{
-                      ...cellStyle,
-                      color: "#999",
-                      fontSize: "11px",
-                      fontStyle: "italic",
-                    }}
-                  >
-                    Signature: ___________
-                  </td>
+                  </C>
+                  <td style={sigStyle}>Signature: ___________</td>
                 </tr>
                 <tr>
-                  <td style={labelStyle}>Stores</td>
-                  <td colSpan={2} style={cellStyle}>
-                    <input
-                      type="text"
+                  <L>Stores</L>
+                  <C span={2}>
+                    <Inp
                       value={dispatch.stores_person}
-                      onChange={(e) =>
-                        setDispatch((s) => ({
-                          ...s,
-                          stores_person: e.target.value,
-                        }))
-                      }
-                      style={inputStyle}
+                      onChange={(v) => setD("stores_person", v)}
                     />
-                  </td>
-                  <td
-                    style={{
-                      ...cellStyle,
-                      color: "#999",
-                      fontSize: "11px",
-                      fontStyle: "italic",
-                    }}
-                  >
-                    Signature: ___________
-                  </td>
+                  </C>
+                  <td style={sigStyle}>Signature: ___________</td>
                 </tr>
               </tbody>
             </table>

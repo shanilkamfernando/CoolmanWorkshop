@@ -182,7 +182,12 @@ const ProductRowsTable = ({
 }: {
   rows: FlowProduct[];
   stage: string;
-  columns: { field: keyof FlowProduct; label: string; type?: string }[];
+  columns: {
+    field: keyof FlowProduct;
+    label: string;
+    type?: string;
+    readOnly?: boolean;
+  }[];
   isAdmin: boolean;
   isStageEditor: boolean;
   onSaveRow: (row: FlowProduct) => void;
@@ -312,7 +317,7 @@ const ProductRowsTable = ({
                 </td>
                 {columns.map((c) => (
                   <td key={String(c.field)} style={tdS}>
-                    {!isStageEditor || locked ? (
+                    {!isStageEditor || locked || c.readOnly ? (
                       <span>{(r[c.field] as string) || "—"}</span>
                     ) : (
                       <input
@@ -556,7 +561,11 @@ const StagePanel = ({
             isAdmin={isAdmin}
             isStageEditor={isOffice}
             columns={[
-              { field: "order_form_no", label: "Order Form No" },
+              {
+                field: "order_form_no",
+                label: "Order Form No",
+                readOnly: true,
+              },
               { field: "order_notes", label: "Notes" },
             ]}
             onSaveRow={(row) => onSaveProductRow(entry.id, "order", row)}
@@ -570,7 +579,13 @@ const StagePanel = ({
             stage="approve"
             isAdmin={isAdmin}
             isStageEditor={canApprove}
-            columns={[]}
+            columns={[
+              {
+                field: "order_form_no",
+                label: "Order Form No",
+                readOnly: true,
+              },
+            ]}
             showApprove
             editableQty
             onSaveRow={() => {}}
