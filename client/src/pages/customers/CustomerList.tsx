@@ -34,6 +34,11 @@ const CustomerList = () => {
   const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(
     null,
   );
+  const [search, setSearch] = useState("");
+
+  const filteredCustomers = customers.filter((c) =>
+    c.name.toLowerCase().includes(search.trim().toLowerCase()),
+  );
 
   useEffect(() => {
     const userData = localStorage.getItem("user");
@@ -213,11 +218,34 @@ const CustomerList = () => {
           )}
         </div>
 
+        {/* Search bar */}
+        <div style={{ marginBottom: "20px" }}>
+          <input
+            type="text"
+            placeholder="🔍 Search customers..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              padding: "10px 16px",
+              fontSize: "0.95rem",
+              border: "2px solid #e0e0e0",
+              borderRadius: "8px",
+              width: "100%",
+              maxWidth: "400px",
+              outline: "none",
+              background: "#fff",
+              boxSizing: "border-box",
+            }}
+            onFocus={(e) => (e.target.style.borderColor = "#667eea")}
+            onBlur={(e) => (e.target.style.borderColor = "#e0e0e0")}
+          />
+        </div>
+
         {loading ? (
           <div className="loading-center">Loading customers...</div>
         ) : (
           <div className="customers-grid">
-            {customers.map((customer) => {
+            {filteredCustomers.map((customer) => {
               const initials = getInitials(customer.name);
               const color = getColorFromName(customer.name);
 
@@ -250,10 +278,12 @@ const CustomerList = () => {
           </div>
         )}
 
-        {!loading && customers.length === 0 && (
+        {!loading && filteredCustomers.length === 0 && (
           <div className="empty-state">
-            <p>No customers found</p>
-            {isAdmin && (
+            <p>
+              {search ? "No customers match your search" : "No customers found"}
+            </p>
+            {isAdmin && !search && (
               <button
                 className="btn-add-customer"
                 onClick={() => setShowAddModal(true)}
