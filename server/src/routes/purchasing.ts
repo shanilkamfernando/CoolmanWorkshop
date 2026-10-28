@@ -81,41 +81,39 @@ router.get(
       // when the name is a unique match in both tables.
       await client.query(`
         UPDATE purchasing_customers pc
-        SET workshop_customer_id = c.id,
-            name = c.name,
-            updated_at = NOW()
-        FROM customers c
-        WHERE pc.workshop_customer_id IS NULL
-          AND LOWER(TRIM(pc.name)) = LOWER(TRIM(c.name))
-          AND (
-            SELECT COUNT(*)
-            FROM customers c2
-            WHERE LOWER(TRIM(c2.name)) = LOWER(TRIM(c.name))
-          ) = 1
-          AND (
-            SELECT COUNT(*)
-            FROM purchasing_customers pc2
-            WHERE pc2.workshop_customer_id IS NULL
-              AND LOWER(TRIM(pc2.name)) = LOWER(TRIM(pc.name))
-          ) = 1
-          AND NOT EXISTS (
-            SELECT 1
-            FROM purchasing_customers existing
-            WHERE existing.workshop_customer_id = c.id
-          )
+SET main_customer_id = c.id,
+    updated_at = NOW()
+FROM customers c
+WHERE pc.main_customer_id IS NULL
+  AND LOWER(TRIM(pc.name)) = LOWER(TRIM(c.name))
+  AND (
+    SELECT COUNT(*)
+    FROM customers c2
+    WHERE LOWER(TRIM(c2.name)) = LOWER(TRIM(c.name))
+  ) = 1
+  AND (
+    SELECT COUNT(*)
+    FROM purchasing_customers pc2
+    WHERE pc2.main_customer_id IS NULL
+      AND LOWER(TRIM(pc2.name)) = LOWER(TRIM(pc.name))
+  ) = 1
+  AND NOT EXISTS (
+    SELECT 1
+    FROM purchasing_customers existing
+    WHERE existing.main_customer_id = c.id
+  );
       `);
 
       // Add main Customers records that have not yet been linked.
       await client.query(`
-        INSERT INTO purchasing_customers
-          (name, created_by, workshop_customer_id)
-        SELECT c.name, 'System Sync', c.id
-        FROM customers c
-        WHERE NOT EXISTS (
-          SELECT 1
-          FROM purchasing_customers pc
-          WHERE pc.workshop_customer_id = c.id
-        )
+       INSERT INTO purchasing_customers
+    (name, created_by, main_customer_id)
+SELECT c.name, 'System Sync', c.id
+FROM customers c
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM purchasing_customers pc
+    WHERE pc.main_customer_id = c.id
       `);
 
       await client.query("COMMIT");
