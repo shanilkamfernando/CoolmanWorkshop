@@ -67,13 +67,13 @@ const Dashboard = () => {
     //   path: "/myTasks",
     //   description: "Specific Users Task management",
     // },
-    {
-      id: "jobAssigned",
-      label: "Job Assigned",
-      image: jobAssigned,
-      path: "/jobAssigned",
-      description: "Task management",
-    },
+    // {
+    //   id: "jobAssigned",
+    //   label: "Job Assigned",
+    //   image: jobAssigned,
+    //   path: "/jobAssigned",
+    //   description: "Task management",
+    // },
     {
       id: "purchasing",
       label: "Purchasing",
@@ -133,6 +133,48 @@ const Dashboard = () => {
     // },
   ];
 
+  const profilePortals = [
+    {
+      id: "jobAssigned",
+      label: "Job Assigned",
+      description: "View and manage assigned tasks",
+      path: "/jobAssigned",
+      icon: "📋",
+    },
+    {
+      id: "attendance",
+      label: "Attendance",
+      description: "Track employee attendance",
+      path: "/attendance",
+      icon: "🕒",
+      adminOnly: true,
+    },
+    {
+      id: "leave",
+      label: "Leave",
+      description: "Manage leave requests",
+      path: "/leave",
+      icon: "📅",
+      adminOnly: true,
+    },
+    {
+      id: "myDocuments",
+      label: "My Documents",
+      description: "Access employee documents",
+      path: "/myDocuments",
+      icon: "📁",
+      adminOnly: true,
+    },
+    {
+      id: "workReport",
+      label: "Work Report",
+      description: "View employee work reports",
+      path: "/workReport",
+      icon: "📊",
+      adminOnly: true,
+    },
+  ];
+
   const hasPortalAccess = (portalId: PortalId): boolean => {
     if (!user) return false;
     if (user.role === "admin") return true;
@@ -172,6 +214,78 @@ const Dashboard = () => {
         <div className="welcome-section">
           <h2>Welcome back, {user.firstName}! 👋</h2>
           <p>Select a portal to get started</p>
+        </div>
+
+        {/* My Profile Section */}
+        <div className="profile-section">
+          <div className="profile-card">
+            {/* Profile Header */}
+            <div className="profile-header">
+              <div className="profile-avatar">
+                {user.firstName?.charAt(0).toUpperCase()}
+                {user.lastName?.charAt(0).toUpperCase()}
+              </div>
+
+              <div className="profile-info">
+                <span className="profile-label">MY PROFILE</span>
+                <h2>
+                  {user.firstName} {user.lastName}
+                </h2>
+                <p>{user.username}</p>
+                <span className="profile-role">
+                  {user.role === "admin" ? "Administrator" : "Employee"}
+                </span>
+              </div>
+            </div>
+
+            <div className="profile-divider"></div>
+
+            {/* Profile Portals */}
+            <div className="profile-portal-heading">
+              <h3>My Workspace</h3>
+              <p>Your personal workspace and employee services</p>
+            </div>
+
+            <div className="profile-portal-grid">
+              {profilePortals.map((portal) => {
+                const isAdmin = user.role === "admin";
+
+                const hasAccess = portal.adminOnly
+                  ? isAdmin
+                  : portal.id === "jobAssigned"
+                    ? hasPortalAccess("jobAssigned")
+                    : false;
+
+                return (
+                  <div
+                    key={portal.id}
+                    className={`profile-portal-tile ${
+                      !hasAccess ? "profile-portal-disabled" : ""
+                    }`}
+                    onClick={() => hasAccess && navigate(portal.path)}
+                    title={
+                      hasAccess
+                        ? portal.label
+                        : "Only administrators can access this section"
+                    }
+                  >
+                    <div className="profile-portal-icon">{portal.icon}</div>
+
+                    <div className="profile-portal-details">
+                      <h4>{portal.label}</h4>
+                      <p>{portal.description}</p>
+                    </div>
+
+                    {!hasAccess ? (
+                      <span className="profile-lock">🔒</span>
+                    ) : (
+                      <span className="profile-arrow">→</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         {/* Portal Grid */}
