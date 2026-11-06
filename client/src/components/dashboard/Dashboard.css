@@ -511,13 +511,13 @@
   gap: 15px;
 }
 
-.user-name {
+/* .user-name {
   color: #fff;
 }
 
 .user-role {
   color: rgba(255, 255, 255, 0.8);
-}
+} */
 
 .btn-logout {
   white-space: nowrap;
