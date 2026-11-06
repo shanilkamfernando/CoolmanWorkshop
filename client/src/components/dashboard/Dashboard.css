@@ -461,3 +461,469 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* =========================================
+   COMPLETE DASHBOARD RESPONSIVE DESIGN
+========================================= */
+
+/* Prevent horizontal overflow */
+.dashboard {
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.dashboard *,
+.dashboard *::before,
+.dashboard *::after {
+  box-sizing: border-box;
+}
+
+/* Main content */
+.dashboard-content {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 40px 30px;
+}
+
+/* =========================================
+   HEADER RESPONSIVENESS
+========================================= */
+
+.dashboard-header {
+  width: 100%;
+}
+
+.header-content {
+  width: 100%;
+  min-height: 55px;
+  gap: 20px;
+}
+
+.dashboard-header h1 {
+  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+  line-height: 1.3;
+}
+
+.user-info {
+  flex-shrink: 0;
+  gap: 15px;
+}
+
+.user-name {
+  color: #fff;
+}
+
+.user-role {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.btn-logout {
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-logout:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* =========================================
+   WELCOME SECTION
+========================================= */
+
+.welcome-section {
+  margin-bottom: 30px;
+}
+
+.welcome-section h2 {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  line-height: 1.3;
+}
+
+.welcome-section p {
+  color: #718096;
+  font-size: 0.95rem;
+}
+
+/* =========================================
+   MAIN PORTAL GRID
+========================================= */
+
+.portal-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 20px;
+  width: 100%;
+}
+
+.portal-tile {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+/* Keep image tiles proportional */
+.portal-tile.image-tile {
+  aspect-ratio: 1 / 1;
+}
+
+.portal-tile-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* =========================================
+   MY PROFILE
+========================================= */
+
+.profile-section {
+  width: 100%;
+}
+
+.profile-card {
+  width: 100%;
+  min-width: 0;
+}
+
+.profile-header {
+  flex-wrap: wrap;
+}
+
+.profile-info {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.profile-portal-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.profile-portal-tile {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.profile-portal-details {
+  overflow-wrap: anywhere;
+}
+
+/* =========================================
+   LARGE TABLETS / SMALL LAPTOPS
+========================================= */
+
+@media (max-width: 1100px) {
+  .dashboard-content {
+    padding: 30px 24px;
+  }
+
+  .portal-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 18px;
+  }
+
+  .profile-portal-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* =========================================
+   TABLETS
+========================================= */
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: 16px 0;
+  }
+
+  .header-content {
+    padding: 0 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .user-info {
+    gap: 12px;
+  }
+
+  .user-name {
+    font-size: 0.9rem;
+  }
+
+  .user-role {
+    font-size: 0.75rem;
+  }
+
+  .btn-logout {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+
+  .dashboard-content {
+    padding: 25px 20px;
+  }
+
+  .welcome-section {
+    margin-bottom: 25px;
+  }
+
+  .portal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 16px;
+  }
+
+  .portal-tile.image-tile {
+    aspect-ratio: 1 / 1;
+  }
+
+  .profile-card {
+    padding: 22px;
+  }
+
+  .profile-portal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .profile-portal-tile {
+    min-height: 95px;
+    padding: 12px;
+  }
+
+  .profile-portal-details h4 {
+    font-size: 0.9rem;
+  }
+}
+
+/* =========================================
+   MOBILE PHONES
+========================================= */
+
+@media (max-width: 480px) {
+  .dashboard-header {
+    padding: 14px 0;
+  }
+
+  .header-content {
+    padding: 0 15px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .user-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .user-details {
+    text-align: left;
+  }
+
+  .user-name {
+    font-size: 0.9rem;
+  }
+
+  .btn-logout {
+    padding: 8px 15px;
+    border-radius: 7px;
+  }
+
+  .dashboard-content {
+    padding: 22px 15px;
+  }
+
+  .welcome-section {
+    margin-bottom: 22px;
+  }
+
+  .welcome-section h2 {
+    font-size: 1.4rem;
+    margin-bottom: 6px;
+  }
+
+  .welcome-section p {
+    font-size: 0.85rem;
+  }
+
+  /* Profile card */
+  .profile-section {
+    margin-bottom: 25px;
+  }
+
+  .profile-card {
+    padding: 18px 15px;
+    border-radius: 14px;
+  }
+
+  .profile-header {
+    gap: 13px;
+    flex-wrap: nowrap;
+  }
+
+  .profile-avatar {
+    width: 60px;
+    height: 60px;
+    min-width: 60px;
+    font-size: 20px;
+  }
+
+  .profile-label {
+    font-size: 0.68rem;
+  }
+
+  .profile-info h2 {
+    font-size: 1.1rem;
+  }
+
+  .profile-info p {
+    font-size: 0.8rem;
+  }
+
+  .profile-divider {
+    margin: 18px 0;
+  }
+
+  .profile-portal-heading {
+    margin-bottom: 15px;
+  }
+
+  .profile-portal-heading h3 {
+    font-size: 1.1rem;
+  }
+
+  .profile-portal-heading p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
+  .profile-portal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .profile-portal-tile {
+    min-height: 110px;
+    padding: 12px 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 10px;
+  }
+
+  .profile-portal-icon {
+    width: 35px;
+    min-width: 35px;
+    height: 35px;
+    font-size: 19px;
+  }
+
+  .profile-portal-details h4 {
+    font-size: 0.82rem;
+    margin-bottom: 3px;
+  }
+
+  .profile-portal-details p {
+    font-size: 0.7rem;
+  }
+
+  .profile-arrow,
+  .profile-lock {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 13px;
+  }
+
+  /* Main portal cards */
+  .portal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px;
+  }
+
+  .portal-tile {
+    padding: 0;
+    border-radius: 10px;
+  }
+
+  .portal-tile.image-tile {
+    aspect-ratio: 1 / 1;
+  }
+
+  .portal-tile-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Admin card */
+  .portal-tile.admin-tile {
+    padding: 15px;
+    min-height: 150px;
+  }
+
+  .portal-tile.admin-tile h3 {
+    font-size: 1rem;
+  }
+
+  .portal-tile.admin-tile p {
+    font-size: 0.8rem;
+  }
+
+  .admin-badge {
+    font-size: 0.65rem;
+    padding: 4px 7px;
+  }
+}
+
+/* =========================================
+   VERY SMALL MOBILE PHONES
+========================================= */
+
+@media (max-width: 350px) {
+  .dashboard-content {
+    padding: 18px 10px;
+  }
+
+  .header-content {
+    padding: 0 10px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 1.15rem;
+  }
+
+  .profile-card {
+    padding: 14px 10px;
+  }
+
+  .profile-portal-grid {
+    gap: 8px;
+  }
+
+  .profile-portal-tile {
+    padding: 9px;
+    min-height: 105px;
+  }
+
+  .portal-grid {
+    gap: 9px;
+  }
+
+  .profile-info h2 {
+    font-size: 1rem;
+  }
+}
