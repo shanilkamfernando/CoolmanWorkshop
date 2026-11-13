@@ -114,8 +114,16 @@ router.get(
       if (customer_id) {
         result = await pool.query(
           `SELECT b.*,
-            (b.available_quantity - COALESCE(SUM(cpe.required_quantity)
-              FILTER (WHERE cpe.entry_type = 'boq'), 0)) AS remaining_quantity
+            b.available_quantity - COALESCE(
+              SUM(
+                CASE
+                  WHEN cpe.approved = TRUE
+                    THEN COALESCE(cpe.approved_quantity, cpe.required_quantity)
+                  ELSE cpe.required_quantity
+                END
+              ) FILTER (WHERE cpe.entry_type = 'boq'),
+              0
+            ) AS remaining_quantity
            FROM boq_items b
            LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id
            WHERE b.customer_id = $1
@@ -126,8 +134,16 @@ router.get(
       } else {
         result = await pool.query(
           `SELECT b.*,
-            (b.available_quantity - COALESCE(SUM(cpe.required_quantity)
-              FILTER (WHERE cpe.entry_type = 'boq'), 0)) AS remaining_quantity
+           b.available_quantity - COALESCE(
+  SUM(
+    CASE
+      WHEN cpe.approved = TRUE
+        THEN COALESCE(cpe.approved_quantity, cpe.required_quantity)
+      ELSE cpe.required_quantity
+    END
+  ) FILTER (WHERE cpe.entry_type = 'boq'),
+  0
+) AS remaining_quantity
            FROM boq_items b
            LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id
            GROUP BY b.id
@@ -447,146 +463,6 @@ router.get(
   },
 );
 
-// POST create customer entry
-
-// router.post(
-
-//   "/boq/customer/:customerId/entries",
-
-//   authenticateToken,
-
-//   async (req: AuthRequest, res: Response): Promise<void> => {
-
-//     const pool = getPool(req);
-
-//     const { customerId } = req.params;
-
-//     const {
-
-//       entry_type,
-
-//       boq_item_id,
-
-//       product,
-
-//       specification,
-
-//       part_number,
-
-//       required_quantity,
-
-//       required_date,
-
-//       description,
-
-//     } = req.body;
-
-//     if (!product?.trim()) {
-
-//       res.status(400).json({ success: false, error: "Product is required" });
-
-//       return;
-
-//     }
-
-//     try {
-
-//       let available_quantity = null;
-
-//       let shortage_quantity = 0;
-
-//       if (entry_type === "boq" && boq_item_id) {
-
-//         // Get current remaining quantity for this BOQ item
-
-//         const boqResult = await pool.query(
-
-//           `SELECT b.available_quantity,
-
-//                 COALESCE(SUM(cpe.required_quantity), 0) as total_requested
-
-//          FROM boq_items b
-
-//          LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id AND cpe.entry_type = 'boq'
-
-//          WHERE b.id = $1
-
-//          GROUP BY b.id, b.available_quantity`,
-
-//           [boq_item_id],
-
-//         );
-
-//         if (boqResult.rows.length > 0) {
-
-//           const { available_quantity: boq_avail, total_requested } =
-
-//             boqResult.rows[0];
-
-//           const remaining =
-
-//             parseFloat(boq_avail) - parseFloat(total_requested || "0");
-
-//           available_quantity = remaining < 0 ? 0 : remaining;
-
-//           const req_qty = parseFloat(required_quantity) || 0;
-
-//           shortage_quantity = req_qty > remaining ? req_qty - remaining : 0;
-
-//         }
-
-//       }
-
-//       const result = await pool.query(
-
-//         `INSERT INTO customer_purchasing_entries
-
-//     (customer_id, entry_type, boq_item_id, product, specification, part_number, available_quantity, required_quantity, shortage_quantity, required_date, description, requested_by)
-
-//    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-
-//         [
-
-//           customerId,
-
-//           entry_type || "boq",
-
-//           boq_item_id || null,
-
-//           product.trim(),
-
-//           specification || null,
-
-//           part_number || null,
-
-//           available_quantity,
-
-//           required_quantity || 0,
-
-//           shortage_quantity,
-
-//           required_date || null,
-
-//           description || "",
-
-//           req.user?.username,
-
-//         ],
-
-//       );
-
-//       res.status(201).json({ success: true, entry: result.rows[0] });
-
-//     } catch (error: any) {
-
-//       res.status(500).json({ success: false, error: error?.message });
-
-//     }
-
-//   },
-
-// );
-
 router.post(
   "/boq/customer/:customerId/entries",
 
@@ -665,27 +541,20 @@ router.post(
       if (entry_type === "boq" && boq_item_id) {
         const boqResult = await pool.query(
           `SELECT b.available_quantity, b.part_number,
-
-
-
-                COALESCE(SUM(cpe.required_quantity), 0) as total_requested
-
-
-
+                COALESCE(
+  SUM(
+    CASE
+      WHEN cpe.approved = TRUE
+        THEN COALESCE(cpe.approved_quantity, cpe.required_quantity)
+      ELSE cpe.required_quantity
+    END
+  ),
+  0
+) AS total_requested
            FROM boq_items b
-
-
-
            LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id AND cpe.entry_type = 'boq'
-
-
-
            WHERE b.id = $1
-
-
-
            GROUP BY b.id, b.available_quantity, b.part_number`,
-
           [boq_item_id],
         );
 
@@ -702,16 +571,11 @@ router.post(
 
           const remaining =
             parseFloat(boq_avail) - parseFloat(total_requested || "0");
-
-          available_quantity = remaining < 0 ? 0 : remaining;
-
-          const req_qty = parseFloat(required_quantity) || 0;
-
-          shortage_quantity = req_qty > remaining ? req_qty - remaining : 0;
-
-          // The BOQ entry itself only ever records what BOQ stock can cover
-
-          fulfilledQuantity = Math.max(req_qty - shortage_quantity, 0);
+          const actualAvailable = Math.max(remaining, 0);
+          available_quantity = actualAvailable;
+          const req_qty = Math.max(parseFloat(required_quantity) || 0, 0);
+          shortage_quantity = Math.max(req_qty - actualAvailable, 0);
+          fulfilledQuantity = Math.min(req_qty, actualAvailable);
         }
       }
 
