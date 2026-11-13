@@ -115,17 +115,26 @@ router.get(
         result = await pool.query(
           `SELECT b.*,
             b.available_quantity - COALESCE(
-              SUM(
-                CASE
-                  WHEN cpe.approved = TRUE
-                    THEN COALESCE(cpe.approved_quantity, cpe.required_quantity)
-                  ELSE cpe.required_quantity
-                END
-              ) FILTER (WHERE cpe.entry_type = 'boq'),
-              0
-            ) AS remaining_quantity
+  SUM(
+    CASE
+      WHEN cpe.approved = TRUE
+        THEN COALESCE(
+          NULLIF(cpe.approved_quantity::text, '')::numeric,
+          NULLIF(cpe.required_quantity::text, '')::numeric,
+          0
+        )
+      ELSE COALESCE(
+        NULLIF(cpe.required_quantity::text, '')::numeric,
+        0
+      )
+    END
+  ) FILTER (WHERE cpe.entry_type = 'boq'),
+  0
+) AS remaining_quantity
            FROM boq_items b
-           LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id
+          LEFT JOIN customer_purchasing_entries cpe
+  ON cpe.boq_item_id = b.id
+  AND cpe.customer_id = b.customer_id
            WHERE b.customer_id = $1
            GROUP BY b.id
            ORDER BY b.item_name ASC, b.specification ASC`,
@@ -134,20 +143,30 @@ router.get(
       } else {
         result = await pool.query(
           `SELECT b.*,
-           b.available_quantity - COALESCE(
+       b.available_quantity - COALESCE(
   SUM(
     CASE
       WHEN cpe.approved = TRUE
-        THEN COALESCE(cpe.approved_quantity, cpe.required_quantity)
-      ELSE cpe.required_quantity
+        THEN COALESCE(
+          NULLIF(cpe.approved_quantity::text, '')::numeric,
+          NULLIF(cpe.required_quantity::text, '')::numeric,
+          0
+        )
+      ELSE COALESCE(
+        NULLIF(cpe.required_quantity::text, '')::numeric,
+        0
+      )
     END
   ) FILTER (WHERE cpe.entry_type = 'boq'),
   0
 ) AS remaining_quantity
-           FROM boq_items b
-           LEFT JOIN customer_purchasing_entries cpe ON cpe.boq_item_id = b.id
-           GROUP BY b.id
-           ORDER BY b.item_name ASC, b.specification ASC`,
+FROM boq_items b
+LEFT JOIN customer_purchasing_entries cpe
+  ON cpe.boq_item_id = b.id
+  AND cpe.customer_id = b.customer_id
+WHERE b.customer_id = 66
+GROUP BY b.id
+ORDER BY b.item_name ASC, b.specification ASC;`,
         );
       }
 
@@ -465,73 +484,43 @@ router.get(
 
 router.post(
   "/boq/customer/:customerId/entries",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
-
     const { customerId } = req.params;
-
     const boqStatus = await pool.query(
       `SELECT COUNT(*)::int AS total,
-
-
-
           COUNT(*) FILTER (WHERE boq_locked = TRUE)::int AS locked
-
-
-
    FROM boq_items
-
-
-
    WHERE customer_id = $1`,
-
       [customerId],
     );
-
     const total = boqStatus.rows[0].total;
-
     const locked = boqStatus.rows[0].locked;
-
     if (total === 0 || locked !== total) {
       res.status(409).json({
         success: false,
-
         error: "BOQ Master must be completed before adding purchasing entries",
       });
-
       return;
     }
-
     const {
       entry_type,
-
       boq_item_id,
-
       product,
-
       specification,
-
       part_number,
-
       required_quantity,
-
       required_date,
-
       description,
     } = req.body;
 
     if (!product?.trim()) {
       res.status(400).json({ success: false, error: "Product is required" });
-
       return;
     }
-
     try {
       let available_quantity = null;
-
       let shortage_quantity = 0;
 
       let fulfilledQuantity = parseFloat(required_quantity) || 0;
@@ -545,8 +534,15 @@ router.post(
   SUM(
     CASE
       WHEN cpe.approved = TRUE
-        THEN COALESCE(cpe.approved_quantity, cpe.required_quantity)
-      ELSE cpe.required_quantity
+        THEN COALESCE(
+  NULLIF(cpe.approved_quantity::text, '')::numeric,
+  NULLIF(cpe.required_quantity::text, '')::numeric,
+  0
+)
+ELSE COALESCE(
+  NULLIF(cpe.required_quantity::text, '')::numeric,
+  0
+)
     END
   ),
   0
