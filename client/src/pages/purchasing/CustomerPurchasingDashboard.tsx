@@ -1455,12 +1455,12 @@ const CustomerPurchasingDashboard = () => {
                 fontWeight: 600,
                 border: "none",
                 borderBottom:
-                  activeTab === "boq"
+                  activeTab === "Item"
                     ? "3px solid #0891b2"
                     : "3px solid transparent",
                 background: "none",
                 cursor: "pointer",
-                color: activeTab === "boq" ? "#0891b2" : "#555",
+                color: activeTab === "Item" ? "#0891b2" : "#555",
                 marginBottom: "-2px",
               }}
             >
@@ -1474,12 +1474,12 @@ const CustomerPurchasingDashboard = () => {
                 fontWeight: 600,
                 border: "none",
                 borderBottom:
-                  activeTab === "boq"
+                  activeTab === "TransportMaster"
                     ? "3px solid #0891b2"
                     : "3px solid transparent",
                 background: "none",
                 cursor: "pointer",
-                color: activeTab === "boq" ? "#0891b2" : "#555",
+                color: activeTab === "TransportMaster" ? "#0891b2" : "#555",
                 marginBottom: "-2px",
               }}
             >
@@ -1493,12 +1493,12 @@ const CustomerPurchasingDashboard = () => {
                 fontWeight: 600,
                 border: "none",
                 borderBottom:
-                  activeTab === "boq"
+                  activeTab === "TransportSummary"
                     ? "3px solid #0891b2"
                     : "3px solid transparent",
                 background: "none",
                 cursor: "pointer",
-                color: activeTab === "boq" ? "#0891b2" : "#555",
+                color: activeTab === "TransportSummary" ? "#0891b2" : "#555",
                 marginBottom: "-2px",
               }}
             >
