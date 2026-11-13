@@ -926,7 +926,9 @@ const CustomerPurchasingDashboard = () => {
   const [expandedEntryId, setExpandedEntryId] = useState<number | null>(null);
 
   // Tab control: "customer" = the two customer tables, "boq" = BOQ master
-  const [activeTab, setActiveTab] = useState<"customer" | "boq">("customer");
+  const [activeTab, setActiveTab] = useState<
+    "customer" | "boq" | "Item" | "TransportMaster" | "TransportSummary"
+  >("customer");
 
   // BOQ master management (from BOQPage)
   const [showBOQMasterForm, setShowBOQMasterForm] = useState(false);
@@ -1444,6 +1446,63 @@ const CustomerPurchasingDashboard = () => {
               }}
             >
               📊 BOQ Master
+            </button>
+            <button
+              onClick={() => setActiveTab("Item")}
+              style={{
+                padding: "10px 18px",
+                fontSize: "13px",
+                fontWeight: 600,
+                border: "none",
+                borderBottom:
+                  activeTab === "boq"
+                    ? "3px solid #0891b2"
+                    : "3px solid transparent",
+                background: "none",
+                cursor: "pointer",
+                color: activeTab === "boq" ? "#0891b2" : "#555",
+                marginBottom: "-2px",
+              }}
+            >
+              📑 Item Summary
+            </button>
+            <button
+              onClick={() => setActiveTab("TransportMaster")}
+              style={{
+                padding: "10px 18px",
+                fontSize: "13px",
+                fontWeight: 600,
+                border: "none",
+                borderBottom:
+                  activeTab === "boq"
+                    ? "3px solid #0891b2"
+                    : "3px solid transparent",
+                background: "none",
+                cursor: "pointer",
+                color: activeTab === "boq" ? "#0891b2" : "#555",
+                marginBottom: "-2px",
+              }}
+            >
+              🚛 Transport Master
+            </button>
+            <button
+              onClick={() => setActiveTab("TransportSummary")}
+              style={{
+                padding: "10px 18px",
+                fontSize: "13px",
+                fontWeight: 600,
+                border: "none",
+                borderBottom:
+                  activeTab === "boq"
+                    ? "3px solid #0891b2"
+                    : "3px solid transparent",
+                background: "none",
+                cursor: "pointer",
+                color: activeTab === "boq" ? "#0891b2" : "#555",
+                marginBottom: "-2px",
+              }}
+            >
+              📈 Transport Summary
             </button>
           </div>
         )}
