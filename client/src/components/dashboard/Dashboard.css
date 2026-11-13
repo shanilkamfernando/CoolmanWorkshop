@@ -5,11 +5,13 @@
   background: #f5f7fa;
 }
 
+/* Optional: give the header a subtle glow edge like the auth pages */
 .dashboard-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #1e5faa 0%, #0d1b30 100%);
   color: white;
   padding: 20px 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 20px rgba(30, 95, 170, 0.35);
+  border-bottom: 1px solid rgba(100, 181, 246, 0.25);
 }
 
 .header-content {
@@ -99,6 +101,21 @@
   cursor: pointer;
   transition: all 0.3s;
   position: relative;
+  text-align: center;
+}
+.portal-tile.image-tile {
+  padding: 0;
+  overflow: hidden; /* clips the image to the rounded corners */
+  aspect-ratio: 1 / 1; /* square cards; change if your images aren't square */
+  display: block;
+  line-height: 0; /* removes the small gap under inline images */
+}
+
+.portal-tile-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* fills the whole card */
 }
 
 .portal-tile:hover:not(.disabled) {
@@ -116,9 +133,23 @@
   background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
 }
 
+.portal-image {
+  display: block;
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
 .portal-icon {
-  font-size: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 16px;
+}
+.portal-tile.admin-tile .portal-image {
+  width: 90px;
+  height: 90px;
 }
 
 .portal-tile h3 {
@@ -165,6 +196,35 @@
   color: #666;
 }
 
+/* Append to the existing Dashboard.css */
+.portal-tile.job-assigned-tile {
+  padding: 0;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.job-assigned-tile-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.portal-tile.job-assigned-tile .no-access-badge {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+.portal-card-image {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: contain;
+}
+
 /* @media (max-width: 768px) {
   .header-content {
     flex-direction: column;
@@ -175,3 +235,695 @@
     grid-template-columns: 1fr;
   }
 } */
+.portal-image {
+  display: block;
+  width: 90px;
+  height: 90px;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
+/* ==================================
+   MY PROFILE SECTION
+================================== */
+
+.profile-section {
+  margin-bottom: 40px;
+}
+
+.profile-card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 3px 15px rgba(0, 0, 0, 0.07);
+  border: 1px solid #e8edf3;
+}
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.profile-avatar {
+  width: 85px;
+  height: 85px;
+  min-width: 85px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1e5faa, #0d1b30);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 27px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(30, 95, 170, 0.2);
+}
+
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.profile-label {
+  color: #1e5faa;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+.profile-info h2 {
+  margin: 0;
+  color: #172b45;
+  font-size: 1.5rem;
+  text-transform: capitalize;
+}
+
+.profile-info p {
+  margin: 0;
+  color: #718096;
+  font-size: 0.9rem;
+}
+
+.profile-role {
+  display: inline-block;
+  width: fit-content;
+  margin-top: 5px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background: #e8f1fc;
+  color: #1e5faa;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.profile-divider {
+  height: 1px;
+  background: #e9edf2;
+  margin: 25px 0;
+}
+
+.profile-portal-heading {
+  margin-bottom: 20px;
+}
+
+.profile-portal-heading h3 {
+  margin: 0 0 5px;
+  color: #172b45;
+  font-size: 1.25rem;
+}
+
+.profile-portal-heading p {
+  margin: 0;
+  color: #7b8794;
+  font-size: 0.9rem;
+}
+
+.profile-portal-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.profile-portal-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-height: 100px;
+  padding: 18px;
+  border: 1px solid #e5ebf2;
+  border-radius: 12px;
+  background: #f9fbfd;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.profile-portal-tile:hover:not(.profile-portal-disabled) {
+  transform: translateY(-3px);
+  background: #edf5ff;
+  border-color: #8bb8e8;
+  box-shadow: 0 5px 15px rgba(30, 95, 170, 0.1);
+}
+
+.profile-portal-icon {
+  min-width: 43px;
+  height: 43px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: #e8f1fc;
+  font-size: 23px;
+}
+
+.profile-portal-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-portal-details h4 {
+  margin: 0 0 5px;
+  color: #26374a;
+  font-size: 0.95rem;
+}
+
+.profile-portal-details p {
+  margin: 0;
+  color: #8592a1;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.profile-arrow {
+  color: #1e5faa;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.profile-lock {
+  font-size: 15px;
+  opacity: 0.7;
+}
+
+.profile-portal-disabled {
+  background: #f2f3f5;
+  border-color: #e6e8eb;
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.profile-portal-disabled .profile-portal-icon {
+  background: #e5e7eb;
+  filter: grayscale(1);
+}
+
+/* Responsive */
+
+@media (max-width: 1100px) {
+  .profile-portal-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-card {
+    padding: 20px;
+  }
+
+  .profile-portal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-portal-tile {
+    padding: 13px;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-header {
+    gap: 14px;
+  }
+
+  .profile-avatar {
+    width: 65px;
+    height: 65px;
+    min-width: 65px;
+    font-size: 22px;
+  }
+
+  .profile-info h2 {
+    font-size: 1.2rem;
+  }
+
+  .profile-portal-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* =========================================
+   COMPLETE DASHBOARD RESPONSIVE DESIGN
+========================================= */
+
+/* Prevent horizontal overflow */
+.dashboard {
+  width: 100%;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.dashboard *,
+.dashboard *::before,
+.dashboard *::after {
+  box-sizing: border-box;
+}
+
+/* Main content */
+.dashboard-content {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 40px 30px;
+}
+
+/* =========================================
+   HEADER RESPONSIVENESS
+========================================= */
+
+.dashboard-header {
+  width: 100%;
+}
+
+.header-content {
+  width: 100%;
+  min-height: 55px;
+  gap: 20px;
+}
+
+.dashboard-header h1 {
+  font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+  line-height: 1.3;
+}
+
+.user-info {
+  flex-shrink: 0;
+  gap: 15px;
+}
+
+/* .user-name {
+  color: #fff;
+}
+
+.user-role {
+  color: rgba(255, 255, 255, 0.8);
+} */
+
+.btn-logout {
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.btn-logout:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* =========================================
+   WELCOME SECTION
+========================================= */
+
+.welcome-section {
+  margin-bottom: 30px;
+}
+
+.welcome-section h2 {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  line-height: 1.3;
+}
+
+.welcome-section p {
+  color: #718096;
+  font-size: 0.95rem;
+}
+
+/* =========================================
+   MAIN PORTAL GRID
+========================================= */
+
+.portal-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 20px;
+  width: 100%;
+}
+
+.portal-tile {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+/* Keep image tiles proportional */
+.portal-tile.image-tile {
+  aspect-ratio: 1 / 1;
+}
+
+.portal-tile-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* =========================================
+   MY PROFILE
+========================================= */
+
+.profile-section {
+  width: 100%;
+}
+
+.profile-card {
+  width: 100%;
+  min-width: 0;
+}
+
+.profile-header {
+  flex-wrap: wrap;
+}
+
+.profile-info {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.profile-portal-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.profile-portal-tile {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.profile-portal-details {
+  overflow-wrap: anywhere;
+}
+
+/* =========================================
+   LARGE TABLETS / SMALL LAPTOPS
+========================================= */
+
+@media (max-width: 1100px) {
+  .dashboard-content {
+    padding: 30px 24px;
+  }
+
+  .portal-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 18px;
+  }
+
+  .profile-portal-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* =========================================
+   TABLETS
+========================================= */
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: 16px 0;
+  }
+
+  .header-content {
+    padding: 0 20px;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .user-info {
+    gap: 12px;
+  }
+
+  .user-name {
+    font-size: 0.9rem;
+  }
+
+  .user-role {
+    font-size: 0.75rem;
+  }
+
+  .btn-logout {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+
+  .dashboard-content {
+    padding: 25px 20px;
+  }
+
+  .welcome-section {
+    margin-bottom: 25px;
+  }
+
+  .portal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 16px;
+  }
+
+  .portal-tile.image-tile {
+    aspect-ratio: 1 / 1;
+  }
+
+  .profile-card {
+    padding: 22px;
+  }
+
+  .profile-portal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .profile-portal-tile {
+    min-height: 95px;
+    padding: 12px;
+  }
+
+  .profile-portal-details h4 {
+    font-size: 0.9rem;
+  }
+}
+
+/* =========================================
+   MOBILE PHONES
+========================================= */
+
+@media (max-width: 480px) {
+  .dashboard-header {
+    padding: 14px 0;
+  }
+
+  .header-content {
+    padding: 0 15px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 1.35rem;
+  }
+
+  .user-info {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .user-details {
+    text-align: left;
+  }
+
+  .user-name {
+    font-size: 0.9rem;
+  }
+
+  .btn-logout {
+    padding: 8px 15px;
+    border-radius: 7px;
+  }
+
+  .dashboard-content {
+    padding: 22px 15px;
+  }
+
+  .welcome-section {
+    margin-bottom: 22px;
+  }
+
+  .welcome-section h2 {
+    font-size: 1.4rem;
+    margin-bottom: 6px;
+  }
+
+  .welcome-section p {
+    font-size: 0.85rem;
+  }
+
+  /* Profile card */
+  .profile-section {
+    margin-bottom: 25px;
+  }
+
+  .profile-card {
+    padding: 18px 15px;
+    border-radius: 14px;
+  }
+
+  .profile-header {
+    gap: 13px;
+    flex-wrap: nowrap;
+  }
+
+  .profile-avatar {
+    width: 60px;
+    height: 60px;
+    min-width: 60px;
+    font-size: 20px;
+  }
+
+  .profile-label {
+    font-size: 0.68rem;
+  }
+
+  .profile-info h2 {
+    font-size: 1.1rem;
+  }
+
+  .profile-info p {
+    font-size: 0.8rem;
+  }
+
+  .profile-divider {
+    margin: 18px 0;
+  }
+
+  .profile-portal-heading {
+    margin-bottom: 15px;
+  }
+
+  .profile-portal-heading h3 {
+    font-size: 1.1rem;
+  }
+
+  .profile-portal-heading p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+
+  .profile-portal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .profile-portal-tile {
+    min-height: 110px;
+    padding: 12px 10px;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 10px;
+  }
+
+  .profile-portal-icon {
+    width: 35px;
+    min-width: 35px;
+    height: 35px;
+    font-size: 19px;
+  }
+
+  .profile-portal-details h4 {
+    font-size: 0.82rem;
+    margin-bottom: 3px;
+  }
+
+  .profile-portal-details p {
+    font-size: 0.7rem;
+  }
+
+  .profile-arrow,
+  .profile-lock {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 13px;
+  }
+
+  /* Main portal cards */
+  .portal-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 12px;
+  }
+
+  .portal-tile {
+    padding: 0;
+    border-radius: 10px;
+  }
+
+  .portal-tile.image-tile {
+    aspect-ratio: 1 / 1;
+  }
+
+  .portal-tile-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Admin card */
+  .portal-tile.admin-tile {
+    padding: 15px;
+    min-height: 150px;
+  }
+
+  .portal-tile.admin-tile h3 {
+    font-size: 1rem;
+  }
+
+  .portal-tile.admin-tile p {
+    font-size: 0.8rem;
+  }
+
+  .admin-badge {
+    font-size: 0.65rem;
+    padding: 4px 7px;
+  }
+}
+
+/* =========================================
+   VERY SMALL MOBILE PHONES
+========================================= */
+
+@media (max-width: 350px) {
+  .dashboard-content {
+    padding: 18px 10px;
+  }
+
+  .header-content {
+    padding: 0 10px;
+  }
+
+  .dashboard-header h1 {
+    font-size: 1.15rem;
+  }
+
+  .profile-card {
+    padding: 14px 10px;
+  }
+
+  .profile-portal-grid {
+    gap: 8px;
+  }
+
+  .profile-portal-tile {
+    padding: 9px;
+    min-height: 105px;
+  }
+
+  .portal-grid {
+    gap: 9px;
+  }
+
+  .profile-info h2 {
+    font-size: 1rem;
+  }
+}

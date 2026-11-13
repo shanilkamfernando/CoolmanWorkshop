@@ -9,7 +9,9 @@ import axios from "axios";
 import "./Customers.css";
 
 // Import logo
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
+import { API_BASE } from "../../config";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -50,10 +52,9 @@ const CustomerPortal = () => {
   const fetchCustomer = async () => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}`,
-        { headers: { Authorization: `Bearer ${token}` } },
-      );
+      const response = await axios.get(`${API_BASE}/customers/${customerId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (response.data.customer) {
         setCustomer(response.data.customer);
@@ -161,13 +162,13 @@ const CustomerPortal = () => {
       description: "Regular system inspections",
       path: `/customers/${customerId}/system-inspection`,
     },
-    {
-      id: "spare-parts",
-      name: "Spare Parts",
-      icon: "🔩",
-      description: "Spare parts management",
-      path: `/customers/${customerId}/spare-parts`,
-    },
+    // {
+    //   id: "spare-parts",
+    //   name: "Spare Parts",
+    //   icon: "🔩",
+    //   description: "Spare parts management",
+    //   path: `/customers/${customerId}/spare-parts`,
+    // },
     {
       id: "documents",
       name: "Documents",
@@ -198,7 +199,7 @@ const CustomerPortal = () => {
   return (
     <div className="customer-portal">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div className="logo-container" onClick={handleBackToDashboard}>
             <img
@@ -213,7 +214,7 @@ const CustomerPortal = () => {
           </h1>
         </div>
         <div className="header-right">
-          {/* Customer Logo Badge with Generated Initials */}
+        
           <div className="customer-logo-badge-with-icon">
             <div
               className="customer-badge-logo"
@@ -226,7 +227,8 @@ const CustomerPortal = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       {/* Main Content */}
       <div className="main-content-full">

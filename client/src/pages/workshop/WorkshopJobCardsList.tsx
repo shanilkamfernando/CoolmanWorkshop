@@ -6,7 +6,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
 import "../stores/StoresDashboard.css";
 import "../customers/ProjectDashboard.css";
 
@@ -23,6 +23,7 @@ interface WorkshopCustomer {
 interface JobCard {
   id: number;
   job_card_number: string;
+  job_card_name: string;
   date: string;
   item: string;
   item_number: string;
@@ -92,7 +93,7 @@ const WorkshopJobCardsList = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        "http://localhost:5000/api/workshop/customers",
+        "https://coolmanworkshop-production.up.railway.app/api/workshop/customers",
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -111,7 +112,7 @@ const WorkshopJobCardsList = () => {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(
-        `http://localhost:5000/api/workshop/customers/${customerId}/jobcards`,
+        `https://coolmanworkshop-production.up.railway.app/api/workshop/customers/${customerId}/jobcards`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setJobCards(res.data.jobcards || []);
@@ -128,7 +129,7 @@ const WorkshopJobCardsList = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/workshop/customers/${customerId}/jobcards/${id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/workshop/customers/${customerId}/jobcards/${id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       fetchJobCards();
@@ -140,6 +141,7 @@ const WorkshopJobCardsList = () => {
   const filtered = jobCards.filter(
     (jc) =>
       jc.job_card_number.toLowerCase().includes(search.toLowerCase()) ||
+      (jc.job_card_name || "").toLowerCase().includes(search.toLowerCase()) ||
       (jc.item || "").toLowerCase().includes(search.toLowerCase()) ||
       (jc.vehicle_number || "").toLowerCase().includes(search.toLowerCase()),
   );
@@ -291,6 +293,7 @@ const WorkshopJobCardsList = () => {
                 <tr>
                   <th style={{ width: "48px" }}>No</th>
                   <th style={{ width: "200px" }}>Job Card #</th>
+                  <th>Name</th>
                   <th style={{ width: "110px" }}>Date</th>
                   <th>Item</th>
                   <th style={{ width: "120px" }}>Vehicle</th>
@@ -348,6 +351,21 @@ const WorkshopJobCardsList = () => {
                         >
                           {jc.job_card_number}
                         </button>
+                      </td>
+                      <td
+                        style={{
+                          fontSize: "14px",
+                          color: "#111827",
+                          fontWeight: 500,
+                        }}
+                      >
+                        {jc.job_card_name || (
+                          <span
+                            style={{ color: "#9ca3af", fontStyle: "italic" }}
+                          >
+                            —
+                          </span>
+                        )}
                       </td>
                       <td style={{ fontSize: "14px", color: "#555" }}>
                         {jc.date

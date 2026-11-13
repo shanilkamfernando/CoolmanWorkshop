@@ -3,7 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import pool from "./db";
-import authRoutes from "../src/routes/auth";
+import authRoutes from "./routes/auth";
 import customers from "./routes/customers";
 import projects from "./routes/projects";
 import attachments from "./routes/attachments";
@@ -18,6 +18,7 @@ import customerDocuments from "./routes/customer-documents";
 import jobCards from "./routes/job-cards";
 
 import purchasing from "./routes/purchasing";
+import boqRouter from "./routes/boq";
 import workshopProjects from "./routes/workshop-projects";
 import workshopRepairs from "./routes/workshop-repairs";
 
@@ -41,12 +42,25 @@ const app: Application = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+// Middleware — CORS accepts a comma-separated list of allowed origins in CLIENT_URL
+const allowedOrigins = (process.env.CLIENT_URL || "http://localhost:5173")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: (origin, callback) => {
+      // Allow tools with no origin (curl, Postman, mobile apps)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      console.warn(`❌ CORS blocked origin: ${origin}`);
+      return callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   }),
 );
+
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ limit: "100mb", extended: true }));
 
@@ -73,7 +87,9 @@ app.use("/api/customers", jobCards);
 
 app.use("/api/purchasing", workshopProjects);
 app.use("/api/purchasing", workshopRepairs);
+
 app.use("/api", purchasing);
+app.use("/api", boqRouter);
 
 app.use("/api", stores);
 app.use("/api", storeBrands);
