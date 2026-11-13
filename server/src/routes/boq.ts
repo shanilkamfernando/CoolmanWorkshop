@@ -592,66 +592,38 @@ router.post(
 
         [
           customerId,
-
           entry_type || "boq",
-
           boq_item_id || null,
-
           product.trim(),
-
           specification || null,
-
           part_number || null,
-
           available_quantity,
-
           fulfilledQuantity,
-
           0, // shortage no longer tracked on the BOQ row itself
-
           required_date || null,
-
           description || "",
-
           req.user?.username,
         ],
       );
 
       // Uncovered quantity is genuinely a "not in BOQ" purchase — it has to
-
       // be sourced outside stock, so it becomes its own row in that table
-
       // instead of a synthetic sub-row under the BOQ entry.
-
       if (entry_type === "boq" && shortage_quantity > 0) {
         await pool.query(
           `INSERT INTO customer_purchasing_entries
-
-
-
       (customer_id, entry_type, boq_item_id, product, specification, part_number, required_quantity, required_date, description, requested_by)
-
-
-
      VALUES ($1,'non_boq',NULL,$2,$3,$4,$5,$6,$7,$8)`,
-
           [
             customerId,
-
             product.trim(),
-
             specification || null,
-
             part_number || boqPartNumber || null,
-
             shortage_quantity,
-
             required_date || null,
-
             description
               ? `${description} — Shortage from BOQ stock`
               : "Shortage from BOQ stock",
-
             req.user?.username,
           ],
         );
@@ -673,39 +645,22 @@ router.put(
 
   async (req: AuthRequest, res: Response): Promise<void> => {
     const { entryId, action } = req.params;
-
     const pool = getPool(req);
-
     const username = req.user?.username || "Unknown";
-
     const role = req.user?.role || "";
-
     try {
       let result;
-
       if (action === "order") {
         result = await pool.query(
           `UPDATE customer_purchasing_entries
-
-
-
            SET order_form_no = $1, order_notes = $2,
-
-
-
                order_saved_at = NOW(), order_saved_by = $3
-
-
-
            WHERE id = $4 RETURNING *`,
 
           [
             req.body.order_form_no || null,
-
             req.body.order_notes || null,
-
             username,
-
             entryId,
           ],
         );
@@ -713,28 +668,16 @@ router.put(
         if (!["admin", "office_admin"].includes(role)) {
           res.status(403).json({
             success: false,
-
             error: "Only admin/office_admin can approve",
           });
-
           return;
         }
 
         result = await pool.query(
           `UPDATE customer_purchasing_entries
-
-
-
            SET approved = TRUE, approved_by = $1, approved_at = NOW(),
-
-
-
                approved_quantity = $2, remark = $3
-
-
-
            WHERE id = $4 RETURNING *`,
-
           [
             username,
             req.body.approved_quantity ?? null,
@@ -749,25 +692,14 @@ router.put(
 
 
            SET po_no = $1, po_saved_at = NOW(), po_saved_by = $2
-
-
-
            WHERE id = $3 RETURNING *`,
-
           [req.body.po_no || null, username, entryId],
         );
       } else if (action === "invoice") {
         result = await pool.query(
           `UPDATE customer_purchasing_entries
-
-
-
            SET invoice_no = $1, invoice_saved_at = NOW(), invoice_saved_by = $2
-
-
-
            WHERE id = $3 RETURNING *`,
-
           [req.body.invoice_no || null, username, entryId],
         );
       } else if (action === "driver") {
@@ -862,14 +794,10 @@ router.put(
     } catch (error: any) {
       console.error(
         "Update customer entry stage error:",
-
         error?.message || error,
       );
-
       res
-
         .status(500)
-
         .json({ success: false, error: error?.message || "Failed to update" });
     }
   },
@@ -885,17 +813,13 @@ router.delete(
   async (req: AuthRequest, res: Response): Promise<void> => {
     if (req.user?.role !== "admin") {
       res.status(403).json({ success: false, error: "Admin only" });
-
       return;
     }
-
     const pool = getPool(req);
-
     try {
       await pool.query("DELETE FROM customer_purchasing_entries WHERE id=$1", [
         req.params.entryId,
       ]);
-
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error?.message });
@@ -904,45 +828,29 @@ router.delete(
 );
 
 // ============================================================
-
 // COMPLETE / LOCK BOQ MASTER FOR A CUSTOMER
-
 // ============================================================
 
 router.put(
   "/boq/customer/:customerId/complete",
-
   authenticateToken,
-
   async (req: AuthRequest, res: Response): Promise<void> => {
     const pool = getPool(req);
-
     const { customerId } = req.params;
-
     // Only admin/data-entry can complete the BOQ
-
     if (!["admin", "data_entry"].includes(req.user?.role || "")) {
       res.status(403).json({
         success: false,
-
         error: "Only admin or data entry can complete the BOQ",
       });
-
       return;
     }
-
     try {
       // Make sure the customer has at least one BOQ item
 
       const checkResult = await pool.query(
         `SELECT COUNT(*)::int AS count
-
-
-
          FROM boq_items
-
-
-
          WHERE customer_id = $1`,
 
         [customerId],
@@ -951,42 +859,24 @@ router.put(
       if (checkResult.rows[0].count === 0) {
         res.status(400).json({
           success: false,
-
           error: "Cannot complete BOQ because no BOQ items exist",
         });
-
         return;
       }
-
       // Lock all BOQ items for this customer
 
       const result = await pool.query(
         `UPDATE boq_items
-
-
-
          SET boq_locked = TRUE,
-
-
-
              updated_at = NOW()
-
-
-
          WHERE customer_id = $1
-
-
-
          RETURNING *`,
-
         [customerId],
       );
 
       res.json({
         success: true,
-
         message: "BOQ Master completed and locked successfully",
-
         items: result.rows,
       });
     } catch (error: any) {
@@ -994,7 +884,6 @@ router.put(
 
       res.status(500).json({
         success: false,
-
         error: error?.message || "Failed to complete BOQ Master",
       });
     }
