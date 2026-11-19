@@ -40,10 +40,14 @@ import JobCardDetail from "./pages/customers/JobCardDetail";
 
 //purchasing portal
 import PurchasingPortal from "./pages/purchasing/PurchasingPortal";
+import PurchasingCustomerList from "./pages/purchasing/PurchasingCustomerList";
+import BOQPage from "./pages/purchasing/BOQPage";
+import CustomerPurchasingDashboard from "./pages/purchasing/CustomerPurchasingDashboard";
 
 //purchasing - Workshop portal
 import WorkshopPortal from "./pages/purchasing/WorkshopPortal";
 import PurchasingCustomerPortal from "./pages/purchasing/PurchasingCustomerPortal";
+import PurchasingDashboard from "./pages/purchasing/PurchasingDashboard";
 
 //stores - dashboard
 import StoresDashboard from "./pages/stores/StoresDashboard";
@@ -56,6 +60,7 @@ import Documents from "./pages/documents/Documents";
 //worklist - worklist years
 import WorklistDashboard from "./pages/worklist/WorklistDashboard";
 import WorklistTasksDashboard from "./pages/worklist/WorklistTaskDashboard";
+import MyTasks from "./pages/worklist/MyTasks";
 
 //meetings
 import MeetingsDashboard from "./pages/meetings/MeetingsDashboard";
@@ -66,6 +71,7 @@ import FollowUpDashboard from "./pages/followup/FollowUpDashboard";
 import WorkshopPage from "./pages/workshop/WorkshopPage";
 import WorkshopJobCardsList from "./pages/workshop/WorkshopJobCardsList";
 import WorkshopJobCardDetail from "./pages/workshop/WorkshopJobCardDetail";
+import PurchasingProjectsPortal from "./pages/purchasing/PurchasingProjectPortal";
 
 // Protected Route Component
 interface ProtectedRouteProps {
@@ -250,12 +256,17 @@ function App() {
           path="/customers/:customerId/jobcards"
           element={<JobCardsList />}
         />
-        <Route
+        {/* <Route
           path="/customers/:customerId/jobcards/:jobCardId"
           element={<JobCardDetail />}
-        />
+        /> */}
 
         <Route path="/purchasing" element={<PurchasingPortal />} />
+
+        <Route
+          path="/purchasing/customers/:customerId/projects"
+          element={<PurchasingProjectsPortal />}
+        />
 
         <Route path="/purchasing/workshop" element={<WorkshopPortal />} />
         <Route
@@ -263,6 +274,47 @@ function App() {
           element={
             <ProtectedRoute>
               <PurchasingCustomerPortal />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/purchasing/workshop/customers/:customerId/dashboard"
+          element={
+            <ProtectedRoute>
+              <PurchasingDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/purchasing/customer-list"
+          element={
+            <ProtectedRoute>
+              <PurchasingCustomerList />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/purchasing/customers/:customerId/dashboard"
+          element={
+            <ProtectedRoute>
+              <CustomerPurchasingDashboard />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/purchasing/customers/:customerId/entries"
+          element={<PurchasingDashboard />}
+        />
+
+        <Route
+          path="/purchasing/boq"
+          element={
+            <ProtectedRoute>
+              <BOQPage />
             </ProtectedRoute>
           }
         />
@@ -343,6 +395,8 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        <Route path="/myTasks" element={<MyTasks />} />
 
         <Route
           path="/jobAssigned"

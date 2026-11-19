@@ -7,7 +7,8 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import axios from "axios";
 import "./Customers.css";
-import companyLogo from "../../assets/mainlogo.jpeg";
+import companyLogo from "../../assets/mainlogo.png";
+import AppHeader from "../../components/AppHeader";
 
 interface User {
   username: string;
@@ -62,7 +63,7 @@ const CompressorRepairPortal = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
@@ -107,7 +108,7 @@ const CompressorRepairPortal = () => {
       setLoading(true);
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `http://localhost:5000/api/customers/${customerId}/compressor-repair`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-repair`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       setRepairCompanies(response.data.companies || []);
@@ -142,7 +143,7 @@ const CompressorRepairPortal = () => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `http://localhost:5000/api/customers/${customerId}/compressor-repair`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-repair`,
         { name: newCompanyName },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -175,7 +176,7 @@ const CompressorRepairPortal = () => {
     try {
       const token = localStorage.getItem("token");
       await axios.delete(
-        `http://localhost:5000/api/customers/${customerId}/compressor-repair/${companyToDelete.id}`,
+        `https://coolmanworkshop-production.up.railway.app/api/customers/${customerId}/compressor-repair/${companyToDelete.id}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("Repair company deleted successfully!");
@@ -200,7 +201,7 @@ const CompressorRepairPortal = () => {
   return (
     <div className="customer-portal">
       {/* Header */}
-      <div className="portal-header">
+      {/* <div className="portal-header">
         <div className="header-left">
           <div className="logo-container" onClick={handleBackToDashboard}>
             <img
@@ -227,7 +228,8 @@ const CompressorRepairPortal = () => {
           <span className="user-icon">👤</span>
           <span className="username">{user?.username || "User"}</span>
         </div>
-      </div>
+      </div> */}
+      <AppHeader />
 
       {/* Main Content */}
       <div className="main-content-full">

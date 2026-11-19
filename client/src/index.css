@@ -401,7 +401,7 @@ body {
   background: var(--white) !important;
   border-radius: var(--radius-lg) !important;
   width: 100% !important;
-  max-width: 700px !important;
+  max-width: 1200px !important;
   max-height: 90vh !important;
   overflow-y: auto !important;
   box-shadow: var(--shadow-lg) !important;
