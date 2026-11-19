@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./Dashboard.css";
-
+import jobAssigned from "../../assets/jobAssigned.jpeg";
 import purchasing from "../../assets/purchasing.jpeg";
 import customers from "../../assets/customers.jpeg";
 import workshop from "../../assets/workshop.jpeg";
@@ -44,31 +44,36 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
 
-  // Load logged-in user
   useEffect(() => {
     const userData = localStorage.getItem("user");
-
     if (userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch {
-        localStorage.removeItem("user");
-        navigate("/signin");
-      }
+      setUser(JSON.parse(userData));
     } else {
       navigate("/signin");
     }
   }, [navigate]);
 
-  // Logout
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     navigate("/signin");
   };
 
-  // Main dashboard portals
   const portals: Portal[] = [
+    // {
+    //   id: "myTasks",
+    //   label: "My Tasks",
+    //   icon: "☑️",
+    //   path: "/myTasks",
+    //   description: "Specific Users Task management",
+    // },
+    // {
+    //   id: "jobAssigned",
+    //   label: "Job Assigned",
+    //   image: jobAssigned,
+    //   path: "/jobAssigned",
+    //   description: "Task management",
+    // },
     {
       id: "purchasing",
       label: "Purchasing",
@@ -111,15 +116,69 @@ const Dashboard = () => {
       path: "/documents",
       description: "Document management",
     },
+
+    // {
+    //   id: "followup",
+    //   label: "Follow Up",
+    //   icon: "🔄",
+    //   path: "/followup",
+    //   description: "Customer follow-ups",
+    // },
+    // {
+    //   id: "staff",
+    //   label: "Staff",
+    //   icon: "👤",
+    //   path: "/staff",
+    //   description: "Employee management",
+    // },
   ];
 
-  // Check portal permissions
+  const profilePortals = [
+    {
+      id: "jobAssigned",
+      label: "Job Assigned",
+      description: "View and manage assigned tasks",
+      path: "/jobAssigned",
+      icon: "📋",
+    },
+    {
+      id: "attendance",
+      label: "Attendance",
+      description: "Track employee attendance",
+      path: "/attendance",
+      icon: "🕒",
+      adminOnly: true,
+    },
+    {
+      id: "leave",
+      label: "Leave",
+      description: "Manage leave requests",
+      path: "/leave",
+      icon: "📅",
+      adminOnly: true,
+    },
+    {
+      id: "myDocuments",
+      label: "My Documents",
+      description: "Access employee documents",
+      path: "/myDocuments",
+      icon: "📁",
+      adminOnly: true,
+    },
+    {
+      id: "workReport",
+      label: "Work Report",
+      description: "View employee work reports",
+      path: "/workReport",
+      icon: "📊",
+      adminOnly: true,
+    },
+  ];
+
   const hasPortalAccess = (portalId: PortalId): boolean => {
     if (!user) return false;
-
     if (user.role === "admin") return true;
-
-    return user.permissions?.portals?.includes(portalId) ?? false;
+    return user.permissions.portals.includes(portalId);
   };
 
   if (!user) {
@@ -128,25 +187,21 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard">
-      {/* ================= HEADER ================= */}
-
+      {/* Header */}
       <div className="dashboard-header">
         <div className="header-content">
           <h1>
             <span className="brand-cool">COOL</span>
             <span className="brand-man">Man</span> Refrigeration
           </h1>
-
           <div className="user-info">
             <div className="user-details">
               <span className="user-name">
                 {user.role === "admin" && "👑 "}
                 {user.firstName} {user.lastName}
               </span>
-
               <span className="user-role">{user.role}</span>
             </div>
-
             <button onClick={handleLogout} className="btn-logout">
               Logout
             </button>
@@ -154,40 +209,103 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ================= MAIN CONTENT ================= */}
-
+      {/* Main Content */}
       <div className="dashboard-content">
-        {/* Welcome Section */}
-
         <div className="welcome-section">
           <h2>Welcome back, {user.firstName}! 👋</h2>
-
           <p>Select a portal to get started</p>
         </div>
 
-        {/* ================= PORTAL GRID ================= */}
+        {/* My Profile Section */}
+        <div className="profile-section">
+          <div className="profile-card">
+            {/* Profile Header */}
+            <div className="profile-header">
+              <div className="profile-avatar">
+                {user.firstName?.charAt(0).toUpperCase()}
+                {user.lastName?.charAt(0).toUpperCase()}
+              </div>
 
+              <div className="profile-info">
+                <span className="profile-label">MY PROFILE</span>
+                <h2>
+                  {user.firstName} {user.lastName}
+                </h2>
+                <p>{user.username}</p>
+                <span className="profile-role">
+                  {user.role === "admin" ? "Administrator" : "Employee"}
+                </span>
+              </div>
+            </div>
+
+            <div className="profile-divider"></div>
+
+            {/* Profile Portals */}
+            <div className="profile-portal-heading">
+              <h3>My Workspace</h3>
+              <p>Your personal workspace and employee services</p>
+            </div>
+
+            <div className="profile-portal-grid">
+              {profilePortals.map((portal) => {
+                const isAdmin = user.role === "admin";
+
+                const hasAccess = portal.adminOnly
+                  ? isAdmin
+                  : portal.id === "jobAssigned"
+                    ? hasPortalAccess("jobAssigned")
+                    : false;
+
+                return (
+                  <div
+                    key={portal.id}
+                    className={`profile-portal-tile ${
+                      !hasAccess ? "profile-portal-disabled" : ""
+                    }`}
+                    onClick={() => hasAccess && navigate(portal.path)}
+                    title={
+                      hasAccess
+                        ? portal.label
+                        : "Only administrators can access this section"
+                    }
+                  >
+                    <div className="profile-portal-icon">{portal.icon}</div>
+
+                    <div className="profile-portal-details">
+                      <h4>{portal.label}</h4>
+                      <p>{portal.description}</p>
+                    </div>
+
+                    {!hasAccess ? (
+                      <span className="profile-lock">🔒</span>
+                    ) : (
+                      <span className="profile-arrow">→</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Portal Grid */}
         <div className="portal-grid">
-          {/* Main Portals */}
-
           {portals.map((portal) => {
             const hasAccess = hasPortalAccess(portal.id);
 
             return (
               <div
                 key={portal.id}
-                className={`portal-tile image-tile ${
-                  !hasAccess ? "disabled" : ""
-                }`}
+                className={`portal-tile ${!hasAccess ? "disabled" : ""}`}
                 onClick={() => hasAccess && navigate(portal.path)}
                 title={portal.label}
               >
-                <img
-                  src={portal.image}
-                  className="portal-tile-image"
-                  alt={portal.label}
-                />
+                {/* <div className="portal-image">{portal.image}</div> */}
 
+                <img src={portal.image} className="portal-tile-image" />
+
+                {/* <h3>{portal.label}</h3>
+                <p>{portal.description}</p> */}
                 {!hasAccess && (
                   <div className="no-access-badge">🔒 No Access</div>
                 )}
@@ -195,38 +313,15 @@ const Dashboard = () => {
             );
           })}
 
-          {/* ================= MY WORKSPACE ================= */}
-
-          <div
-            className="portal-tile image-tile workspace-tile"
-            onClick={() => navigate("/workspace")}
-            title="My Workspace"
-          >
-            <img
-              src={purchasing}
-              className="portal-tile-image"
-              alt="My Workspace"
-            />
-
-            <div className="workspace-overlay">
-              <h3>My Workspace</h3>
-              <p>Employee services and personal workspace</p>
-            </div>
-          </div>
-
-          {/* ================= ADMIN PORTAL ================= */}
-
+          {/* Admin Portal */}
           {user.role === "admin" && (
             <div
               className="portal-tile admin-tile"
               onClick={() => navigate("/users")}
             >
               <div className="portal-icon">⚙️</div>
-
               <h3>User Management</h3>
-
               <p>Manage users and permissions</p>
-
               <div className="admin-badge">Admin Only</div>
             </div>
           )}
